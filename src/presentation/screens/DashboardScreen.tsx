@@ -13,11 +13,18 @@ import { parcelRepository } from '../../infrastructure/storage/ParcelRepository'
 import { trackingEngineManager } from '../../infrastructure/engine';
 import { Theme } from '../theme/adaptiveTheme';
 import { ParcelCardBento } from '../components/dashboard/ParcelCardBento';
+import { ParcelCardIndustrial } from '../components/dashboard/ParcelCardIndustrial';
+import { ParcelCardRetroOS } from '../components/dashboard/ParcelCardRetroOS';
 import { BentoStatsWidget } from '../components/dashboard/BentoStatsWidget';
 import { SegmentedFilter, FilterTab } from '../components/dashboard/SegmentedFilter';
 import { RenameParcelModal } from '../components/common/RenameParcelModal';
 import { updateService, UpdateInfo } from '../../infrastructure/services/UpdateService';
-import { Plus, Search, X, Package, Cpu, Download } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
+import { Plus, Search, X, Package, Cpu, Download, LayoutGrid, Barcode, Monitor } from 'lucide-react-native';
+
+export type CardStyle = 'bento' | 'industrial' | 'retro';
+const CARD_STYLE_KEY = '@open_parcels:card_style';
 
 interface DashboardScreenProps {
   onSelectParcel: (parcel: Parcel) => void;
@@ -36,8 +43,25 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [cardStyle, setCardStyle] = useState<CardStyle>('bento');
   const [isLocalMode, setIsLocalMode] = useState(trackingEngineManager.isLocalFirst());
   const [renamingParcel, setRenamingParcel] = useState<Parcel | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem(CARD_STYLE_KEY).then((stored) => {
+      if (stored === 'bento' || stored === 'industrial' || stored === 'retro') {
+        setCardStyle(stored);
+      }
+    });
+  }, []);
+
+  const handleCardStyleChange = async (style: CardStyle) => {
+    setCardStyle(style);
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    await AsyncStorage.setItem(CARD_STYLE_KEY, style);
+  };
 
   const loadParcels = useCallback(async () => {
     const list = await parcelRepository.getAll();
@@ -203,6 +227,60 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       {/* Segmented Filter */}
       <SegmentedFilter activeTab={activeTab} onTabChange={setActiveTab} counts={counts} />
 
+      {/* Card Style Switcher */}
+      <View style={styles.cardStyleRow}>
+        <Text style={styles.cardStyleLabel}>DISEÑO:</Text>
+        <View style={styles.cardStyleTabs}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Estilo Bento"
+            onPress={() => handleCardStyleChange('bento')}
+            style={({ pressed }) => [
+              styles.cardStyleBtn,
+              cardStyle === 'bento' && styles.cardStyleBtnActive,
+              pressed && styles.pressed,
+            ]}
+          >
+            <LayoutGrid size={11} color={cardStyle === 'bento' ? '#000000' : '#475569'} strokeWidth={2.5} />
+            <Text style={[styles.cardStyleText, cardStyle === 'bento' && styles.cardStyleTextActive]}>
+              BENTO
+            </Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Estilo Industrial"
+            onPress={() => handleCardStyleChange('industrial')}
+            style={({ pressed }) => [
+              styles.cardStyleBtn,
+              cardStyle === 'industrial' && styles.cardStyleBtnActive,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Barcode size={11} color={cardStyle === 'industrial' ? '#000000' : '#475569'} strokeWidth={2.5} />
+            <Text style={[styles.cardStyleText, cardStyle === 'industrial' && styles.cardStyleTextActive]}>
+              INDUSTRIAL
+            </Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Estilo Retro OS"
+            onPress={() => handleCardStyleChange('retro')}
+            style={({ pressed }) => [
+              styles.cardStyleBtn,
+              cardStyle === 'retro' && styles.cardStyleBtnActive,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Monitor size={11} color={cardStyle === 'retro' ? '#000000' : '#475569'} strokeWidth={2.5} />
+            <Text style={[styles.cardStyleText, cardStyle === 'retro' && styles.cardStyleTextActive]}>
+              RETRO OS
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+
       {/* Parcels List */}
       <ScrollView
         style={styles.scroll}
@@ -249,14 +327,21 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             )}
           </View>
         ) : (
-          filteredParcels.map((parcel) => (
-            <ParcelCardBento
-              key={parcel.id}
-              parcel={parcel}
-              onPress={() => onSelectParcel(parcel)}
-              onRename={() => setRenamingParcel(parcel)}
-            />
-          ))
+          filteredParcels.map((parcel) => {
+            const cardProps = {
+              parcel,
+              onPress: () => onSelectParcel(parcel),
+              onRename: () => setRenamingParcel(parcel),
+            };
+
+            if (cardStyle === 'industrial') {
+              return <ParcelCardIndustrial key={parcel.id} {...cardProps} />;
+            }
+            if (cardStyle === 'retro') {
+              return <ParcelCardRetroOS key={parcel.id} {...cardProps} />;
+            }
+            return <ParcelCardBento key={parcel.id} {...cardProps} />;
+          })
         )}
       </ScrollView>
 
@@ -497,6 +582,49 @@ const styles = StyleSheet.create({
   },
   clearSearchPressed: {
     backgroundColor: Theme.colors.surfaceSubtle,
+  },
+  cardStyleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 6,
+  },
+  cardStyleLabel: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: 0.6,
+  },
+  cardStyleTabs: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  cardStyleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: Theme.radius.xs,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    ...Theme.shadows.sm,
+  },
+  cardStyleBtnActive: {
+    backgroundColor: '#FFE600',
+  },
+  cardStyleText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#475569',
+    letterSpacing: 0.4,
+  },
+  cardStyleTextActive: {
+    color: '#000000',
+    fontWeight: '900',
   },
   scroll: {
     flex: 1,
