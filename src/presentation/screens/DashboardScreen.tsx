@@ -16,22 +16,26 @@ import { ParcelCardBento } from '../components/dashboard/ParcelCardBento';
 import { BentoStatsWidget } from '../components/dashboard/BentoStatsWidget';
 import { SegmentedFilter, FilterTab } from '../components/dashboard/SegmentedFilter';
 import { RenameParcelModal } from '../components/common/RenameParcelModal';
-import { Plus, Search, X, Package, Cpu } from 'lucide-react-native';
+import { updateService, UpdateInfo } from '../../infrastructure/services/UpdateService';
+import { Plus, Search, X, Package, Cpu, Download } from 'lucide-react-native';
 
 interface DashboardScreenProps {
   onSelectParcel: (parcel: Parcel) => void;
   onOpenNewParcel: () => void;
+  onUpdateFound?: (info: UpdateInfo) => void;
 }
 
 export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   onSelectParcel,
   onOpenNewParcel,
+  onUpdateFound,
 }) => {
   const [parcels, setParcels] = useState<Parcel[]>([]);
   const [activeTab, setActiveTab] = useState<FilterTab>('active');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [isLocalMode, setIsLocalMode] = useState(trackingEngineManager.isLocalFirst());
   const [renamingParcel, setRenamingParcel] = useState<Parcel | null>(null);
 
@@ -65,6 +69,18 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     const next = !isLocalMode;
     trackingEngineManager.setLocalFirst(next);
     setIsLocalMode(next);
+  };
+
+  const handleManualUpdateCheck = async () => {
+    setIsCheckingUpdate(true);
+    try {
+      const info = await updateService.checkForUpdate(true);
+      if (info && onUpdateFound) {
+        onUpdateFound(info);
+      }
+    } finally {
+      setIsCheckingUpdate(false);
+    }
   };
 
   const handleUpdateAlias = async (id: string, newAlias: string) => {
@@ -115,17 +131,32 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             <Text style={styles.appTitle} numberOfLines={1}>
               OPEN PARCELS
             </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Cambiar motor de seguimiento"
-              onPress={toggleEngineMode}
-              style={({ pressed }) => [styles.engineToggle, pressed && styles.pressed]}
-            >
-              <Cpu size={12} color="#000000" strokeWidth={2.5} />
-              <Text style={styles.engineToggleText} numberOfLines={1}>
-                {isLocalMode ? 'CORE: GO EMBEBIDO' : 'CORE: REST :8080'}
-              </Text>
-            </Pressable>
+            <View style={styles.headerChipsRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Cambiar motor de seguimiento"
+                onPress={toggleEngineMode}
+                style={({ pressed }) => [styles.engineToggle, pressed && styles.pressed]}
+              >
+                <Cpu size={11} color="#000000" strokeWidth={2.5} />
+                <Text style={styles.engineToggleText} numberOfLines={1}>
+                  {isLocalMode ? 'GO EMBEBIDO' : 'REST :8080'}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Buscar actualizaciones de la app"
+                onPress={handleManualUpdateCheck}
+                disabled={isCheckingUpdate}
+                style={({ pressed }) => [styles.updateCheckBtn, pressed && styles.pressed]}
+              >
+                <Download size={11} color="#000000" strokeWidth={2.5} />
+                <Text style={styles.updateCheckText} numberOfLines={1}>
+                  {isCheckingUpdate ? 'BUSCANDO...' : 'ACTUALIZAR'}
+                </Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </View>
@@ -374,10 +405,15 @@ const styles = StyleSheet.create({
     color: '#000000',
     letterSpacing: -0.6,
   },
+  headerChipsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 3,
+  },
   engineToggle: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 3,
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -385,8 +421,26 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#000000',
     alignSelf: 'flex-start',
-    maxWidth: '100%',
     ...Theme.shadows.sm,
+  },
+  updateCheckBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Theme.colors.yellow,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Theme.radius.xs,
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    alignSelf: 'flex-start',
+    ...Theme.shadows.sm,
+  },
+  updateCheckText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#000000',
+    marginLeft: 3,
+    letterSpacing: 0.5,
   },
   engineToggleText: {
     flexShrink: 1,

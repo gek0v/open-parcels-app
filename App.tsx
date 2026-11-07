@@ -8,10 +8,13 @@ import { DashboardScreen } from './src/presentation/screens/DashboardScreen';
 import { NewParcelModal } from './src/presentation/screens/NewParcelModal';
 import { ParcelDetailScreen } from './src/presentation/screens/ParcelDetailScreen';
 import { AppLoadingSplash } from './src/presentation/components/common/AppLoadingSplash';
+import { UpdateAvailableModal } from './src/presentation/components/common/UpdateAvailableModal';
+import { updateService, UpdateInfo } from './src/infrastructure/services/UpdateService';
 import { Theme } from './src/presentation/theme/adaptiveTheme';
 
 export default function App() {
   const [isLoadingSplash, setIsLoadingSplash] = useState(true);
+  const [availableUpdate, setAvailableUpdate] = useState<UpdateInfo | null>(null);
   const [selectedParcel, setSelectedParcel] = useState<Parcel | null>(null);
   const [newParcelModalVisible, setNewParcelModalVisible] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -43,6 +46,16 @@ export default function App() {
     setRefreshTrigger((prev) => prev + 1);
   };
 
+  const handleSplashFinish = () => {
+    setIsLoadingSplash(false);
+    // Check for GitHub Release update in background
+    updateService.checkForUpdate().then((info) => {
+      if (info) {
+        setAvailableUpdate(info);
+      }
+    });
+  };
+
   return (
     <SafeAreaProvider style={styles.provider}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
@@ -68,6 +81,7 @@ export default function App() {
             key={refreshTrigger}
             onSelectParcel={setSelectedParcel}
             onOpenNewParcel={() => setNewParcelModalVisible(true)}
+            onUpdateFound={setAvailableUpdate}
           />
         )}
 
@@ -80,7 +94,16 @@ export default function App() {
 
         {/* Branded Neo-Brutalist Loading Splash Screen */}
         {isLoadingSplash && (
-          <AppLoadingSplash onFinish={() => setIsLoadingSplash(false)} minDurationMs={1100} />
+          <AppLoadingSplash onFinish={handleSplashFinish} minDurationMs={1100} />
+        )}
+
+        {/* Custom Neo-Brutalist GitHub Release Update Modal */}
+        {availableUpdate && (
+          <UpdateAvailableModal
+            visible={!!availableUpdate}
+            updateInfo={availableUpdate}
+            onClose={() => setAvailableUpdate(null)}
+          />
         )}
       </SafeAreaView>
     </SafeAreaProvider>
