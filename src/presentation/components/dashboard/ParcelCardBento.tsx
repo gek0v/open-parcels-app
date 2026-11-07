@@ -4,7 +4,7 @@ import { Parcel } from '../../../domain/models/parcel';
 import { Theme } from '../../theme/adaptiveTheme';
 import { StatusBadge } from '../common/StatusBadge';
 import { ProgressBar } from '../common/ProgressBar';
-import { ArrowRight, Clock, Edit2, MapPin } from 'lucide-react-native';
+import { ArrowRight, Clock, Edit2, MapPin, Barcode } from 'lucide-react-native';
 
 interface ParcelCardBentoProps {
   parcel: Parcel;
@@ -25,13 +25,22 @@ export const ParcelCardBento: React.FC<ParcelCardBentoProps> = ({
       onPress={onPress}
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
     >
-      {/* Top Barcode Strip Decorative Pattern */}
-      <View style={styles.barcodeHeader}>
-        <View style={styles.barcodeLines}>
-          <Text style={styles.barcodeText}>||| | ||||| || |||||| | |||| ||</Text>
+      {/* Card Header: Window Controls & Route Pill */}
+      <View style={styles.cardTopHeader}>
+        <View style={styles.leftMetaGroup}>
+          <View style={styles.dotsRow}>
+            <View style={[styles.dot, { backgroundColor: '#FF5C38' }]} />
+            <View style={[styles.dot, { backgroundColor: '#FFE600' }]} />
+            <View style={[styles.dot, { backgroundColor: '#10B981' }]} />
+          </View>
+          <View style={styles.serviceTag}>
+            <Barcode size={13} color="#000000" strokeWidth={2.2} />
+            <Text style={styles.serviceTagText}>EXPEDICIÓN</Text>
+          </View>
         </View>
+
         <View style={styles.routePill}>
-          <MapPin size={10} color="#000000" />
+          <MapPin size={10} color="#000000" strokeWidth={2.5} />
           <Text style={styles.routePillText}>
             {parcel.origin?.code || 'ORIG'} ➔ {parcel.destination?.code || 'DEST'}
           </Text>
@@ -118,7 +127,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 2, height: 2 },
     ...(Theme.isWeb ? ({ boxShadow: '2px 2px 0px #000000' } as any) : {}),
   },
-  barcodeHeader: {
+  cardTopHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -127,24 +136,47 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1.5,
     borderBottomColor: '#E2E8F0',
   },
-  barcodeLines: {
-    opacity: 0.6,
+  leftMetaGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  barcodeText: {
-    fontFamily: Theme.isIOS ? 'Courier' : 'monospace',
-    fontSize: 10,
+  dotsRow: {
+    flexDirection: 'row',
+    gap: 5,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    borderWidth: 1.2,
+    borderColor: '#000000',
+  },
+  serviceTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: Theme.radius.xs,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  serviceTagText: {
+    fontSize: 9,
     fontWeight: '900',
-    letterSpacing: 2,
-    color: '#000000',
+    color: '#334155',
+    letterSpacing: 0.5,
   },
   routePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 6,
+    backgroundColor: '#FFE600',
+    paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: Theme.radius.xs,
-    borderWidth: 1,
+    borderWidth: 1.2,
     borderColor: '#000000',
     gap: 4,
   },
