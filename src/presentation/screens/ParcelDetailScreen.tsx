@@ -128,7 +128,7 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         {/* Main Status & Progress Hero Card */}
         <View style={styles.heroCard}>
-          <View style={styles.heroTopRow}>
+          <View style={styles.statusHeaderGroup}>
             <StatusBadge status={parcel.status} size="medium" />
             <View style={styles.transitBadge}>
               <Clock size={12} color="#000000" style={styles.clockIcon} />
@@ -294,21 +294,22 @@ const styles = StyleSheet.create({
     elevation: 5,
     ...(Theme.isWeb ? ({ boxShadow: '4px 4px 0px #000000' } as any) : {}),
   },
-  heroTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
+  statusHeaderGroup: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: 14,
   },
   transitBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F1F5F9',
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: Theme.radius.xs,
     borderWidth: 1.5,
     borderColor: '#000000',
+    alignSelf: 'flex-start',
   },
   clockIcon: {
     marginRight: 4,
