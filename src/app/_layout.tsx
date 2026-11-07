@@ -7,11 +7,21 @@ import { I18nProvider } from '../infrastructure/i18n';
 import { AppLoadingSplash } from '../presentation/components/common/AppLoadingSplash';
 import { UpdateAvailableModal } from '../presentation/components/common/UpdateAvailableModal';
 import { updateService, UpdateInfo } from '../infrastructure/services/UpdateService';
+import { notificationService } from '../infrastructure/services/NotificationService';
+import { registerBackgroundSync } from '../infrastructure/services/BackgroundSyncService';
 import { Theme } from '../presentation/theme/adaptiveTheme';
 
 export default function RootLayout() {
   const [isLoadingSplash, setIsLoadingSplash] = useState(true);
   const [availableUpdate, setAvailableUpdate] = useState<UpdateInfo | null>(null);
+
+  React.useEffect(() => {
+    notificationService.requestPermissions().then((granted) => {
+      if (granted) {
+        registerBackgroundSync();
+      }
+    });
+  }, []);
 
   const handleSplashFinish = () => {
     setIsLoadingSplash(false);
