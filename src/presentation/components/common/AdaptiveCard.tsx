@@ -45,7 +45,6 @@ export const AdaptiveCard: React.FC<AdaptiveCardProps> = ({
   if (onPress) {
     return (
       <Pressable
-        accessibilityRole="button"
         onPress={onPress}
         style={({ pressed }) => [cardStyle, pressed && styles.pressed]}
       >

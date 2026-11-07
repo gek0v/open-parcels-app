@@ -107,7 +107,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             <Package size={22} color="#000000" strokeWidth={2.5} />
           </View>
           <View style={styles.brandCopy}>
-            <Text style={styles.appTitle}>OPEN PARCELS</Text>
+            <Text style={styles.appTitle} numberOfLines={1}>
+              OPEN PARCELS
+            </Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Cambiar motor de seguimiento"
@@ -115,7 +117,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               style={({ pressed }) => [styles.engineToggle, pressed && styles.pressed]}
             >
               <Cpu size={12} color="#000000" strokeWidth={2.5} />
-              <Text style={styles.engineToggleText}>
+              <Text style={styles.engineToggleText} numberOfLines={1}>
                 {isLocalMode ? 'CORE: GO EMBEBIDO' : 'CORE: REST :8080'}
               </Text>
             </Pressable>
@@ -138,6 +140,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         <View style={[styles.searchBox, isSearchFocused && styles.searchBoxFocused]}>
           <Search size={18} color="#000000" strokeWidth={2.5} style={styles.searchIcon} />
           <TextInput
+            accessibilityLabel="Buscar envíos"
             style={styles.searchInput}
             placeholder="Buscar por alias, código o transportista..."
             placeholderTextColor="#64748B"
@@ -292,9 +295,11 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#000000',
     alignSelf: 'flex-start',
+    maxWidth: '100%',
     ...Theme.shadows.sm,
   },
   engineToggleText: {
+    flexShrink: 1,
     fontSize: 9,
     fontWeight: '900',
     color: '#000000',

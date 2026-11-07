@@ -170,6 +170,7 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
               <Text style={styles.fieldLabel}>NÚMERO DE SEGUIMIENTO *</Text>
               <View style={styles.inputWithActions}>
                 <TextInput
+                  accessibilityLabel="Número de seguimiento"
                   style={styles.mainInput}
                   placeholder="Ej: LP00561234567890, 75616714..."
                   placeholderTextColor="#64748B"
@@ -214,6 +215,7 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
                   </Text>
                 </View>
                 <TextInput
+                  accessibilityLabel="Código postal de destino"
                   style={styles.standardInput}
                   placeholder="Ej: 47140, 28001..."
                   placeholderTextColor="#64748B"
@@ -229,6 +231,7 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>ALIAS PERSONALIZADO (OPCIONAL)</Text>
               <TextInput
+                accessibilityLabel="Alias personalizado"
                 style={styles.standardInput}
                 placeholder="Ej: Zapatillas Nike, Teclado AliExpress..."
                 placeholderTextColor="#64748B"

@@ -70,6 +70,7 @@ export const RenameParcelModal: React.FC<RenameParcelModalProps> = ({
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>ALIAS / NOMBRE DEL PAQUETE</Text>
             <TextInput
+              accessibilityLabel="Alias del paquete"
               style={styles.input}
               value={alias}
               onChangeText={setAlias}

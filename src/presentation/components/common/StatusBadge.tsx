@@ -32,7 +32,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   const meta = CANONICAL_STATUS_MAP[status] || CANONICAL_STATUS_MAP.pending;
   const color = Theme.colors.status[status] || Theme.colors.status.pending;
   const isSmall = size === 'small';
-  const label = isSmall ? SHORT_LABELS[status] ?? meta.labelEs : meta.labelEs;
+  const label = SHORT_LABELS[status] ?? meta.labelEs;
 
   return (
     <View

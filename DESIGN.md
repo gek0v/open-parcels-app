@@ -88,4 +88,4 @@ export const Theme = {
 3. **Contraste tipográfico:** titulares `900`, etiquetas/captions `800`, cuerpo `600–700`. Los metadatos usan monoespaciada.
 4. **Stickers armonizados:** los badges de estado y chips comparten radio, borde negro y sombra `sm`; el color comunica el estado, no la forma.
 5. **Orden en móvil y web:** el contenido mantiene un ancho máximo legible en web (columna centrada) y los márgenes laterales se mantienen en `20px`.
-```
+
