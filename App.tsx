@@ -56,6 +56,10 @@ export default function App() {
             onToggleArchive={handleToggleArchive}
             onDelete={handleDeleteParcel}
             onUpdateAlias={handleUpdateAlias}
+            onParcelUpdated={(updated) => {
+              setSelectedParcel({ ...updated });
+              setRefreshTrigger((prev) => prev + 1);
+            }}
           />
         ) : (
           <DashboardScreen

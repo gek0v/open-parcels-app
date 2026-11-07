@@ -8,6 +8,7 @@ import {
   Alert,
   Linking,
   Share,
+  ActivityIndicator,
 } from 'react-native';
 import { Parcel } from '../../domain/models/parcel';
 import { Theme } from '../theme/adaptiveTheme';
@@ -16,6 +17,8 @@ import { ProgressBar } from '../components/common/ProgressBar';
 import { JourneyFlow } from '../components/detail/JourneyFlow';
 import { EventTimeline } from '../components/detail/EventTimeline';
 import { RenameParcelModal } from '../components/common/RenameParcelModal';
+import { trackingEngineManager } from '../../infrastructure/engine';
+import { parcelRepository } from '../../infrastructure/storage/ParcelRepository';
 import {
   ArrowLeft,
   ExternalLink,
@@ -25,6 +28,7 @@ import {
   Clock,
   Calendar,
   Edit2,
+  RefreshCw,
 } from 'lucide-react-native';
 
 interface ParcelDetailScreenProps {
@@ -33,6 +37,7 @@ interface ParcelDetailScreenProps {
   onToggleArchive: (id: string) => void;
   onDelete: (id: string) => void;
   onUpdateAlias: (id: string, newAlias: string) => void;
+  onParcelUpdated?: (updated: Parcel) => void;
 }
 
 export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
@@ -41,8 +46,41 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
   onToggleArchive,
   onDelete,
   onUpdateAlias,
+  onParcelUpdated,
 }) => {
   const [renameModalVisible, setRenameModalVisible] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleFetchUpdate = async () => {
+    setIsRefreshing(true);
+    try {
+      const updated = await trackingEngineManager.current.track({
+        trackingNumber: parcel.trackingNumber,
+        carrierHint: parcel.carrier.slug,
+        postalCode: parcel.postalCode,
+        lang: 'es',
+      });
+
+      // Preserve local metadata
+      updated.id = parcel.id;
+      updated.customAlias = parcel.customAlias;
+      updated.isArchived = parcel.isArchived;
+      updated.createdAt = parcel.createdAt;
+      updated.updatedAt = new Date().toISOString();
+
+      await parcelRepository.save(updated);
+      if (onParcelUpdated) {
+        onParcelUpdated(updated);
+      }
+    } catch (err: any) {
+      Alert.alert(
+        'Error al actualizar',
+        err.message || 'No se pudo consultar el estado actual del transportista.'
+      );
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handleOpenCarrierWeb = () => {
     const url = parcel.carrier.website || 'https://openparcels.com';
@@ -106,6 +144,18 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
         </View>
 
         <View style={styles.navActions}>
+          <Pressable
+            onPress={handleFetchUpdate}
+            disabled={isRefreshing}
+            style={[styles.navButton, styles.refreshNavButton]}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            {isRefreshing ? (
+              <ActivityIndicator size="small" color="#000000" />
+            ) : (
+              <RefreshCw size={16} color="#000000" strokeWidth={2.5} />
+            )}
+          </Pressable>
           <Pressable
             onPress={() => setRenameModalVisible(true)}
             style={styles.navButton}
@@ -187,6 +237,25 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
               Última actualización: {formatUpdatedAt(parcel.updatedAt)}
             </Text>
           </View>
+
+          {/* Explicit Fetch / Refresh Button in Hero Card */}
+          <Pressable
+            onPress={handleFetchUpdate}
+            disabled={isRefreshing}
+            style={[
+              styles.refreshHeroButton,
+              isRefreshing && styles.refreshHeroButtonDisabled,
+            ]}
+          >
+            {isRefreshing ? (
+              <ActivityIndicator size="small" color="#000000" style={styles.refreshIcon} />
+            ) : (
+              <RefreshCw size={15} color="#000000" strokeWidth={2.5} style={styles.refreshIcon} />
+            )}
+            <Text style={styles.refreshHeroText}>
+              {isRefreshing ? 'CONSULTANDO AL TRANSPORTISTA...' : 'ACTUALIZAR ESTADO DEL PEDIDO'}
+            </Text>
+          </Pressable>
         </View>
 
         {/* Multi-Carrier Journey Flow Component */}
@@ -252,6 +321,9 @@ const styles = StyleSheet.create({
   },
   navButtonActive: {
     backgroundColor: '#FFE600',
+  },
+  refreshNavButton: {
+    backgroundColor: '#38BDF8', // Electric Sky Blue
   },
   navTitleBox: {
     flex: 1,
@@ -428,6 +500,36 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#64748B',
     marginLeft: 4,
+  },
+  refreshHeroButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFE600', // Cyber Yellow
+    marginTop: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: Theme.radius.sm,
+    borderWidth: 2,
+    borderColor: '#000000',
+    shadowColor: '#000000',
+    shadowOffset: { width: 2.5, height: 2.5 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 3,
+    ...(Theme.isWeb ? ({ boxShadow: '2.5px 2.5px 0px #000000' } as any) : {}),
+  },
+  refreshHeroButtonDisabled: {
+    opacity: 0.7,
+  },
+  refreshIcon: {
+    marginRight: 8,
+  },
+  refreshHeroText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: 0.5,
   },
   carrierLinkButton: {
     flexDirection: 'row',
