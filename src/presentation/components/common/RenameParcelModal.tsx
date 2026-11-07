@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { Theme } from '../../theme/adaptiveTheme';
-import { Edit2, X, Check } from 'lucide-react-native';
+import { X, Check } from 'lucide-react-native';
 
 interface RenameParcelModalProps {
   visible: boolean;
@@ -29,12 +29,6 @@ export const RenameParcelModal: React.FC<RenameParcelModalProps> = ({
 }) => {
   const [alias, setAlias] = useState(initialAlias);
 
-  useEffect(() => {
-    if (visible) {
-      setAlias(initialAlias);
-    }
-  }, [visible, initialAlias]);
-
   const handleSave = () => {
     onSave(alias);
     onClose();
@@ -48,20 +42,27 @@ export const RenameParcelModal: React.FC<RenameParcelModalProps> = ({
       >
         <Pressable style={styles.dismissOverlay} onPress={onClose} />
 
-        <View style={styles.dialogCard}>
+        <View style={styles.dialogCard} accessibilityViewIsModal>
           {/* Retro window header */}
           <View style={styles.header}>
             <View style={styles.dotsRow}>
-              <View style={[styles.dot, { backgroundColor: '#FF5C38' }]} />
-              <View style={[styles.dot, { backgroundColor: '#FFE600' }]} />
-              <View style={[styles.dot, { backgroundColor: '#10B981' }]} />
+              <View style={[styles.dot, { backgroundColor: Theme.colors.coral }]} />
+              <View style={[styles.dot, { backgroundColor: Theme.colors.yellow }]} />
+              <View style={[styles.dot, { backgroundColor: Theme.colors.mint }]} />
             </View>
             <View style={styles.titleBox}>
               <Text style={styles.title}>RENOMBRAR ENVÍO</Text>
-              <Text style={styles.subtitle}>{trackingNumber}</Text>
+              <Text style={styles.subtitle} numberOfLines={1}>
+                {trackingNumber}
+              </Text>
             </View>
-            <Pressable onPress={onClose} style={styles.closeBtn}>
-              <X size={18} color="#000000" strokeWidth={2.5} />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Cerrar"
+              onPress={onClose}
+              style={({ pressed }) => [styles.closeBtn, pressed && styles.smallPressed]}
+            >
+              <X size={18} color="#000000" strokeWidth={3} />
             </Pressable>
           </View>
 
@@ -83,11 +84,21 @@ export const RenameParcelModal: React.FC<RenameParcelModalProps> = ({
 
           {/* Action buttons */}
           <View style={styles.buttonRow}>
-            <Pressable onPress={onClose} style={styles.cancelButton}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Cancelar"
+              onPress={onClose}
+              style={({ pressed }) => [styles.cancelButton, pressed && styles.pressed]}
+            >
               <Text style={styles.cancelText}>CANCELAR</Text>
             </Pressable>
 
-            <Pressable onPress={handleSave} style={styles.saveButton}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Guardar alias"
+              onPress={handleSave}
+              style={({ pressed }) => [styles.saveButton, pressed && styles.pressed]}
+            >
               <Check size={16} color="#FFFFFF" strokeWidth={3} style={styles.checkIcon} />
               <Text style={styles.saveText}>GUARDAR</Text>
             </Pressable>
@@ -119,14 +130,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: Theme.radius.md,
     padding: 20,
-    borderWidth: 2.5,
+    borderWidth: Theme.borders.width,
     borderColor: '#000000',
-    shadowColor: '#000000',
-    shadowOffset: { width: 5, height: 5 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 7,
-    ...(Theme.isWeb ? ({ boxShadow: '5px 5px 0px #000000' } as any) : {}),
+    ...Theme.shadows.lg,
   },
   header: {
     flexDirection: 'row',
@@ -150,6 +156,7 @@ const styles = StyleSheet.create({
   },
   titleBox: {
     flex: 1,
+    minWidth: 0,
   },
   title: {
     fontSize: 15,
@@ -161,28 +168,32 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: Theme.isIOS ? 'Courier' : 'monospace',
     fontWeight: '700',
-    color: '#64748B',
+    color: Theme.colors.textTertiary,
     marginTop: 2,
   },
   closeBtn: {
-    padding: 4,
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: Theme.radius.xs,
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: '#000000',
-    backgroundColor: '#F1F5F9',
+    backgroundColor: Theme.colors.surfaceSubtle,
+    ...Theme.shadows.sm,
   },
   inputContainer: {
     marginBottom: 20,
   },
   inputLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '900',
     color: '#000000',
-    marginBottom: 6,
-    letterSpacing: 0.5,
+    marginBottom: 7,
+    letterSpacing: 0.6,
   },
   input: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Theme.colors.surfaceSubtle,
     borderRadius: Theme.radius.sm,
     borderWidth: 2,
     borderColor: '#000000',
@@ -191,6 +202,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#000000',
+    ...Theme.shadows.sm,
   },
   buttonRow: {
     flexDirection: 'row',
@@ -205,6 +217,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#000000',
     backgroundColor: '#FFFFFF',
+    ...Theme.shadows.sm,
   },
   cancelText: {
     fontSize: 12,
@@ -215,18 +228,13 @@ const styles = StyleSheet.create({
   saveButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2563EB',
+    backgroundColor: Theme.colors.blue,
     paddingVertical: 10,
     paddingHorizontal: 18,
     borderRadius: Theme.radius.sm,
     borderWidth: 2,
     borderColor: '#000000',
-    shadowColor: '#000000',
-    shadowOffset: { width: 2.5, height: 2.5 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 3,
-    ...(Theme.isWeb ? ({ boxShadow: '2.5px 2.5px 0px #000000' } as any) : {}),
+    ...Theme.shadows.sm,
   },
   checkIcon: {
     marginRight: 6,
@@ -236,5 +244,11 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#FFFFFF',
     letterSpacing: 0.5,
+  },
+  pressed: {
+    ...Theme.pressed,
+  },
+  smallPressed: {
+    ...Theme.pressed,
   },
 });

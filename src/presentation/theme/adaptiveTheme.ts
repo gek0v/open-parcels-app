@@ -5,6 +5,51 @@ export const isIOS = Platform.OS === 'ios';
 export const isAndroid = Platform.OS === 'android';
 export const isWeb = Platform.OS === 'web';
 
+/**
+ * Neo-brutalist hard drop shadow, 45º, zero blur.
+ *
+ * - Web:      CSS `boxShadow: 'Npx Npx 0px #000000'`.
+ * - Android:  `boxShadow` (React Native 0.76+ New Architecture). Legacy
+ *             `shadow*` props are ignored on Android and `elevation` always
+ *             produces a diffuse halo, so it is intentionally never used.
+ * - iOS:      legacy `shadowColor/shadowOffset/shadowOpacity/shadowRadius:0`
+ *             which paints a perfectly crisp, non-blurred silhouette.
+ */
+const hardShadow = (offset: number) => {
+  const webShadow = { boxShadow: `${offset}px ${offset}px 0px #000000` };
+
+  if (isIOS) {
+    return {
+      shadowColor: '#000000',
+      shadowOffset: { width: offset, height: offset },
+      shadowOpacity: 1,
+      shadowRadius: 0,
+    };
+  }
+
+  return webShadow;
+};
+
+/** Zeroed shadow used while a control is physically "pressed into" the canvas. */
+const noShadow = () =>
+  isIOS
+    ? {
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0,
+        shadowRadius: 0,
+      }
+    : { boxShadow: '0px 0px 0px #000000' };
+
+/**
+ * Mechanical press micro-interaction:
+ * the element travels +2px/+2px and its shadow collapses to 0.
+ */
+const pressedState = {
+  transform: [{ translateX: 2 }, { translateY: 2 }],
+  ...noShadow(),
+};
+
 export const Theme = {
   isIOS,
   isAndroid,
@@ -30,7 +75,7 @@ export const Theme = {
     // High Contrast Text & Hierarchy
     textPrimary: '#000000',
     textSecondary: '#1E293B',
-    textTertiary: '#64748B',
+    textTertiary: '#475569',
     textInverse: '#FFFFFF',
 
     // Primary Brand Accent (Punchy Electric Blue)
@@ -81,74 +126,71 @@ export const Theme = {
     full: 9999,
   },
 
-  // Hard Zero-Blur Drop Shadows (4px 4px 0px #000)
+  /**
+   * Canonical hard-shadow scale. Never add blur: blur is the enemy of the
+   * neo-brutalist look.
+   *
+   * sm  → 2.5px (badges, chips, small icon buttons)
+   * md  → 4px   (cards, inputs, full-width actions)
+   * lg  → 5px   (FABs, dialogs, floating modals)
+   */
   shadows: {
-    card: {
-      borderWidth: 2.5,
-      borderColor: '#000000',
-      shadowColor: '#000000',
-      shadowOffset: { width: 4, height: 4 },
-      shadowOpacity: 1,
-      shadowRadius: 0,
-      elevation: 5,
-      ...(isWeb ? ({ boxShadow: '4px 4px 0px #000000' } as any) : {}),
-    },
-    cardSm: {
-      borderWidth: 2,
-      borderColor: '#000000',
-      shadowColor: '#000000',
-      shadowOffset: { width: 2.5, height: 2.5 },
-      shadowOpacity: 1,
-      shadowRadius: 0,
-      elevation: 3,
-      ...(isWeb ? ({ boxShadow: '2.5px 2.5px 0px #000000' } as any) : {}),
-    },
-    elevated: {
-      borderWidth: 3,
-      borderColor: '#000000',
-      shadowColor: '#000000',
-      shadowOffset: { width: 5, height: 5 },
-      shadowOpacity: 1,
-      shadowRadius: 0,
-      elevation: 7,
-      ...(isWeb ? ({ boxShadow: '5px 5px 0px #000000' } as any) : {}),
-    },
+    none: noShadow(),
+    sm: hardShadow(2.5),
+    md: hardShadow(4),
+    lg: hardShadow(5),
+    // Backwards-compatible aliases
+    card: hardShadow(4),
+    cardSm: hardShadow(2.5),
+    elevated: hardShadow(5),
+  },
+
+  /** Apply when `Pressable` reports `pressed`. */
+  pressed: pressedState,
+
+  spacing: {
+    xs: 4,
+    sm: 8,
+    md: 12,
+    lg: 16,
+    xl: 20,
+    xxl: 32,
   },
 
   typography: {
     fontFamily: isIOS ? 'System' : 'sans-serif',
     titleLarge: {
-      fontSize: 26,
+      fontSize: 27,
       fontWeight: '900' as const,
-      letterSpacing: -0.5,
+      letterSpacing: -0.6,
       lineHeight: 32,
       color: '#000000',
     },
     titleMedium: {
-      fontSize: 18,
-      fontWeight: '800' as const,
-      letterSpacing: -0.2,
+      fontSize: 19,
+      fontWeight: '900' as const,
+      letterSpacing: -0.3,
       lineHeight: 24,
       color: '#000000',
     },
     bodyLarge: {
       fontSize: 15,
-      fontWeight: '600' as const,
+      fontWeight: '700' as const,
       lineHeight: 22,
     },
     bodyMedium: {
       fontSize: 14,
-      fontWeight: '500' as const,
+      fontWeight: '600' as const,
       lineHeight: 20,
     },
     bodySmall: {
       fontSize: 12,
-      fontWeight: '600' as const,
+      fontWeight: '700' as const,
       lineHeight: 16,
     },
     caption: {
       fontSize: 11,
-      fontWeight: '700' as const,
+      fontWeight: '800' as const,
       letterSpacing: 0.5,
       textTransform: 'uppercase' as const,
     },

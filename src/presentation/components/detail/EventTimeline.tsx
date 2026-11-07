@@ -19,34 +19,34 @@ interface EventTimelineProps {
 export const EventTimeline: React.FC<EventTimelineProps> = ({ events }) => {
   const sorted = [...events].reverse();
 
-  const getStageIcon = (stage: EventStage, isLatest: boolean) => {
+  const getStageIcon = (stage: EventStage) => {
     const size = 15;
     const color = '#000000';
 
     switch (stage) {
       case 'created':
-        return <FileText size={size} color={color} />;
+        return <FileText size={size} color={color} strokeWidth={2.5} />;
       case 'pickup':
-        return <Package size={size} color={color} />;
+        return <Package size={size} color={color} strokeWidth={2.5} />;
       case 'customs':
-        return <ShieldCheck size={size} color={color} />;
+        return <ShieldCheck size={size} color={color} strokeWidth={2.5} />;
       case 'transit':
-        return <Plane size={size} color={color} />;
+        return <Plane size={size} color={color} strokeWidth={2.5} />;
       case 'delivery':
-        return <Truck size={size} color={color} />;
+        return <Truck size={size} color={color} strokeWidth={2.5} />;
       case 'completed':
-        return <CheckCircle size={size} color={color} />;
+        return <CheckCircle size={size} color={color} strokeWidth={2.5} />;
       case 'exception':
-        return <AlertTriangle size={size} color={color} />;
+        return <AlertTriangle size={size} color={color} strokeWidth={2.5} />;
       default:
-        return <Package size={size} color={color} />;
+        return <Package size={size} color={color} strokeWidth={2.5} />;
     }
   };
 
   const getStageBg = (stage: EventStage, isLatest: boolean) => {
-    if (stage === 'completed') return '#34D399';
-    if (stage === 'exception') return '#FF5C38';
-    if (isLatest) return '#FFE600';
+    if (stage === 'completed') return Theme.colors.status.delivered;
+    if (stage === 'exception') return Theme.colors.status.failed_attempt;
+    if (isLatest) return Theme.colors.yellow;
     return '#FFFFFF';
   };
 
@@ -68,9 +68,9 @@ export const EventTimeline: React.FC<EventTimelineProps> = ({ events }) => {
       {/* Retro window header */}
       <View style={styles.cardHeader}>
         <View style={styles.dotsRow}>
-          <View style={[styles.dot, { backgroundColor: '#FF5C38' }]} />
-          <View style={[styles.dot, { backgroundColor: '#FFE600' }]} />
-          <View style={[styles.dot, { backgroundColor: '#10B981' }]} />
+          <View style={[styles.dot, { backgroundColor: Theme.colors.coral }]} />
+          <View style={[styles.dot, { backgroundColor: Theme.colors.yellow }]} />
+          <View style={[styles.dot, { backgroundColor: Theme.colors.mint }]} />
         </View>
         <Text style={styles.cardTitle}>HISTORIAL DE EVENTOS</Text>
       </View>
@@ -91,7 +91,7 @@ export const EventTimeline: React.FC<EventTimelineProps> = ({ events }) => {
                     isLatest && styles.iconBoxActive,
                   ]}
                 >
-                  {getStageIcon(ev.stage, isLatest)}
+                  {getStageIcon(ev.stage)}
                 </View>
                 {!isLast && <View style={styles.verticalLine} />}
               </View>
@@ -99,11 +99,23 @@ export const EventTimeline: React.FC<EventTimelineProps> = ({ events }) => {
               {/* Right Column: Event Content */}
               <View style={[styles.contentCol, isLast && styles.contentColLast]}>
                 <View style={styles.metaRow}>
-                  <Text style={[styles.dateText, isLatest && styles.dateTextActive]}>
-                    {formatDate(ev.date)}
-                  </Text>
+                  <View style={styles.metaLeft}>
+                    <Text
+                      style={[styles.dateText, isLatest && styles.dateTextActive]}
+                      numberOfLines={1}
+                    >
+                      {formatDate(ev.date)}
+                    </Text>
+                    {isLatest && (
+                      <View style={styles.latestTag}>
+                        <Text style={styles.latestTagText}>ÚLTIMO</Text>
+                      </View>
+                    )}
+                  </View>
                   <View style={styles.carrierTag}>
-                    <Text style={styles.carrierTagText}>{ev.carrierName}</Text>
+                    <Text style={styles.carrierTagText} numberOfLines={1}>
+                      {ev.carrierName}
+                    </Text>
                   </View>
                 </View>
 
@@ -113,7 +125,9 @@ export const EventTimeline: React.FC<EventTimelineProps> = ({ events }) => {
 
                 {ev.location && (
                   <View style={styles.locationBox}>
-                    <Text style={styles.locationText}>{ev.location}</Text>
+                    <Text style={styles.locationText} numberOfLines={1}>
+                      {ev.location}
+                    </Text>
                   </View>
                 )}
               </View>
@@ -131,15 +145,10 @@ const styles = StyleSheet.create({
     borderRadius: Theme.radius.md,
     padding: 16,
     marginHorizontal: 20,
-    marginBottom: 32,
-    borderWidth: 2.5,
+    marginBottom: 24,
+    borderWidth: Theme.borders.width,
     borderColor: '#000000',
-    shadowColor: '#000000',
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 5,
-    ...(Theme.isWeb ? ({ boxShadow: '4px 4px 0px #000000' } as any) : {}),
+    ...Theme.shadows.md,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -168,7 +177,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   timelineContainer: {
-    paddingLeft: 4,
+    paddingLeft: 2,
   },
   timelineRow: {
     flexDirection: 'row',
@@ -186,16 +195,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: '#000000',
-    shadowColor: '#000000',
-    shadowOffset: { width: 1.5, height: 1.5 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 2,
-    ...(Theme.isWeb ? ({ boxShadow: '1.5px 1.5px 0px #000000' } as any) : {}),
+    ...Theme.shadows.sm,
   },
   iconBoxActive: {
-    shadowOffset: { width: 2.5, height: 2.5 },
-    ...(Theme.isWeb ? ({ boxShadow: '2.5px 2.5px 0px #000000' } as any) : {}),
+    borderWidth: 2.5,
   },
   verticalLine: {
     flex: 1,
@@ -209,41 +212,65 @@ const styles = StyleSheet.create({
     paddingBottom: 22,
   },
   contentColLast: {
-    paddingBottom: 6,
+    paddingBottom: 4,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: 5,
+    gap: 8,
+  },
+  metaLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 0,
   },
   dateText: {
-    fontSize: 12,
-    color: '#64748B',
+    fontSize: 11,
+    color: Theme.colors.textTertiary,
     fontWeight: '700',
+    letterSpacing: 0.2,
   },
   dateTextActive: {
     color: '#000000',
     fontWeight: '900',
   },
+  latestTag: {
+    marginLeft: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    backgroundColor: '#000000',
+    borderRadius: Theme.radius.xs,
+  },
+  latestTagText: {
+    fontSize: 8,
+    fontWeight: '900',
+    color: Theme.colors.yellow,
+    letterSpacing: 0.7,
+  },
   carrierTag: {
-    backgroundColor: '#FFE600',
+    maxWidth: '42%',
+    backgroundColor: Theme.colors.yellow,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: Theme.radius.xs,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#000000',
+    ...Theme.shadows.sm,
   },
   carrierTagText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '900',
     color: '#000000',
     textTransform: 'uppercase',
+    letterSpacing: 0.2,
   },
   description: {
     fontSize: 13,
-    color: '#334155',
-    fontWeight: '600',
+    color: Theme.colors.textSecondary,
+    fontWeight: '700',
     lineHeight: 18,
   },
   descriptionActive: {
@@ -252,17 +279,18 @@ const styles = StyleSheet.create({
   },
   locationBox: {
     alignSelf: 'flex-start',
-    backgroundColor: '#F1F5F9',
+    maxWidth: '100%',
+    backgroundColor: Theme.colors.surfaceSubtle,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: Theme.radius.xs,
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    marginTop: 4,
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    marginTop: 5,
   },
   locationText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#475569',
+    fontSize: 10,
+    fontWeight: '800',
+    color: Theme.colors.textSecondary,
   },
 });

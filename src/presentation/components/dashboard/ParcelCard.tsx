@@ -28,7 +28,7 @@ export const ParcelCard: React.FC<ParcelCardProps> = ({ parcel, onPress, onRenam
 
           {isChained && parcel.lastMileCarrier && (
             <View style={styles.chainedRow}>
-              <ArrowRight size={13} color="#000" style={styles.chainArrow} />
+              <ArrowRight size={12} color="#000000" strokeWidth={3} style={styles.chainArrow} />
               <Text style={styles.lastMileText} numberOfLines={1}>
                 {parcel.lastMileCarrier.name}
               </Text>
@@ -36,7 +36,7 @@ export const ParcelCard: React.FC<ParcelCardProps> = ({ parcel, onPress, onRenam
           )}
         </View>
 
-        <StatusBadge status={parcel.status} size="small" />
+        <StatusBadge status={parcel.status} size="small" style={styles.statusBadge} />
       </View>
 
       {/* Main Info: Custom Alias & Tracking Number */}
@@ -47,20 +47,27 @@ export const ParcelCard: React.FC<ParcelCardProps> = ({ parcel, onPress, onRenam
           </Text>
           {onRename && (
             <Pressable
+              accessibilityLabel="Renombrar paquete"
+              accessibilityRole="button"
               onPress={(e) => {
                 e.stopPropagation();
                 onRename();
               }}
-              style={styles.cardRenameButton}
+              style={({ pressed }) => [
+                styles.cardRenameButton,
+                pressed && styles.iconButtonPressed,
+              ]}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Edit2 size={13} color="#000000" />
+              <Edit2 size={13} color="#000000" strokeWidth={2.5} />
             </Pressable>
           )}
         </View>
 
         <View style={styles.trackingBox}>
-          <Text style={styles.trackingNumber}>{parcel.trackingNumber}</Text>
+          <Text style={styles.trackingNumber} numberOfLines={1}>
+            {parcel.trackingNumber}
+          </Text>
         </View>
       </View>
 
@@ -72,13 +79,17 @@ export const ParcelCard: React.FC<ParcelCardProps> = ({ parcel, onPress, onRenam
       {/* Footer: Latest Event and Days in Transit */}
       <View style={styles.footerRow}>
         <View style={styles.latestEventContainer}>
+          <View style={styles.eventTick} />
           <Text style={styles.latestEventText} numberOfLines={1}>
             {latestEvent ? latestEvent.description : parcel.statusText}
           </Text>
         </View>
 
-        <View style={styles.daysBadge}>
-          <Clock size={12} color="#000000" style={styles.clockIcon} />
+        <View
+          style={styles.daysBadge}
+          accessibilityLabel={`${parcel.daysInTransit} días en tránsito`}
+        >
+          <Clock size={12} color="#000000" strokeWidth={2.5} style={styles.clockIcon} />
           <Text style={styles.daysText}>{parcel.daysInTransit}d</Text>
         </View>
       </View>
@@ -91,42 +102,50 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   carrierTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFE600',
+    backgroundColor: Theme.colors.yellow,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: Theme.radius.xs,
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: '#000000',
     flexShrink: 1,
     marginRight: 8,
+    ...Theme.shadows.sm,
   },
   carrierName: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '900',
     color: '#000000',
     textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
   chainedRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginLeft: 4,
+    flexShrink: 1,
   },
   chainArrow: {
     marginHorizontal: 3,
   },
   lastMileText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
     color: '#000000',
     textTransform: 'uppercase',
+    letterSpacing: 0.2,
+    flexShrink: 1,
+  },
+  statusBadge: {
+    flexShrink: 0,
   },
   titleSection: {
-    marginBottom: 8,
+    marginBottom: 4,
   },
   titleRow: {
     flexDirection: 'row',
@@ -134,18 +153,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   cardRenameButton: {
-    padding: 5,
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: Theme.radius.xs,
-    backgroundColor: '#FFE600',
-    borderWidth: 1.5,
+    backgroundColor: Theme.colors.yellow,
+    borderWidth: 2,
     borderColor: '#000000',
     marginLeft: 8,
-    shadowColor: '#000000',
-    shadowOffset: { width: 1.5, height: 1.5 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 2,
-    ...(Theme.isWeb ? ({ boxShadow: '1.5px 1.5px 0px #000000' } as any) : {}),
+    ...Theme.shadows.sm,
+  },
+  iconButtonPressed: {
+    ...Theme.pressed,
   },
   alias: {
     flex: 1,
@@ -156,38 +176,50 @@ const styles = StyleSheet.create({
   },
   trackingBox: {
     alignSelf: 'flex-start',
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    maxWidth: '100%',
+    backgroundColor: Theme.colors.surfaceSubtle,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
     borderRadius: Theme.radius.xs,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#000000',
-    marginTop: 4,
+    marginTop: 6,
   },
   trackingNumber: {
     fontSize: 12,
     fontFamily: Theme.isIOS ? 'Courier' : 'monospace',
     fontWeight: '700',
     color: '#000000',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
   progressContainer: {
-    marginVertical: 10,
+    marginVertical: 12,
   },
   footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 4,
+    marginTop: 2,
   },
   latestEventContainer: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     marginRight: 10,
+    minHeight: 24,
+  },
+  eventTick: {
+    width: 3,
+    height: 16,
+    backgroundColor: '#000000',
+    marginRight: 7,
+    borderRadius: 1,
   },
   latestEventText: {
+    flex: 1,
     fontSize: 12,
-    fontWeight: '600',
-    color: '#334155',
+    fontWeight: '700',
+    color: Theme.colors.textSecondary,
   },
   daysBadge: {
     flexDirection: 'row',
@@ -196,14 +228,9 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: Theme.radius.xs,
     backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: '#000000',
-    shadowColor: '#000000',
-    shadowOffset: { width: 1.5, height: 1.5 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 1,
-    ...(Theme.isWeb ? ({ boxShadow: '1.5px 1.5px 0px #000000' } as any) : {}),
+    ...Theme.shadows.sm,
   },
   clockIcon: {
     marginRight: 4,

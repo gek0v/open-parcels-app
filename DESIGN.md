@@ -35,46 +35,57 @@ Inspirado en las referencias visuales de diseño brutalista y neo-brutalismo apl
 ## 2. Tokens del Sistema
 
 ```typescript
-export const NeoTheme = {
+export const Theme = {
   colors: {
-    canvas: '#D8FF38',        // Fondo Acid Lime
-    canvasSubtle: '#EDFF85',
+    background: '#D9FF38',       // Acid Lime canvas
+    backgroundSubtle: '#ECFF82',
+    surface: '#FFFFFF',
+    surfaceSubtle: '#F4F4EB',
+    surfaceElevated: '#FFE600',
     black: '#000000',
-    white: '#FFFFFF',
     yellow: '#FFE600',
-    coral: '#FF5733',
+    coral: '#FF5C38',
     blue: '#2563EB',
     purple: '#7C3AED',
-    mint: '#059669',
+    mint: '#10B981',
     pink: '#F472B6',
-    grayBg: '#F4F4F0',
   },
-  borders: {
-    thick: 2.5,
-    normal: 2,
-    color: '#000000',
-  },
+  borders: { width: 2.5, thin: 2, color: '#000000' },
+  radius: { xs: 4, sm: 8, md: 14, lg: 20, full: 9999 },
   shadows: {
-    hard: {
-      shadowColor: '#000000',
-      shadowOffset: { width: 4, height: 4 },
-      shadowOpacity: 1,
-      shadowRadius: 0,
-      elevation: 6,
-    },
-    hardSm: {
-      shadowColor: '#000000',
-      shadowOffset: { width: 2.5, height: 2.5 },
-      shadowOpacity: 1,
-      shadowRadius: 0,
-      elevation: 3,
-    },
+    sm: hardShadow(2.5), // 2.5px 2.5px 0px #000000
+    md: hardShadow(4),   // 4px   4px   0px #000000
+    lg: hardShadow(5),   // 5px   5px   0px #000000
+    none: noShadow(),    // estado presionado
   },
-  radius: {
-    card: 16,
-    badge: 8,
-    button: 12,
-    pill: 9999,
-  }
+  pressed: {
+    transform: [{ translateX: 2 }, { translateY: 2 }],
+    ...noShadow(),
+  },
 };
+```
+
+### Escala canónica de sombras
+
+| Token | Desplazamiento | Uso |
+| --- | --- | --- |
+| `shadows.sm` | `2.5px 2.5px 0px #000000` | Badges de estado, chips de transportista, botones de icono, navegación y acciones secundarias. |
+| `shadows.md` | `4px 4px 0px #000000` | Tarjetas, inputs, botones de ancho completo y CTAs. |
+| `shadows.lg` | `5px 5px 0px #000000` | FAB, diálogos, hojas modales y elementos flotantes. |
+| `pressed` | `translate(2px, 2px)` + sombra `0` | Hundimiento mecánico de cualquier control al pulsar. |
+
+### Implementación por plataforma (sin desenfoque)
+
+- **Web:** `boxShadow: '4px 4px 0px #000000'` (CSS puro, borde de sombra perfectamente nítido).
+- **iOS:** `shadowColor: '#000000'`, `shadowOffset: { width: 4, height: 4 }`, `shadowOpacity: 1`, `shadowRadius: 0`.
+- **Android:** `boxShadow` de la New Architecture (React Native 0.76+). Nunca `elevation`: siempre genera un halo difuso y rompe el estilo.
+- **Press:** la sombra se colapsa a `0px` y el control se desplaza `+2px / +2px`, como una tecla mecánica real.
+
+### Reglas de composición
+
+1. **Un solo lenguaje de sombra:** ninguna sombra usa blur ni colores distintos al negro puro.
+2. **Jerarquía clara:** los elementos pequeños nunca usan `md`/`lg`; las tarjetas nunca usan `sm`.
+3. **Contraste tipográfico:** titulares `900`, etiquetas/captions `800`, cuerpo `600–700`. Los metadatos usan monoespaciada.
+4. **Stickers armonizados:** los badges de estado y chips comparten radio, borde negro y sombra `sm`; el color comunica el estado, no la forma.
+5. **Orden en móvil y web:** el contenido mantiene un ancho máximo legible en web (columna centrada) y los márgenes laterales se mantienen en `20px`.
 ```

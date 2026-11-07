@@ -1,20 +1,42 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { CanonicalStatus, CANONICAL_STATUS_MAP } from '../../../domain/models/status';
 import { Theme } from '../../theme/adaptiveTheme';
 
 interface StatusBadgeProps {
   status: CanonicalStatus;
   size?: 'small' | 'medium';
+  style?: StyleProp<ViewStyle>;
 }
 
-export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'medium' }) => {
+/**
+ * Compact delivery-sticker wording. Full canonical labels are too long for a
+ * sticky badge and wrap/squeeze the carrier row on small phones.
+ */
+const SHORT_LABELS: Record<CanonicalStatus, string> = {
+  pending: 'PENDIENTE',
+  info_received: 'PRE-REGISTRO',
+  in_transit: 'EN TRÁNSITO',
+  out_for_delivery: 'EN REPARTO',
+  delivered: 'ENTREGADO',
+  failed_attempt: 'FALLIDO',
+  exception: 'EXCEPCIÓN',
+  expired: 'CADUCADO',
+};
+
+export const StatusBadge: React.FC<StatusBadgeProps> = ({
+  status,
+  size = 'medium',
+  style,
+}) => {
   const meta = CANONICAL_STATUS_MAP[status] || CANONICAL_STATUS_MAP.pending;
   const color = Theme.colors.status[status] || Theme.colors.status.pending;
   const isSmall = size === 'small';
+  const label = isSmall ? SHORT_LABELS[status] ?? meta.labelEs : meta.labelEs;
 
   return (
     <View
+      accessibilityLabel={`Estado: ${meta.labelEs}`}
       style={[
         styles.badge,
         {
@@ -22,17 +44,20 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'medium
           paddingVertical: isSmall ? 3 : 5,
           paddingHorizontal: isSmall ? 8 : 12,
         },
+        style,
       ]}
     >
       <Text
+        numberOfLines={1}
         style={[
           styles.text,
           {
             fontSize: isSmall ? 10 : 11,
+            letterSpacing: isSmall ? 0.6 : 0.5,
           },
         ]}
       >
-        {meta.labelEs.toUpperCase()}
+        {label.toUpperCase()}
       </Text>
     </View>
   );
@@ -42,20 +67,16 @@ const styles = StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
+    maxWidth: '100%',
     borderRadius: Theme.radius.sm,
     borderWidth: 2,
     borderColor: '#000000',
     alignSelf: 'flex-start',
-    shadowColor: '#000000',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 2,
-    ...(Theme.isWeb ? ({ boxShadow: '2px 2px 0px #000000' } as any) : {}),
+    ...Theme.shadows.sm,
   },
   text: {
     color: '#000000',
     fontWeight: '900',
-    letterSpacing: 0.5,
+    flexShrink: 1,
   },
 });

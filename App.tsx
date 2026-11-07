@@ -42,7 +42,7 @@ export default function App() {
   };
 
   return (
-    <SafeAreaProvider>
+    <SafeAreaProvider style={styles.provider}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
         <StatusBar style={Theme.isIOS ? 'dark' : 'auto'} />
 
@@ -81,8 +81,24 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  provider: {
+    flex: 1,
+    // On the web the mobile experience is presented as a centered, framed
+    // column instead of stretching neo-brutalist cards across the viewport.
+    backgroundColor: Theme.isWeb ? Theme.colors.surfaceSubtle : Theme.colors.background,
+  },
   safeArea: {
     flex: 1,
+    width: '100%',
+    maxWidth: Theme.isWeb ? 820 : undefined,
+    alignSelf: 'center',
     backgroundColor: Theme.colors.background,
+    ...(Theme.isWeb
+      ? {
+          borderLeftWidth: 2.5,
+          borderRightWidth: 2.5,
+          borderColor: '#000000',
+        }
+      : {}),
   },
 });

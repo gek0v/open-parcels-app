@@ -20,9 +20,9 @@ export const SegmentedFilter: React.FC<SegmentedFilterProps> = ({
   counts,
 }) => {
   const tabs: { key: FilterTab; label: string; count: number; color: string }[] = [
-    { key: 'active', label: 'En camino', count: counts.active, color: '#FFE600' },
-    { key: 'delivered', label: 'Entregados', count: counts.delivered, color: '#34D399' },
-    { key: 'archived', label: 'Archivados', count: counts.archived, color: '#F472B6' },
+    { key: 'active', label: 'En camino', count: counts.active, color: Theme.colors.yellow },
+    { key: 'delivered', label: 'Entregados', count: counts.delivered, color: Theme.colors.status.delivered },
+    { key: 'archived', label: 'Archivados', count: counts.archived, color: Theme.colors.pink },
   ];
 
   return (
@@ -32,25 +32,25 @@ export const SegmentedFilter: React.FC<SegmentedFilterProps> = ({
         return (
           <Pressable
             key={tab.key}
+            accessibilityRole="button"
+            accessibilityState={{ selected: isActive }}
+            accessibilityLabel={`${tab.label}, ${tab.count} envíos`}
             onPress={() => onTabChange(tab.key)}
-            style={[
+            style={({ pressed }) => [
               styles.tab,
               isActive && [styles.activeTab, { backgroundColor: tab.color }],
+              pressed && styles.pressed,
             ]}
           >
-            <Text style={[styles.tabLabel, isActive && styles.activeTabLabel]}>
+            <Text
+              numberOfLines={1}
+              style={[styles.tabLabel, isActive && styles.activeTabLabel]}
+            >
               {tab.label}
             </Text>
             {tab.count > 0 && (
-              <View
-                style={[
-                  styles.countBadge,
-                  isActive && styles.activeCountBadge,
-                ]}
-              >
-                <Text style={styles.countText}>
-                  {tab.count}
-                </Text>
+              <View style={styles.countBadge}>
+                <Text style={styles.countText}>{tab.count}</Text>
               </View>
             )}
           </Pressable>
@@ -63,33 +63,32 @@ export const SegmentedFilter: React.FC<SegmentedFilterProps> = ({
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
     marginHorizontal: 20,
     marginBottom: 16,
   },
   tab: {
     flex: 1,
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 6,
     borderRadius: Theme.radius.sm,
     backgroundColor: '#FFFFFF',
     borderWidth: 2,
     borderColor: '#000000',
-    shadowColor: '#000000',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 2,
-    ...(Theme.isWeb ? ({ boxShadow: '2px 2px 0px #000000' } as any) : {}),
+    ...Theme.shadows.sm,
   },
   activeTab: {
-    shadowOffset: { width: 3, height: 3 },
-    ...(Theme.isWeb ? ({ boxShadow: '3px 3px 0px #000000' } as any) : {}),
+    borderWidth: 2.5,
+  },
+  pressed: {
+    ...Theme.pressed,
   },
   tabLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
     color: '#000000',
     textTransform: 'uppercase',
@@ -97,20 +96,19 @@ const styles = StyleSheet.create({
   },
   activeTabLabel: {
     fontWeight: '900',
-    color: '#000000',
   },
   countBadge: {
+    minWidth: 18,
     marginLeft: 6,
-    paddingHorizontal: 6,
+    paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: Theme.radius.xs,
     backgroundColor: '#000000',
-  },
-  activeCountBadge: {
-    backgroundColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   countText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '900',
     color: '#FFFFFF',
   },

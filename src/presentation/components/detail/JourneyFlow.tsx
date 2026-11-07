@@ -16,9 +16,9 @@ export const JourneyFlow: React.FC<JourneyFlowProps> = ({ parcel }) => {
       {/* Retro window header */}
       <View style={styles.cardHeader}>
         <View style={styles.dotsRow}>
-          <View style={[styles.dot, { backgroundColor: '#FF5C38' }]} />
-          <View style={[styles.dot, { backgroundColor: '#FFE600' }]} />
-          <View style={[styles.dot, { backgroundColor: '#10B981' }]} />
+          <View style={[styles.dot, { backgroundColor: Theme.colors.coral }]} />
+          <View style={[styles.dot, { backgroundColor: Theme.colors.yellow }]} />
+          <View style={[styles.dot, { backgroundColor: Theme.colors.mint }]} />
         </View>
         <Text style={styles.cardTitle}>TRAYECTO MULTITRANSPORTISTA</Text>
       </View>
@@ -26,17 +26,17 @@ export const JourneyFlow: React.FC<JourneyFlowProps> = ({ parcel }) => {
       {/* Origin -> Destination Banner */}
       <View style={styles.routeHeader}>
         <View style={styles.locationNode}>
-          <MapPin size={16} color="#000000" />
-          <Text style={styles.countryText}>
+          <MapPin size={16} color="#000000" strokeWidth={2.5} />
+          <Text style={styles.countryText} numberOfLines={1}>
             {parcel.origin ? `${parcel.origin.name} (${parcel.origin.code})` : 'ORIGEN'}
           </Text>
         </View>
 
-        <ArrowRight size={18} color="#000000" strokeWidth={2.5} style={styles.routeArrow} />
+        <ArrowRight size={18} color="#000000" strokeWidth={3} style={styles.routeArrow} />
 
         <View style={styles.locationNode}>
-          <MapPin size={16} color="#000000" />
-          <Text style={styles.countryText}>
+          <MapPin size={16} color="#000000" strokeWidth={2.5} />
+          <Text style={styles.countryText} numberOfLines={1}>
             {parcel.destination
               ? `${parcel.destination.name} (${parcel.destination.code})`
               : 'DESTINO'}
@@ -48,12 +48,14 @@ export const JourneyFlow: React.FC<JourneyFlowProps> = ({ parcel }) => {
       <View style={styles.carrierChainContainer}>
         {/* First Leg Carrier */}
         <View style={styles.carrierLeg}>
-          <View style={[styles.carrierIconBox, { backgroundColor: '#38BDF8' }]}>
-            <Plane size={18} color="#000000" />
+          <View style={[styles.carrierIconBox, { backgroundColor: Theme.colors.status.in_transit }]}>
+            <Plane size={18} color="#000000" strokeWidth={2.5} />
           </View>
           <View style={styles.carrierDetails}>
             <Text style={styles.legRole}>TRAMO INTERNACIONAL</Text>
-            <Text style={styles.carrierLegName}>{parcel.carrier.name}</Text>
+            <Text style={styles.carrierLegName} numberOfLines={1}>
+              {parcel.carrier.name}
+            </Text>
           </View>
         </View>
 
@@ -68,12 +70,14 @@ export const JourneyFlow: React.FC<JourneyFlowProps> = ({ parcel }) => {
             </View>
 
             <View style={styles.carrierLeg}>
-              <View style={[styles.carrierIconBox, { backgroundColor: '#34D399' }]}>
-                <Truck size={18} color="#000000" />
+              <View style={[styles.carrierIconBox, { backgroundColor: Theme.colors.status.delivered }]}>
+                <Truck size={18} color="#000000" strokeWidth={2.5} />
               </View>
               <View style={styles.carrierDetails}>
                 <Text style={styles.legRole}>ÚLTIMA MILLA LOCAL</Text>
-                <Text style={styles.carrierLegName}>{parcel.lastMileCarrier.name}</Text>
+                <Text style={styles.carrierLegName} numberOfLines={1}>
+                  {parcel.lastMileCarrier.name}
+                </Text>
               </View>
             </View>
           </>
@@ -90,20 +94,15 @@ const styles = StyleSheet.create({
     padding: 16,
     marginHorizontal: 20,
     marginBottom: 16,
-    borderWidth: 2.5,
+    borderWidth: Theme.borders.width,
     borderColor: '#000000',
-    shadowColor: '#000000',
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 5,
-    ...(Theme.isWeb ? ({ boxShadow: '4px 4px 0px #000000' } as any) : {}),
+    ...Theme.shadows.md,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingBottom: 10,
-    marginBottom: 12,
+    marginBottom: 14,
     borderBottomWidth: 2,
     borderBottomColor: '#000000',
   },
@@ -128,45 +127,49 @@ const styles = StyleSheet.create({
   routeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFE600',
+    backgroundColor: Theme.colors.yellow,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 11,
     borderRadius: Theme.radius.sm,
     borderWidth: 2,
     borderColor: '#000000',
-    marginBottom: 14,
+    marginBottom: 16,
+    ...Theme.shadows.sm,
   },
   locationNode: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    minWidth: 0,
   },
   routeArrow: {
-    marginHorizontal: 8,
+    marginHorizontal: 6,
   },
   countryText: {
-    fontSize: 13,
+    flexShrink: 1,
+    fontSize: 12,
     fontWeight: '900',
     color: '#000000',
-    marginLeft: 6,
+    marginLeft: 5,
   },
   carrierChainContainer: {
-    marginTop: 4,
+    marginTop: 2,
   },
   carrierLeg: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingVertical: 7,
   },
   carrierIconBox: {
-    width: 38,
-    height: 38,
+    width: 40,
+    height: 40,
     borderRadius: Theme.radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
     borderWidth: 2,
     borderColor: '#000000',
+    ...Theme.shadows.sm,
   },
   carrierDetails: {
     flex: 1,
@@ -174,19 +177,20 @@ const styles = StyleSheet.create({
   legRole: {
     fontSize: 10,
     fontWeight: '900',
-    color: '#64748B',
-    letterSpacing: 0.5,
+    color: Theme.colors.textTertiary,
+    letterSpacing: 0.6,
   },
   carrierLegName: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '900',
     color: '#000000',
+    letterSpacing: -0.2,
   },
   chainConnector: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingLeft: 18,
-    marginVertical: 4,
+    paddingLeft: 19,
+    marginVertical: 5,
   },
   chainDottedLine: {
     width: 2.5,
@@ -197,13 +201,13 @@ const styles = StyleSheet.create({
     marginLeft: 14,
     backgroundColor: '#000000',
     paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingVertical: 3,
     borderRadius: Theme.radius.xs,
   },
   transferText: {
     fontSize: 10,
     fontWeight: '900',
     color: '#FFFFFF',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
 });

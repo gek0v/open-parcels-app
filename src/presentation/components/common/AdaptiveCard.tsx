@@ -1,11 +1,11 @@
 import React from 'react';
-import { View, StyleSheet, ViewStyle, Pressable } from 'react-native';
+import { View, StyleSheet, ViewStyle, Pressable, StyleProp } from 'react-native';
 import { Theme } from '../../theme/adaptiveTheme';
 
 interface AdaptiveCardProps {
   children: React.ReactNode;
   onPress?: () => void;
-  style?: ViewStyle | ViewStyle[];
+  style?: StyleProp<ViewStyle>;
   elevated?: boolean;
   backgroundColor?: string;
   hasWindowHeader?: boolean;
@@ -19,9 +19,9 @@ export const AdaptiveCard: React.FC<AdaptiveCardProps> = ({
   backgroundColor = Theme.colors.surface,
   hasWindowHeader = false,
 }) => {
-  const cardStyle = [
+  const cardStyle: StyleProp<ViewStyle> = [
     styles.card,
-    elevated ? Theme.shadows.elevated : Theme.shadows.card,
+    elevated ? Theme.shadows.lg : Theme.shadows.md,
     { backgroundColor },
     style,
   ];
@@ -31,9 +31,9 @@ export const AdaptiveCard: React.FC<AdaptiveCardProps> = ({
       {hasWindowHeader && (
         <View style={styles.windowHeader}>
           <View style={styles.dotsRow}>
-            <View style={[styles.dot, { backgroundColor: '#FF5C38' }]} />
-            <View style={[styles.dot, { backgroundColor: '#FFE600' }]} />
-            <View style={[styles.dot, { backgroundColor: '#10B981' }]} />
+            <View style={[styles.dot, { backgroundColor: Theme.colors.coral }]} />
+            <View style={[styles.dot, { backgroundColor: Theme.colors.yellow }]} />
+            <View style={[styles.dot, { backgroundColor: Theme.colors.mint }]} />
           </View>
           <View style={styles.windowGrip} />
         </View>
@@ -45,11 +45,9 @@ export const AdaptiveCard: React.FC<AdaptiveCardProps> = ({
   if (onPress) {
     return (
       <Pressable
+        accessibilityRole="button"
         onPress={onPress}
-        style={({ pressed }) => [
-          cardStyle,
-          pressed && styles.pressed,
-        ]}
+        style={({ pressed }) => [cardStyle, pressed && styles.pressed]}
       >
         {content}
       </Pressable>
@@ -64,19 +62,19 @@ const styles = StyleSheet.create({
     borderRadius: Theme.radius.md,
     padding: 16,
     marginBottom: 14,
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    overflow: 'hidden',
+    borderWidth: Theme.borders.width,
+    borderColor: Theme.borders.color,
+    backgroundColor: Theme.colors.surface,
   },
   pressed: {
-    transform: [{ translateX: 2 }, { translateY: 2 }],
+    ...Theme.pressed,
   },
   windowHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingBottom: 10,
-    marginBottom: 10,
+    marginBottom: 12,
     borderBottomWidth: 2,
     borderBottomColor: '#000000',
   },
@@ -92,7 +90,7 @@ const styles = StyleSheet.create({
     borderColor: '#000000',
   },
   windowGrip: {
-    width: 32,
+    width: 34,
     height: 4,
     backgroundColor: '#000000',
     borderRadius: 2,

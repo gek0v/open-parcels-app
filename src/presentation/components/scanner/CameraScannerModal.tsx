@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, Modal, Pressable, Platform } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Theme } from '../../theme/adaptiveTheme';
-import { X, Flashlight, RefreshCw, Barcode } from 'lucide-react-native';
+import { X, Flashlight, Barcode } from 'lucide-react-native';
 
 interface CameraScannerModalProps {
   visible: boolean;
@@ -38,17 +38,30 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
       <View style={styles.container}>
         {/* Top Controls Header */}
         <View style={styles.topBar}>
-          <Pressable onPress={onClose} style={styles.iconButton}>
-            <X size={24} color="#FFF" />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Cerrar escáner"
+            onPress={onClose}
+            style={({ pressed }) => [styles.iconButton, pressed && styles.controlPressed]}
+          >
+            <X size={24} color="#FFF" strokeWidth={2.5} />
           </Pressable>
 
-          <Text style={styles.scannerTitle}>Escanear Código de Barras / QR</Text>
+          <Text style={styles.scannerTitle} numberOfLines={1}>
+            Escanear Código de Barras / QR
+          </Text>
 
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Alternar linterna"
             onPress={() => setTorchEnabled(!torchEnabled)}
-            style={[styles.iconButton, torchEnabled && styles.iconButtonActive]}
+            style={({ pressed }) => [
+              styles.iconButton,
+              torchEnabled && styles.iconButtonActive,
+              pressed && styles.controlPressed,
+            ]}
           >
-            <Flashlight size={22} color={torchEnabled ? '#FFD700' : '#FFF'} />
+            <Flashlight size={22} color={torchEnabled ? '#FFD700' : '#FFF'} strokeWidth={2.5} />
           </Pressable>
         </View>
 
@@ -56,12 +69,17 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
         <View style={styles.cameraContainer}>
           {!permission?.granted ? (
             <View style={styles.permissionBox}>
-              <Barcode size={48} color={Theme.colors.primary} />
+              <Barcode size={48} color={Theme.colors.primary} strokeWidth={2} />
               <Text style={styles.permissionText}>
                 Se requiere permiso de cámara para leer etiquetas de envío.
               </Text>
-              <Pressable onPress={requestPermission} style={styles.grantButton}>
-                <Text style={styles.grantButtonText}>Conceder Permiso</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Conceder permiso de cámara"
+                onPress={requestPermission}
+                style={({ pressed }) => [styles.grantButton, pressed && styles.controlPressed]}
+              >
+                <Text style={styles.grantButtonText}>CONCEDER PERMISO</Text>
               </Pressable>
             </View>
           ) : (
@@ -104,11 +122,13 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
             {sampleCodes.map((s) => (
               <Pressable
                 key={s.code}
+                accessibilityRole="button"
+                accessibilityLabel={`Probar código ${s.label}`}
                 onPress={() => {
                   onScanResult(s.code);
                   onClose();
                 }}
-                style={styles.sampleChip}
+                style={({ pressed }) => [styles.sampleChip, pressed && styles.sampleChipPressed]}
               >
                 <Text style={styles.sampleChipText}>{s.label}</Text>
               </Pressable>
@@ -133,19 +153,32 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 54 : 24,
     paddingBottom: 16,
     backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    borderBottomWidth: 2.5,
+    borderBottomColor: '#334155',
   },
   scannerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+    flex: 1,
+    marginHorizontal: 12,
+    fontSize: 15,
+    fontWeight: '900',
     color: '#FFF',
+    textAlign: 'center',
+    letterSpacing: -0.2,
   },
   iconButton: {
     padding: 8,
-    borderRadius: Theme.radius.full,
+    borderRadius: Theme.radius.sm,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.35)',
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   iconButtonActive: {
     backgroundColor: 'rgba(255, 215, 0, 0.3)',
+    borderColor: '#FFD700',
+  },
+  controlPressed: {
+    transform: [{ translateX: 2 }, { translateY: 2 }],
+    opacity: 0.8,
   },
   cameraContainer: {
     flex: 1,
@@ -227,24 +260,28 @@ const styles = StyleSheet.create({
     backgroundColor: Theme.colors.primary,
     paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: Theme.radius.md,
+    borderRadius: Theme.radius.sm,
+    borderWidth: 2.5,
+    borderColor: '#000000',
   },
   grantButtonText: {
     color: '#FFF',
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.4,
   },
   bottomBar: {
     padding: 20,
     backgroundColor: '#1E293B',
-    borderTopWidth: 1,
+    borderTopWidth: 2.5,
     borderTopColor: '#334155',
   },
   sampleTitle: {
     color: '#94A3B8',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '800',
     marginBottom: 10,
+    letterSpacing: 0.2,
   },
   sampleChips: {
     flexDirection: 'row',
@@ -252,14 +289,20 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sampleChip: {
-    backgroundColor: '#334155',
+    backgroundColor: '#F1F5F9',
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 7,
     borderRadius: Theme.radius.sm,
+    borderWidth: 2,
+    borderColor: '#000000',
+  },
+  sampleChipPressed: {
+    transform: [{ translateX: 2 }, { translateY: 2 }],
+    opacity: 0.85,
   },
   sampleChipText: {
-    color: '#F1F5F9',
-    fontSize: 12,
-    fontWeight: '500',
+    color: '#000000',
+    fontSize: 11,
+    fontWeight: '800',
   },
 });

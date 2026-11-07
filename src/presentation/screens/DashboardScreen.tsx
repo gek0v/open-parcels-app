@@ -15,13 +15,7 @@ import { Theme } from '../theme/adaptiveTheme';
 import { ParcelCard } from '../components/dashboard/ParcelCard';
 import { SegmentedFilter, FilterTab } from '../components/dashboard/SegmentedFilter';
 import { RenameParcelModal } from '../components/common/RenameParcelModal';
-import {
-  Plus,
-  Search,
-  X,
-  Package,
-  Cpu,
-} from 'lucide-react-native';
+import { Plus, Search, X, Package, Cpu } from 'lucide-react-native';
 
 interface DashboardScreenProps {
   onSelectParcel: (parcel: Parcel) => void;
@@ -35,6 +29,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const [parcels, setParcels] = useState<Parcel[]>([]);
   const [activeTab, setActiveTab] = useState<FilterTab>('active');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLocalMode, setIsLocalMode] = useState(trackingEngineManager.isLocalFirst());
   const [renamingParcel, setRenamingParcel] = useState<Parcel | null>(null);
@@ -45,8 +40,19 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   }, []);
 
   useEffect(() => {
-    loadParcels();
-  }, [loadParcels]);
+    let active = true;
+
+    (async () => {
+      const list = await parcelRepository.getAll();
+      if (active) {
+        setParcels(list);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -98,12 +104,17 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       <View style={styles.topBar}>
         <View style={styles.brandRow}>
           <View style={styles.brandBadge}>
-            <Package size={22} color="#000000" />
+            <Package size={22} color="#000000" strokeWidth={2.5} />
           </View>
-          <View>
+          <View style={styles.brandCopy}>
             <Text style={styles.appTitle}>OPEN PARCELS</Text>
-            <Pressable onPress={toggleEngineMode} style={styles.engineToggle}>
-              <Cpu size={12} color="#000000" />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Cambiar motor de seguimiento"
+              onPress={toggleEngineMode}
+              style={({ pressed }) => [styles.engineToggle, pressed && styles.pressed]}
+            >
+              <Cpu size={12} color="#000000" strokeWidth={2.5} />
               <Text style={styles.engineToggleText}>
                 {isLocalMode ? 'CORE: GO EMBEBIDO' : 'CORE: REST :8080'}
               </Text>
@@ -112,36 +123,48 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         </View>
 
         {/* Quick Add Button in Header */}
-        <Pressable onPress={onOpenNewParcel} style={styles.headerAddButton}>
-          <Plus size={22} color="#FFFFFF" />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Añadir nuevo envío"
+          onPress={onOpenNewParcel}
+          style={({ pressed }) => [styles.headerAddButton, pressed && styles.pressed]}
+        >
+          <Plus size={22} color="#FFFFFF" strokeWidth={3} />
         </Pressable>
       </View>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <View style={styles.searchBox}>
-          <Search size={18} color="#000000" style={styles.searchIcon} />
+        <View style={[styles.searchBox, isSearchFocused && styles.searchBoxFocused]}>
+          <Search size={18} color="#000000" strokeWidth={2.5} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="Buscar por alias, código o transportista..."
             placeholderTextColor="#64748B"
             value={searchQuery}
             onChangeText={setSearchQuery}
+            onFocus={() => setIsSearchFocused(true)}
+            onBlur={() => setIsSearchFocused(false)}
+            returnKeyType="search"
+            autoCapitalize="none"
+            autoCorrect={false}
           />
           {searchQuery.length > 0 && (
-            <Pressable onPress={() => setSearchQuery('')} style={styles.clearSearch}>
-              <X size={16} color="#000000" />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Limpiar búsqueda"
+              onPress={() => setSearchQuery('')}
+              style={({ pressed }) => [styles.clearSearch, pressed && styles.clearSearchPressed]}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <X size={16} color="#000000" strokeWidth={2.5} />
             </Pressable>
           )}
         </View>
       </View>
 
       {/* Segmented Filter */}
-      <SegmentedFilter
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        counts={counts}
-      />
+      <SegmentedFilter activeTab={activeTab} onTabChange={setActiveTab} counts={counts} />
 
       {/* Parcels List */}
       <ScrollView
@@ -152,13 +175,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             refreshing={isRefreshing}
             onRefresh={handleRefresh}
             tintColor="#000000"
+            colors={['#000000']}
+            progressBackgroundColor="#FFE600"
           />
         }
       >
         {filteredParcels.length === 0 ? (
           <View style={styles.emptyContainer}>
             <View style={styles.emptyIconCircle}>
-              <Package size={36} color="#000000" />
+              <Package size={36} color="#000000" strokeWidth={2.5} />
             </View>
             <Text style={styles.emptyTitle}>
               {searchQuery
@@ -188,7 +213,12 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       </ScrollView>
 
       {/* Floating Action Button (FAB) */}
-      <Pressable onPress={onOpenNewParcel} style={styles.fab}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Nuevo envío"
+        onPress={onOpenNewParcel}
+        style={({ pressed }) => [styles.fab, pressed && styles.pressed]}
+      >
         <Plus size={28} color="#FFFFFF" strokeWidth={3} />
       </Pressable>
 
@@ -226,34 +256,35 @@ const styles = StyleSheet.create({
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    minWidth: 0,
   },
   brandBadge: {
     width: 44,
     height: 44,
     borderRadius: Theme.radius.sm,
-    backgroundColor: '#FFE600',
+    backgroundColor: Theme.colors.yellow,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
     borderWidth: 2.5,
     borderColor: '#000000',
-    shadowColor: '#000000',
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
-    ...(Theme.isWeb ? ({ boxShadow: '3px 3px 0px #000000' } as any) : {}),
+    ...Theme.shadows.sm,
+  },
+  brandCopy: {
+    flex: 1,
+    minWidth: 0,
   },
   appTitle: {
     fontSize: 22,
     fontWeight: '900',
     color: '#000000',
-    letterSpacing: -0.5,
+    letterSpacing: -0.6,
   },
   engineToggle: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 2,
+    marginTop: 3,
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -261,9 +292,10 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#000000',
     alignSelf: 'flex-start',
+    ...Theme.shadows.sm,
   },
   engineToggleText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '900',
     color: '#000000',
     marginLeft: 4,
@@ -273,17 +305,13 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: Theme.radius.sm,
-    backgroundColor: '#FF5C38', // Neon Tangerine
+    backgroundColor: Theme.colors.coral,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2.5,
     borderColor: '#000000',
-    shadowColor: '#000000',
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
-    ...(Theme.isWeb ? ({ boxShadow: '3px 3px 0px #000000' } as any) : {}),
+    marginLeft: 12,
+    ...Theme.shadows.md,
   },
   searchContainer: {
     paddingHorizontal: 20,
@@ -298,12 +326,11 @@ const styles = StyleSheet.create({
     borderColor: '#000000',
     paddingHorizontal: 12,
     height: 48,
-    shadowColor: '#000000',
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 3,
-    ...(Theme.isWeb ? ({ boxShadow: '3px 3px 0px #000000' } as any) : {}),
+    ...Theme.shadows.md,
+  },
+  searchBoxFocused: {
+    borderWidth: 3,
+    ...Theme.shadows.lg,
   },
   searchIcon: {
     marginRight: 8,
@@ -311,46 +338,48 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#000000',
+    paddingVertical: 0,
   },
   clearSearch: {
     padding: 4,
+    borderRadius: Theme.radius.xs,
+  },
+  clearSearchPressed: {
+    backgroundColor: Theme.colors.surfaceSubtle,
   },
   scroll: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingBottom: 90,
+    paddingTop: 2,
+    paddingBottom: 96,
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 40,
+    paddingVertical: 36,
     paddingHorizontal: 24,
     backgroundColor: '#FFFFFF',
     borderRadius: Theme.radius.md,
-    borderWidth: 2.5,
+    borderWidth: Theme.borders.width,
     borderColor: '#000000',
-    marginTop: 20,
-    shadowColor: '#000000',
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
-    ...(Theme.isWeb ? ({ boxShadow: '4px 4px 0px #000000' } as any) : {}),
+    marginTop: 16,
+    ...Theme.shadows.md,
   },
   emptyIconCircle: {
     width: 64,
     height: 64,
     borderRadius: Theme.radius.sm,
-    backgroundColor: '#FFE600',
+    backgroundColor: Theme.colors.yellow,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
-    borderWidth: 2,
+    borderWidth: 2.5,
     borderColor: '#000000',
+    ...Theme.shadows.sm,
   },
   emptyTitle: {
     fontSize: 16,
@@ -362,10 +391,10 @@ const styles = StyleSheet.create({
   },
   emptySubtitle: {
     fontSize: 13,
-    fontWeight: '500',
-    color: '#334155',
+    fontWeight: '600',
+    color: Theme.colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 19,
   },
   fab: {
     position: 'absolute',
@@ -374,16 +403,14 @@ const styles = StyleSheet.create({
     width: 62,
     height: 62,
     borderRadius: Theme.radius.md,
-    backgroundColor: '#FF5C38', // Neon Tangerine
+    backgroundColor: Theme.colors.coral,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 3,
     borderColor: '#000000',
-    shadowColor: '#000000',
-    shadowOffset: { width: 5, height: 5 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 7,
-    ...(Theme.isWeb ? ({ boxShadow: '5px 5px 0px #000000' } as any) : {}),
+    ...Theme.shadows.lg,
+  },
+  pressed: {
+    ...Theme.pressed,
   },
 });

@@ -9,6 +9,9 @@ interface ProgressBarProps {
   height?: number;
 }
 
+/** Block milestones that reinforce the "logistics progress" metaphor. */
+const MILESTONES = [25, 50, 75];
+
 export const ProgressBar: React.FC<ProgressBarProps> = ({
   progress,
   status = 'in_transit',
@@ -18,38 +21,58 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   const activeColor = Theme.colors.status[status] || Theme.colors.primary;
 
   return (
-    <View style={[styles.container, { height }]}>
-      <View
-        style={[
-          styles.fill,
-          {
-            width: `${clamped}%`,
-            backgroundColor: activeColor,
-          },
-        ]}
-      />
+    <View style={[styles.shadowWrap, { height }]}>
+      <View style={styles.container}>
+        {clamped > 0 && (
+          <View
+            style={[
+              styles.fill,
+              {
+                width: `${clamped}%`,
+                backgroundColor: activeColor,
+                borderRightWidth: clamped < 100 ? 2 : 0,
+              },
+            ]}
+          />
+        )}
+
+        {MILESTONES.map((milestone) => (
+          <View
+            key={milestone}
+            pointerEvents="none"
+            style={[styles.milestone, { left: `${milestone}%` }]}
+          />
+        ))}
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  shadowWrap: {
     width: '100%',
+    borderRadius: Theme.radius.sm,
+    backgroundColor: '#FFFFFF',
+    ...Theme.shadows.sm,
+  },
+  container: {
+    flex: 1,
     backgroundColor: '#FFFFFF',
     borderRadius: Theme.radius.sm,
     borderWidth: 2,
     borderColor: '#000000',
     overflow: 'hidden',
-    shadowColor: '#000000',
-    shadowOffset: { width: 1.5, height: 1.5 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 2,
-    ...(Theme.isWeb ? ({ boxShadow: '1.5px 1.5px 0px #000000' } as any) : {}),
   },
   fill: {
     height: '100%',
-    borderRightWidth: 2,
     borderRightColor: '#000000',
+  },
+  milestone: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 1.5,
+    backgroundColor: '#000000',
+    opacity: 0.18,
   },
 });

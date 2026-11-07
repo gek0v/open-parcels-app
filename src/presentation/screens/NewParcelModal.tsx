@@ -41,24 +41,40 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
     const clean = trackingNumber.trim();
-    if (clean.length >= 4) {
-      trackingEngineManager.current.detect(clean).then((results) => {
-        setCandidates(results);
-        if (results.length > 0 && !selectedCarrierSlug) {
-          setSelectedCarrierSlug(results[0].carrier.slug);
-        }
+
+    // Debounce detection so we do not re-scan on every keystroke.
+    const timer = setTimeout(async () => {
+      if (clean.length < 4) {
+        if (!active) return;
+        setCandidates([]);
+        setSelectedCarrierSlug(undefined);
+        return;
+      }
+
+      const results = await trackingEngineManager.current.detect(clean);
+      if (!active) return;
+
+      setCandidates(results);
+      setSelectedCarrierSlug((previous) => {
+        if (results.length === 0) return undefined;
+        const stillAvailable = results.some((r) => r.carrier.slug === previous);
+        return stillAvailable ? previous : results[0].carrier.slug;
       });
-    } else {
-      setCandidates([]);
-      setSelectedCarrierSlug(undefined);
-    }
+    }, 180);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
   }, [trackingNumber]);
 
   const currentSelectedCandidate = candidates.find(
     (c) => c.carrier.slug === selectedCarrierSlug
   );
   const requiresPostalCode = currentSelectedCandidate?.carrier.requiresPostalCode ?? false;
+  const canSubmit = !!trackingNumber.trim() && !isLoading;
 
   const handleTrackAndSave = async () => {
     const cleanNumber = trackingNumber.trim();
@@ -116,32 +132,39 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
         <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>
-            <View>
+            <View style={styles.headerCopy}>
               <View style={styles.windowDots}>
-                <View style={[styles.dot, { backgroundColor: '#FF5C38' }]} />
-                <View style={[styles.dot, { backgroundColor: '#FFE600' }]} />
-                <View style={[styles.dot, { backgroundColor: '#10B981' }]} />
+                <View style={[styles.dot, { backgroundColor: Theme.colors.coral }]} />
+                <View style={[styles.dot, { backgroundColor: Theme.colors.yellow }]} />
+                <View style={[styles.dot, { backgroundColor: Theme.colors.mint }]} />
                 <Text style={styles.headerTitle}>NUEVO ENVÍO</Text>
               </View>
               <View style={styles.engineBadge}>
-                <Cpu size={12} color="#000000" />
-                <Text style={styles.engineBadgeText}>
+                <Cpu size={12} color="#000000" strokeWidth={2.5} />
+                <Text style={styles.engineBadgeText} numberOfLines={1}>
                   {trackingEngineManager.current.engineName.toUpperCase()}
                 </Text>
               </View>
             </View>
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Cerrar formulario de nuevo envío"
               onPress={() => {
                 resetForm();
                 onClose();
               }}
-              style={styles.closeButton}
+              style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}
             >
-              <X size={18} color="#000000" strokeWidth={2.5} />
+              <X size={18} color="#000000" strokeWidth={3} />
             </Pressable>
           </View>
 
-          <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
+          <ScrollView
+            style={styles.content}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
             {/* Tracking Number Input & Scanner Trigger */}
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>NÚMERO DE SEGUIMIENTO *</Text>
@@ -157,14 +180,21 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
                   }}
                   autoCapitalize="characters"
                   autoCorrect={false}
+                  returnKeyType="done"
                 />
                 <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Escanear código de barras"
                   onPress={() => setCameraVisible(true)}
-                  style={styles.scannerIconButton}
+                  style={({ pressed }) => [styles.scannerIconButton, pressed && styles.smallPressed]}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                 >
                   <Camera size={20} color="#000000" strokeWidth={2.5} />
                 </Pressable>
               </View>
+              <Text style={styles.helperText}>
+                Detectamos el transportista automáticamente al escribir el código.
+              </Text>
             </View>
 
             {/* Carrier Real-Time Auto-Detection Chips */}
@@ -178,8 +208,8 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
             {requiresPostalCode && (
               <View style={[styles.fieldGroup, styles.conditionalBox]}>
                 <View style={styles.conditionalHeader}>
-                  <ShieldAlert size={16} color="#000000" strokeWidth={2.5} />
-                  <Text style={styles.conditionalTitle}>
+                  <ShieldAlert size={16} color="#000000" strokeWidth={3} />
+                  <Text style={styles.conditionalTitle} numberOfLines={2}>
                     CÓDIGO POSTAL OBLIGATORIO ({currentSelectedCandidate?.carrier.name.toUpperCase()})
                   </Text>
                 </View>
@@ -216,11 +246,14 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
 
             {/* Submit Action Button */}
             <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !canSubmit, busy: isLoading }}
               onPress={handleTrackAndSave}
-              disabled={isLoading || !trackingNumber.trim()}
-              style={[
+              disabled={!canSubmit}
+              style={({ pressed }) => [
                 styles.submitButton,
-                (!trackingNumber.trim() || isLoading) && styles.submitButtonDisabled,
+                !canSubmit && styles.submitButtonDisabled,
+                pressed && canSubmit && styles.pressed,
               ]}
             >
               {isLoading ? (
@@ -249,10 +282,21 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
 const styles = StyleSheet.create({
   keyboardContainer: {
     flex: 1,
+    backgroundColor: Theme.isWeb ? Theme.colors.surfaceSubtle : Theme.colors.background,
   },
   container: {
     flex: 1,
+    width: '100%',
+    maxWidth: 680,
+    alignSelf: 'center',
     backgroundColor: Theme.colors.background,
+    ...(Theme.isWeb
+      ? {
+          borderLeftWidth: 2.5,
+          borderRightWidth: 2.5,
+          borderColor: '#000000',
+        }
+      : {}),
   },
   header: {
     flexDirection: 'row',
@@ -261,9 +305,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 16,
-    borderBottomWidth: 2.5,
+    borderBottomWidth: 3,
     borderBottomColor: '#000000',
     backgroundColor: '#FFFFFF',
+  },
+  headerCopy: {
+    flex: 1,
+    minWidth: 0,
   },
   windowDots: {
     flexDirection: 'row',
@@ -288,48 +336,51 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 6,
-    backgroundColor: '#FFE600',
+    backgroundColor: Theme.colors.yellow,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: Theme.radius.xs,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#000000',
     alignSelf: 'flex-start',
+    ...Theme.shadows.sm,
   },
   engineBadgeText: {
+    maxWidth: 210,
     fontSize: 9,
     fontWeight: '900',
     color: '#000000',
     marginLeft: 4,
+    letterSpacing: 0.3,
   },
   closeButton: {
-    padding: 8,
+    width: 38,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: Theme.radius.sm,
     backgroundColor: '#FFFFFF',
     borderWidth: 2,
     borderColor: '#000000',
-    shadowColor: '#000000',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 2,
-    ...(Theme.isWeb ? ({ boxShadow: '2px 2px 0px #000000' } as any) : {}),
+    marginLeft: 12,
+    ...Theme.shadows.sm,
   },
   content: {
     flex: 1,
   },
   scrollContent: {
     padding: 20,
+    paddingBottom: 40,
   },
   fieldGroup: {
     marginBottom: 16,
   },
   fieldLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '900',
     color: '#000000',
-    marginBottom: 6,
-    letterSpacing: 0.5,
+    marginBottom: 7,
+    letterSpacing: 0.6,
   },
   inputWithActions: {
     flexDirection: 'row',
@@ -339,12 +390,7 @@ const styles = StyleSheet.create({
     borderWidth: 2.5,
     borderColor: '#000000',
     paddingHorizontal: 12,
-    shadowColor: '#000000',
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 3,
-    ...(Theme.isWeb ? ({ boxShadow: '3px 3px 0px #000000' } as any) : {}),
+    ...Theme.shadows.md,
   },
   mainInput: {
     flex: 1,
@@ -353,14 +399,25 @@ const styles = StyleSheet.create({
     fontFamily: Theme.isIOS ? 'Courier' : 'monospace',
     fontWeight: '700',
     color: '#000000',
+    paddingVertical: 0,
+  },
+  helperText: {
+    marginTop: 7,
+    fontSize: 10,
+    fontWeight: '700',
+    color: Theme.colors.textTertiary,
   },
   scannerIconButton: {
-    padding: 8,
-    backgroundColor: '#FFE600',
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Theme.colors.yellow,
     borderRadius: Theme.radius.xs,
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: '#000000',
     marginLeft: 8,
+    ...Theme.shadows.sm,
   },
   standardInput: {
     backgroundColor: '#FFFFFF',
@@ -372,59 +429,46 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#000000',
-    shadowColor: '#000000',
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 3,
-    ...(Theme.isWeb ? ({ boxShadow: '3px 3px 0px #000000' } as any) : {}),
+    ...Theme.shadows.sm,
   },
   conditionalBox: {
-    backgroundColor: '#FFE600',
+    backgroundColor: Theme.colors.yellow,
     padding: 14,
     borderRadius: Theme.radius.sm,
     borderWidth: 2.5,
     borderColor: '#000000',
-    shadowColor: '#000000',
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 3,
-    ...(Theme.isWeb ? ({ boxShadow: '3px 3px 0px #000000' } as any) : {}),
+    ...Theme.shadows.md,
   },
   conditionalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 9,
+    gap: 6,
   },
   conditionalTitle: {
-    fontSize: 11,
+    flex: 1,
+    fontSize: 10,
     fontWeight: '900',
     color: '#000000',
-    marginLeft: 6,
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
   errorContainer: {
-    backgroundColor: '#FF5C38',
+    backgroundColor: Theme.colors.coral,
     padding: 12,
     borderRadius: Theme.radius.sm,
     marginBottom: 16,
     borderWidth: 2,
     borderColor: '#000000',
-    shadowColor: '#000000',
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 3,
-    ...(Theme.isWeb ? ({ boxShadow: '3px 3px 0px #000000' } as any) : {}),
+    ...Theme.shadows.sm,
   },
   errorText: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
+    lineHeight: 17,
   },
   submitButton: {
-    backgroundColor: '#2563EB',
+    backgroundColor: Theme.colors.blue,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -433,12 +477,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     borderWidth: 2.5,
     borderColor: '#000000',
-    shadowColor: '#000000',
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 5,
-    ...(Theme.isWeb ? ({ boxShadow: '4px 4px 0px #000000' } as any) : {}),
+    ...Theme.shadows.md,
   },
   submitButtonDisabled: {
     opacity: 0.5,
@@ -451,5 +490,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '900',
     letterSpacing: 0.5,
+  },
+  pressed: {
+    ...Theme.pressed,
+  },
+  smallPressed: {
+    ...Theme.pressed,
   },
 });

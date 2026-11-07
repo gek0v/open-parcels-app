@@ -20,7 +20,7 @@ export const CarrierDetectorBar: React.FC<CarrierDetectorBarProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.labelRow}>
-        <Sparkles size={14} color="#000000" style={styles.sparkleIcon} />
+        <Sparkles size={14} color="#000000" strokeWidth={2.5} style={styles.sparkleIcon} />
         <Text style={styles.headerLabel}>TRANSPORTISTAS DETECTADOS:</Text>
       </View>
 
@@ -36,10 +36,14 @@ export const CarrierDetectorBar: React.FC<CarrierDetectorBarProps> = ({
           return (
             <Pressable
               key={item.carrier.slug}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isSelected }}
+              accessibilityLabel={`${item.carrier.name}, ${confidencePercent}% de coincidencia`}
               onPress={() => onSelectCarrier(item.carrier.slug)}
-              style={[
+              style={({ pressed }) => [
                 styles.chip,
                 isSelected ? styles.chipSelected : styles.chipUnselected,
+                pressed && styles.pressed,
               ]}
             >
               <Text
@@ -47,6 +51,7 @@ export const CarrierDetectorBar: React.FC<CarrierDetectorBarProps> = ({
                   styles.carrierName,
                   isSelected && styles.carrierNameSelected,
                 ]}
+                numberOfLines={1}
               >
                 {item.carrier.name.toUpperCase()}
               </Text>
@@ -78,7 +83,8 @@ export const CarrierDetectorBar: React.FC<CarrierDetectorBarProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 10,
+    marginTop: 2,
+    marginBottom: 14,
   },
   labelRow: {
     flexDirection: 'row',
@@ -89,14 +95,15 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   headerLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '900',
     color: '#000000',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
   scrollList: {
     flexDirection: 'row',
-    paddingVertical: 4,
+    paddingVertical: 5,
+    paddingRight: 4,
   },
   chip: {
     flexDirection: 'row',
@@ -106,26 +113,24 @@ const styles = StyleSheet.create({
     borderRadius: Theme.radius.sm,
     borderWidth: 2,
     borderColor: '#000000',
-    marginRight: 8,
-    shadowColor: '#000000',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 2,
-    ...(Theme.isWeb ? ({ boxShadow: '2px 2px 0px #000000' } as any) : {}),
+    marginRight: 9,
+    ...Theme.shadows.sm,
   },
   chipUnselected: {
     backgroundColor: '#FFFFFF',
   },
   chipSelected: {
-    backgroundColor: '#FFE600', // Cyber Yellow
-    shadowOffset: { width: 3, height: 3 },
-    ...(Theme.isWeb ? ({ boxShadow: '3px 3px 0px #000000' } as any) : {}),
+    backgroundColor: Theme.colors.yellow,
+    borderWidth: 2.5,
+  },
+  pressed: {
+    ...Theme.pressed,
   },
   carrierName: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '900',
     color: '#000000',
+    letterSpacing: 0.2,
   },
   carrierNameSelected: {
     color: '#000000',
@@ -146,7 +151,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   confidenceTextSelected: {
-    color: '#FFE600',
+    color: Theme.colors.yellow,
   },
   checkIcon: {
     marginLeft: 4,
