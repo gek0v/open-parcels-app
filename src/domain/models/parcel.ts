@@ -44,11 +44,11 @@ export interface TrackResponsePayload {
     name: string;
     website?: string;
   };
-  additional_carriers?: Array<{
+  additional_carriers?: {
     slug: string;
     name: string;
     website?: string;
-  }>;
+  }[];
   last_mile_carrier?: {
     slug: string;
     name: string;
@@ -60,7 +60,7 @@ export interface TrackResponsePayload {
   origin?: { code: string; name: string };
   destination?: { code: string; name: string };
   delivered_at?: string | null;
-  events: Array<{
+  events: {
     date: string;
     status: CanonicalStatus;
     stage: string;
@@ -69,7 +69,7 @@ export interface TrackResponsePayload {
     carrier_slug: string;
     carrier_name: string;
     event_code?: string;
-  }>;
+  }[];
   days_in_transit: number;
   updated_at: string;
 }

@@ -1,5 +1,9 @@
 # 📦 Open Parcels Mobile (Android & iOS)
 
+[![CI Quality Gate](https://github.com/gek0v/open-parcels-app/actions/workflows/ci.yml/badge.svg)](https://github.com/gek0v/open-parcels-app/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/gek0v/open-parcels-app?color=D8FF38&label=Release)](https://github.com/gek0v/open-parcels-app/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-black.svg)](LICENSE)
+
 > Aplicación móvil oficial universal de rastreo de envíos y paquetería impulsada por el motor de alto rendimiento **[Open Parcels (v1.0.2)](https://github.com/gek0v/open-parcels)**.
 
 ---

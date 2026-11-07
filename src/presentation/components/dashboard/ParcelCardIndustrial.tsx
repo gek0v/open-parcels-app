@@ -4,7 +4,7 @@ import { Parcel } from '../../../domain/models/parcel';
 import { Theme } from '../../theme/adaptiveTheme';
 import { StatusBadge } from '../common/StatusBadge';
 import { ProgressBar } from '../common/ProgressBar';
-import { Tag, Edit2, ShieldAlert } from 'lucide-react-native';
+import { Tag, Edit2 } from 'lucide-react-native';
 
 interface ParcelCardIndustrialProps {
   parcel: Parcel;
@@ -26,7 +26,7 @@ export const ParcelCardIndustrial: React.FC<ParcelCardIndustrialProps> = ({
     >
       {/* Top Hazard / Shipping Stripe */}
       <View style={styles.hazardStripe}>
-        <Text style={styles.hazardText}>/// AIR & GROUND LOGISTICS MATRIX ///</Text>
+        <Text style={styles.hazardText}>{'/// AIR & GROUND LOGISTICS MATRIX ///'}</Text>
         <Text style={styles.destinationStamp}>
           DEST: {parcel.destination?.code || 'ES'}
         </Text>

@@ -1,5 +1,5 @@
 import { Carrier, DetectedCarrier } from '../models/carrier';
-import { verifyUpuS10, verifyUps1Z, verifyIataAwb } from './checksums';
+import { verifyUpuS10, verifyUps1Z } from './checksums';
 
 export const CARRIERS_CATALOG: Carrier[] = [
   {

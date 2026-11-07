@@ -1,0 +1,49 @@
+name: CI Quality Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lint, Typecheck & Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: ⚡ Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: |
+          if [ -f bun.lockb ] || [ -f bun.lock ]; then
+            bun install --frozen-lockfile
+          else
+            npm ci
+          fi
+
+      - name: 🔍 Linter (Expo Lint)
+        run: bun run lint
+
+      - name: 🛡️ Typecheck (TypeScript)
+        run: bun run typecheck
+
+      - name: 🧪 Unit Tests (Bun Test)
+        run: bun run test

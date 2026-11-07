@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Theme } from '../../theme/adaptiveTheme';
-import { Package, Truck, CheckCircle2, Camera } from 'lucide-react-native';
+import { Truck, CheckCircle2, Camera } from 'lucide-react-native';
 
 interface BentoStatsWidgetProps {
   activeCount: number;

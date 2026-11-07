@@ -51,7 +51,9 @@ export const AppLoadingSplash: React.FC<AppLoadingSplashProps> = ({
 
         {/* Loading status text */}
         <View style={styles.statusPill}>
-          <Text style={styles.statusPillText}>INICIALIZANDO MOTOR LOGÍSTICO...</Text>
+          <Text style={styles.statusPillText}>
+            INICIALIZANDO MOTOR... {Array.from({ length: 5 }, (_, i) => (i < progressStep ? '■' : '□')).join('')}
+          </Text>
         </View>
       </View>
 

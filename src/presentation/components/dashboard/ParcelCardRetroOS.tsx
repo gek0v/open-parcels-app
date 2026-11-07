@@ -43,7 +43,7 @@ export const ParcelCardRetroOS: React.FC<ParcelCardRetroOSProps> = ({
           <View style={[styles.dot, { backgroundColor: '#10B981' }]} />
         </View>
         <Text style={styles.windowTitleText} numberOfLines={1}>
-          {parcel.carrier.name.toUpperCase()} // TRACK
+          {parcel.carrier.name.toUpperCase()}{' // TRACK'}
         </Text>
         <StatusBadge status={parcel.status} size="small" />
       </View>
