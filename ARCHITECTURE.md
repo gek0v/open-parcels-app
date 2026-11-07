@@ -1,90 +1,88 @@
 # Open Parcels Mobile — Arquitectura Técnica & Especificación de Producto
 
-**Versión:** 1.0.0  
+**Versión:** 1.0.1  
 **Motor Base:** Open Parcels (v1.0.2)  
-**Plataformas:** Android e iOS (con soporte Web de desarrollo)  
+**Plataformas:** Android e iOS (con soporte Web para desarrollo y pruebas)  
+**Harness / Framework:** Expo SDK 58 + React Native 0.88 (New Architecture) + TypeScript  
+**Identidad Visual:** Neo-Brutalismo Industrial  
 **Autor:** Equipo de Ingeniería `app-openparcels`  
 
 ---
 
 ## 1. Visión General y Objetivos
 
-**Open Parcels Mobile** es la aplicación móvil oficial de rastreo universal de paquetería impulsada por el motor libre Open Parcels. Permite a los usuarios rastrear envíos de más de 1.500 transportistas globales con detección automática inteligente, cálculo de progreso en 8 estados canónicos y visualización unificada de viajes multitransportista (Multi-Carrier Journey).
+**Open Parcels Mobile** es el cliente móvil oficial de rastreo universal de paquetería impulsado por el motor de código abierto [Open Parcels (v1.0.2)](https://github.com/gek0v/open-parcels). Permite a los usuarios rastrear envíos de más de 1.500 transportistas globales con detección automática reactiva, validaciones matemáticas de checksum, cálculo de progreso en 8 estados canónicos y visualización unificada de viajes multitransportista (*Multi-Carrier Journey*).
 
-### Decisiones Clave del Proyecto
-1. **Stack Tecnológico:** React Native + Expo SDK 52 (TypeScript).
-2. **Modelo de Integración:** **Opción B — Local-First / Motor Go Embebido**. La app es capaz de operar localmente en el dispositivo con librerías nativas compiladas (`.aar` para Android y `.xcframework` para iOS con `gomobile`), con soporte para fallback a cliente REST cuando se use servidor centralizado.
-3. **Estilo Visual:** **Adaptive HIG / Material You**. Adaptación profunda a las directrices de diseño del sistema operativo:
-   - **iOS:** Apple Human Interface Guidelines (SF Pro, barras translúcidas con desenfoque de fondo `expo-blur`, listas agrupadas, gestos nativos de swipe, háptica fina).
-   - **Android:** Material Design 3 (Material You, esquinas redondeadas, superficies tonales, Floating Action Button expresivo, feedback ripple).
+### Decisiones Fundamentales de Arquitectura
+1. **Stack Tecnológico:** React Native 0.88 + Expo SDK 58 (TypeScript estricto), empaquetado nativo con Gradle 9 y CMake/Ninja en Android.
+2. **Modelo de Integración:** **Local-First con Motor Conmutable**. La aplicación ejecuta algoritmos de detección y parsing localmente en el dispositivo (`LocalTrackingEngine`), con capacidad de conmutar en caliente a cliente HTTP REST (`RestTrackingEngine`) hacia demonios locales o remotos (`open-parcels serve --port 8080`).
+3. **Lenguaje Visual Canónico:** **Neo-Brutalismo Industrial**. Paleta de alto contraste basada en **Acid Lime (`#D8FF38`)**, **Cyber Yellow (`#FFE600`)** y **Neon Tangerine (`#FF5C38`)**, contornos negros sólidos de `2.5px`, sombras rígidas sin difuminado a 45º (`4px 4px 0px #000`), controles de ventana retro (`🔴 🟡 🟢`) y micro-interacciones mecánicas táctiles.
+4. **Distribución Autónoma & In-App Updater:** Sistema de auto-actualización integrado (`UpdateService`) que consulta la API de GitHub Releases y despliega un diálogo nativo (`UpdateAvailableModal`) para descargar e instalar nuevas versiones del APK con un solo toque.
 
 ---
 
-## 2. Arquitectura del Sistema (Local-First)
+## 2. Arquitectura de Capas (Clean Architecture)
 
 ```
 ┌────────────────────────────────────────────────────────┐
 │                   Capa de Presentación                  │
-│  (Expo Router / Screens: Dashboard, Scan, Detail...)   │
-│  (Design System: Adaptive HIG / Material You)           │
+│  - Dashboard: Bento Hero Widget, Segmented Filters     │
+│  - Detail Screen: Journey Flow, Event Timeline         │
+│  - Modales: Camera Scanner, Rename, Delete, Update     │
+│  - Design System: Neo-Brutalist Theme Tokens           │
 └───────────────────────────┬────────────────────────────┘
                             │
 ┌───────────────────────────▼────────────────────────────┐
 │                    Capa de Dominio                     │
-│  (Modelos tipados, 8 estados canónicos, Journey merge) │
+│  - Modelos Canónicos: Parcel, Carrier, TrackingEvent   │
+│  - 8 Estados Canónicos Normalizados                    │
+│  - Validadores Checksum: UPU S10, UPS 1Z, IATA AWB     │
+│  - Algoritmo de Detección Reactiva de Transportistas   │
 └───────────────────────────┬────────────────────────────┘
                             │
 ┌───────────────────────────▼────────────────────────────┐
 │                 Capa de Infraestructura                │
 │ ┌───────────────────────────┐ ┌──────────────────────┐ │
 │ │  Almacenamiento Local     │ │ Motor Open Parcels   │ │
-│ │  (expo-sqlite / MMKV)     │ │ Local-First Bridge   │ │
-│ │  - Historial envíos       │ │ (gomobile .aar/.xcf) │ │
-│ │  - Cache transportistas   │ │ (Dev Fallback Mock)  │ │
+│ │  - ParcelRepository       │ │ - ITrackingEngine    │ │
+│ │  - AsyncStorage (v1)      │ │ - LocalTrackingEngine│ │
+│ │  - expo-sqlite (Roadmap)  │ │ - RestTrackingEngine │ │
+│ └───────────────────────────┘ └──────────────────────┘ │
+│ ┌───────────────────────────┐ ┌──────────────────────┐ │
+│ │  Servicios Auxiliares     │ │ Distribución         │ │
+│ │  - UpdateService (GitHub) │ │ - Release APK        │ │
 │ └───────────────────────────┘ └──────────────────────┘ │
 └────────────────────────────────────────────────────────┘
 ```
 
-### 2.1 Módulo Nativo Open Parcels (gomobile bind)
-El core de Go se compila como framework nativo:
-- **Android:** `openparcels.aar` expuesto a React Native vía un módulo nativo TurboModule / Expo Config Plugin.
-- **iOS:** `OpenParcels.xcframework` enlazado en CocoaPods / Swift.
-- **Métodos expuestos al puente JavaScript/TypeScript:**
-  - `detectCarriers(trackingNumber: string): string` (retorna JSON con candidatos y scores).
-  - `trackShipment(paramsJson: string): string` (ejecuta el tracking nativo con reglas UPU S10, UPS 1Z, IATA, etc.).
-  - `getCarriersCatalog(): string` (devuelve el catálogo de operadores).
-
-### 2.2 Entorno de Desarrollo y Simulación Local
-Para garantizar que el equipo de frontend pueda iterar rápidamente en simuladores, emuladores y navegador web sin necesidad de compilar Go en cada micro-cambio, el puente implementa un **Motor Híbrido Conmutable**:
-1. `NativeGoEngine`: invoca el binario embebido gomobile en builds nativas de producción.
-2. `RestApiEngine`: cliente HTTP que apunta a `http://localhost:8080` (o servidor remoto con `open-parcels serve`).
-3. `MockDevEngine`: emulador TypeScript completo que implementa los algoritmos de detección checksum (Luhn, UPU S10 mod 11, etc.) y simula respuestas exactas de Open Parcels v1.0.2 para desarrollo y tests E2E.
-
 ---
 
-## 3. Modelo de Datos y Contratos (Open Parcels v1.0.2)
+## 3. Modelo de Datos y 8 Estados Canónicos
 
-### 3.1 Estados Canónicos Normalizados
-El motor clasifica cada paquete en uno de los 8 estados canónicos:
-| Estado | Progreso Base | Descripción ES | Descripción EN |
-|---|---|---|---|
-| `pending` | 5% | Pendiente de registro | Pending |
-| `info_received` | 15% | Información recibida / Pre-registrado | Info Received |
-| `in_transit` | 45% | En tránsito | In Transit |
-| `out_for_delivery` | 85% | En reparto / Última milla | Out for Delivery |
-| `delivered` | 100% | Entregado | Delivered |
-| `failed_attempt` | 70% | Intento de entrega fallido | Failed Attempt |
-| `exception` | 50% | Excepción / Retenido en aduana | Exception / Alert |
-| `expired` | 0% | Caducado / Sin actividad | Expired |
+### 3.1 Tabla de Estados Canónicos
+El motor clasifica todo hito logístico en uno de los 8 estados canónicos estandarizados:
 
-### 3.2 Estructura de Entidades
+| Estado Canónico | Progreso Base | Etiqueta ES | Etiqueta EN | Color Semántico |
+|---|---|---|---|---|
+| `pending` | 5% | Pendiente de registro | Pending | `#64748B` (Pizarra) |
+| `info_received` | 15% | Información recibida | Info Received | `#7C3AED` (Violeta) |
+| `in_transit` | 45% | En tránsito | In Transit | `#0284C7` (Azul Eléctrico) |
+| `out_for_delivery` | 85% | En reparto | Out for Delivery | `#FFE600` (Cyber Yellow) |
+| `delivered` | 100% | Entregado | Delivered | `#10B981` (Verde Esmeralda) |
+| `failed_attempt` | 70% | Intento fallido | Failed Attempt | `#FF5C38` (Neon Coral) |
+| `exception` | 50% | Retenido / Aduanas | Exception | `#EF4444` (Rojo Intenso) |
+| `expired` | 0% | Caducado | Expired | `#475569` (Gris Oscuro) |
+
+### 3.2 Contratos TypeScript Fundamentales
+
 ```typescript
 export interface Carrier {
   slug: string;
   name: string;
   website?: string;
-  logo_url?: string;
   requires_postal_code?: boolean;
+  region?: string;
+  color?: string;
 }
 
 export interface TrackingEvent {
@@ -94,87 +92,87 @@ export interface TrackingEvent {
   description: string;
   location?: string;
   carrier_slug: string;
-  carrier_name: string;
+  carrier_name?: string;
   event_code?: string;
 }
 
 export interface Parcel {
-  id: string; // UUID local
-  tracking_number: string;
-  custom_alias?: string; // ej: "Zapatillas Nike"
+  id: string;
+  trackingNumber: string;
+  customAlias?: string;
   carrier: Carrier;
-  additional_carriers?: Carrier[];
-  last_mile_carrier?: Carrier;
+  additionalCarriers?: Carrier[];
+  lastMileCarrier?: Carrier;
   status: CanonicalStatus;
-  status_text: string;
+  statusText: string;
   progress: number; // 0 a 100
   origin?: { code: string; name: string };
   destination?: { code: string; name: string };
-  postal_code?: string;
-  delivered_at?: string | null;
-  days_in_transit: number;
+  postalCode?: string;
+  deliveredAt?: string | null;
+  daysInTransit: number;
   events: TrackingEvent[];
-  updated_at: string;
-  is_archived: boolean;
-  created_at: string;
+  updatedAt: string;
+  isArchived: boolean;
+  createdAt: string;
 }
 ```
 
 ---
 
-## 4. Sistema de Diseño: Adaptive HIG / Material You
+## 4. Validadores Matemáticos de Checksum
 
-La aplicación implementa un sistema de diseño bifronte dinámico:
+Para garantizar una detección precisa sin falsos positivos, el sistema implementa:
 
-### 4.1 iOS (Human Interface Guidelines)
-- **Tipografía:** SF Pro Display y SF Pro Text con pesos estándar (`system`).
-- **Navegación:** Cabeceras grandes que se reducen al deslizar (`Large Title` con blur).
-- **Tab Bar:** Pestañas translúcidas con efectos de desenfoque (`UIBlurEffect` / `expo-blur`) y badges de color.
-- **Tarjetas:** Celdas agrupadas con bordes de radio 12-16px, separadores sutiles y chevron indicador.
-- **Acciones:** `Swipeable` nativo para archivar/eliminar envíos y menú contextual `ContextMenu`.
-
-### 4.2 Android (Material Design 3 - Material You)
-- **Tipografía:** Roboto / Google Sans.
-- **Navegación:** Top App Bar con esquinas limpias y elevación tonal dinámica.
-- **Navegación Inferior:** Navigation Bar Material 3 con indicador de píldora activa.
-- **Floating Action Button (FAB):** Botón flotante prominente `+` en esquina inferior derecha.
-- **Tarjetas:** Surface Containers de MD3 con elevación tonal y efectos Ripple al toque.
-
-### 4.3 Colores Semánticos de Estado (Compatibles con ambos sistemas)
-- `in_transit`: Azul Zafiro / Cyan (`#0284C7` / `#38BDF8`)
-- `out_for_delivery`: Ámbar Cálido (`#D97706` / `#FBBF24`)
-- `delivered`: Esmeralda / Menta (`#059669` / `#34D399`)
-- `exception` / `failed_attempt`: Carmesí (`#DC2626` / `#F87171`)
-- `info_received` / `pending`: Púrpura / Neutro (`#7C3AED` / `#A78BFA`)
+1. **UPU S10 (Módulo 11):**  
+   - Estructura: 2 letras de servicio + 8 dígitos de serie + 1 dígito de control + 2 letras ISO de país (ej. `PQ481920391ES`).
+   - Ponderación: Factores `8, 6, 4, 2, 3, 5, 9, 7`. Residuo calculado con módulo 11.
+2. **UPS 1Z (Módulo 10):**  
+   - Estructura: `1Z` + 6 alfanuméricos de cuenta + 2 dígitos de servicio + 7 dígitos de serie + 1 dígito de verificación.
+   - Ponderación alfanumérica idéntica al core Go (`(char - '0') % 10` para números; `(ASCII - 63) % 10` para letras). Alternancia de pesos `1` y `2`.
+3. **IATA AWB (Módulo 7):**  
+   - Estructura: 3 dígitos prefijo de aerolínea + separador opcional + 7 dígitos de serie + 1 dígito de control igual a `(serie % 7)`.
+4. **Parámetros Obligatorios Reactivos:**  
+   - Despliegue automático de entrada de **Código Postal** para InPost, Mondial Relay y CTT Express, evitando errores `MISSING_POSTAL_CODE`.
 
 ---
 
-## 5. Módulos y Pantallas Principales
+## 5. Sistema de Diseño Neo-Brutalista
 
-1. **Dashboard Principal (`/dashboard`):**
-   - Segmented Tabs: «En camino» (activos), «Entregados» (finalizados) y «Archivados».
-   - Pull-to-refresh para actualizar masivamente todos los envíos con el motor.
-   - Resumen rápido de estado y días en tránsito.
-   - Acceso rápido a búsqueda y filtrado por nombre/código.
+El lenguaje visual implementado en `src/presentation/theme/adaptiveTheme.ts` se rige por las siguientes directrices:
 
-2. **Alta Rápida de Envíos (`/new-shipment`):**
-   - **Escáner de Cámara Integrado:** Soporte nativo para Code 128, Code 39, QR y DataMatrix vía `expo-camera`.
-   - **Autodetección Reactiva:** Al pegar o teclear, analiza en tiempo real el formato del código y muestra badges con transportistas candidatos y confianza (ej: Correos 98%, Seur 65%).
-   - **Selector de Código Postal:** Se muestra automáticamente si el carrier lo exige (ej. InPost, Mondial Relay, CTT Express).
-   - **Etiqueta / Alias:** Campo amigable («Teclado mecánico», «Regalo mamá»).
-
-3. **Detalle del Paquete & Journey (`/parcel/[id]`):**
-   - Header con estado actual, barra de progreso interactiva (0% a 100%) y transportistas encadenados.
-   - **Multi-Carrier Journey Bar:** Muestra el cambio de manos (ej: Cainiao ➔ Aduanas ➔ Correos Express) de forma visual.
-   - **Timeline Vertical Cronológico:** Eventos deduplicados, fecha, hora, ubicación y distintivo del transportista que originó el hito.
-   - Botón de acceso directo a la web del transportista para trámites oficiales.
+- **Paleta Cromática:**
+  - Lienzo: `#D8FF38` (Acid Lime).
+  - Acentos Primarios: `#FFE600` (Cyber Yellow) y `#FF5C38` (Neon Tangerine).
+  - Fondos de Tarjeta: `#FFFFFF` puro con separadores `#000000`.
+- **Bordes:** `2.5px` sólidos de color `#000000` en todos los componentes interactivos.
+- **Sombras:** Rígidas y duras a 45 grados sin difuminado:
+  - `sm`: `2px 2px 0px #000000`
+  - `md`: `4px 4px 0px #000000`
+  - `lg`: `6px 6px 0px #000000`
+- **Controles de Ventana Retro:** Cabeceras inspiradas en interfaces de sistemas operativos de los 90 (`🔴 🟡 🟢`).
+- **Estados Activos (Micro-interacciones):** Al presionar (`active/pressed`), las tarjetas y botones reducen su elevación simulando un pulsador mecánico:
+  `transform: [{ translateX: 2 }, { translateY: 2 }]`.
 
 ---
 
-## 6. Hoja de Ruta de Implementación
-- [x] Especificación y arquitectura técnica aprobada.
-- [ ] Scaffolding de Expo SDK 52 con TypeScript, dependencias y estructura de carpetas.
-- [ ] Implementación de modelos de dominio y validadores de transportistas.
-- [ ] Implementación del motor conmutable (Local-First Engine Bridge + Mock/Rest).
-- [ ] Sistema de diseño adaptativo (HIG / Material You) y temas de color.
-- [ ] Pantallas de Dashboard, Alta con Escáner y Detalle de Envío.
+## 6. Sistema de Actualizaciones en la App (In-App Updater)
+
+Diseñado para instalaciones autónomas sin dependencia de Google Play Store:
+- **Detección Automática:** Consulta `https://api.github.com/repos/gek0v/open-parcels-app/releases/latest`.
+- **Comparación Semántica (`isNewerVersion`):** Compara `CURRENT_APP_VERSION` contra el tag publicado en GitHub.
+- **Descarga en 1 Toque:** `UpdateAvailableModal` abre la URL de descarga directa del binario `.apk` adjunto para instalación inmediata.
+- **Comprobación Manual:** Botón `[ 📥 ACTUALIZAR ]` disponible en la cabecera del Dashboard.
+
+---
+
+## 7. Roadmap y Evolución de Arquitectura
+
+- [x] **Fase 0:** Scaffolding inicial con Expo SDK 58, TypeScript y motor simulado.
+- [x] **Fase 0.5:** Transición completa a Sistema de Diseño Neo-Brutalista y Dashboard Bento Hero.
+- [x] **Fase 1.0.0:** Generación de APK firmado para Android, splash nativo y assets 3D.
+- [x] **Fase 1.0.1:** Sistema de auto-actualizaciones desde GitHub Releases y arranque limpio sin mocks.
+- [ ] **Fase 2:** Selector de estilo de tarjeta (Bento, Industrial, RetroOS) y soporte multi-idioma (ES/EN).
+- [ ] **Fase 3:** Migración de enrutamiento por estado hacia Expo Router (`src/app/`).
+- [ ] **Fase 4:** Persistencia relacional en SQLite con `expo-sqlite` y tareas periódicas en segundo plano con notificaciones locales.
+- [ ] **Fase 5:** Enlace nativo JSI / TurboModule con el core Open Parcels Go compilado mediante `gomobile bind`.

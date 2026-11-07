@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Discusiones de la Comunidad
+    url: https://github.com/gek0v/open-parcels-app/discussions
+    about: ¿Tienes preguntas generales o ideas para debatir?
+  - name: 🔒 Reporte Confidencial de Seguridad
+    url: https://github.com/gek0v/open-parcels-app/security/policy
+    about: Para reportar vulnerabilidades de seguridad de forma privada.

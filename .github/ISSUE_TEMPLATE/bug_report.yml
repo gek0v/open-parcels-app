@@ -1,0 +1,70 @@
+name: 🐛 Reporte de Error (Bug Report)
+description: Informa de un fallo en la app, error en la detección de transportista o problema de tracking.
+title: "[BUG]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por tomarte el tiempo de reportar este problema. Completa los campos siguientes para que podamos reproducirlo y solucionarlo.
+
+  - type: input
+    id: version
+    attributes:
+      label: Versión de la Aplicación
+      description: ¿Qué versión de Open Parcels Mobile estás utilizando? (ej. v1.0.1)
+      placeholder: v1.0.1
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Sistema Operativo
+      description: Dispositivo en el que ocurrió el problema.
+      options:
+        - Android (APK nativo)
+        - iOS
+        - Web / Navegador
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Descripción del Error
+      description: Explica qué ocurrió y qué esperabas que sucediera.
+    validations:
+      required: true
+
+  - type: input
+    id: carrier
+    attributes:
+      label: Transportista Afectado (si aplica)
+      description: ej. Correos España, InPost, UPS, Cainiao Global.
+      placeholder: InPost
+
+  - type: input
+    id: tracking_sample
+    attributes:
+      label: Formato de Código de Seguimiento de Ejemplo
+      description: Ejemplo anonimizado de tracking para reproducir el fallo.
+      placeholder: 1Z9999999999999999
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Pasos para Reproducir
+      description: 1. Ir a '...', 2. Pulsar en '...', 3. Ver error.
+      placeholder: |
+        1. Pulsar en el botón '+' del Dashboard.
+        2. Pegar el código de seguimiento.
+        3. Observar que...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs o Capturas de Pantalla
+      description: Pega aquí los mensajes de error de la consola o arrastra capturas.

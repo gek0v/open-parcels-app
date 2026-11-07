@@ -1,0 +1,37 @@
+name: 💡 Propuesta de Funcionalidad (Feature Request)
+description: Sugiere una mejora, nuevo transportista o característica para Open Parcels Mobile.
+title: "[FEAT]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ¡Tus ideas ayudan a que Open Parcels sea el mejor cliente universal de paquetería!
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: ¿Qué problema resuelve o qué caso de uso aborda esta propuesta?
+      description: Explica la necesidad o fricción actual que experimentas al usar la aplicación.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Descripción de la Solución Propuesta
+      description: Explica con claridad cómo te gustaría que funcionara esta característica.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativas Consideradas
+      description: Cualquier solución alternativa o enfoque que hayas evaluado.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexto Adicional o Referencias Visuales
+      description: Mockups, capturas, enlaces o especificaciones de APIs de transportistas.
