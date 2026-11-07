@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { I18nProvider } from '../infrastructure/i18n';
 import { AppLoadingSplash } from '../presentation/components/common/AppLoadingSplash';
 import { UpdateAvailableModal } from '../presentation/components/common/UpdateAvailableModal';
+import { UpdateToast } from '../presentation/components/common/UpdateToast';
 import { updateService, UpdateInfo } from '../infrastructure/services/UpdateService';
 import { notificationService } from '../infrastructure/services/NotificationService';
 import { registerBackgroundSync } from '../infrastructure/services/BackgroundSyncService';
@@ -13,7 +14,8 @@ import { Theme } from '../presentation/theme/adaptiveTheme';
 
 export default function RootLayout() {
   const [isLoadingSplash, setIsLoadingSplash] = useState(true);
-  const [availableUpdate, setAvailableUpdate] = useState<UpdateInfo | null>(null);
+  const [updateToastInfo, setUpdateToastInfo] = useState<UpdateInfo | null>(null);
+  const [updateModalInfo, setUpdateModalInfo] = useState<UpdateInfo | null>(null);
 
   React.useEffect(() => {
     notificationService.requestPermissions().then((granted) => {
@@ -25,9 +27,10 @@ export default function RootLayout() {
 
   const handleSplashFinish = () => {
     setIsLoadingSplash(false);
+    // Check if an update is available on GitHub Releases
     updateService.checkForUpdate().then((info) => {
       if (info) {
-        setAvailableUpdate(info);
+        setUpdateToastInfo(info);
       }
     });
   };
@@ -66,12 +69,24 @@ export default function RootLayout() {
             <AppLoadingSplash onFinish={handleSplashFinish} minDurationMs={1100} />
           )}
 
+          {/* Floating Neo-Brutalist Update Toast */}
+          {updateToastInfo && (
+            <UpdateToast
+              updateInfo={updateToastInfo}
+              onPress={() => {
+                setUpdateModalInfo(updateToastInfo);
+                setUpdateToastInfo(null);
+              }}
+              onDismiss={() => setUpdateToastInfo(null)}
+            />
+          )}
+
           {/* Custom Neo-Brutalist update modal */}
-          {availableUpdate && (
+          {updateModalInfo && (
             <UpdateAvailableModal
-              visible={!!availableUpdate}
-              updateInfo={availableUpdate}
-              onClose={() => setAvailableUpdate(null)}
+              visible={!!updateModalInfo}
+              updateInfo={updateModalInfo}
+              onClose={() => setUpdateModalInfo(null)}
             />
           )}
         </View>

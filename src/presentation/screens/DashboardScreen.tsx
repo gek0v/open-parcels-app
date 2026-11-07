@@ -18,11 +18,10 @@ import { ParcelCardRetroOS } from '../components/dashboard/ParcelCardRetroOS';
 import { BentoStatsWidget } from '../components/dashboard/BentoStatsWidget';
 import { SegmentedFilter, FilterTab } from '../components/dashboard/SegmentedFilter';
 import { RenameParcelModal } from '../components/common/RenameParcelModal';
-import { updateService, UpdateInfo } from '../../infrastructure/services/UpdateService';
 import { useI18n } from '../../infrastructure/i18n';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
-import { Plus, Search, X, Package, Cpu, Download, LayoutGrid, Barcode, Monitor, Languages } from 'lucide-react-native';
+import { Plus, Search, X, Package, Cpu, LayoutGrid, Barcode, Monitor, Languages } from 'lucide-react-native';
 
 export type CardStyle = 'bento' | 'industrial' | 'retro';
 const CARD_STYLE_KEY = '@open_parcels:card_style';
@@ -30,13 +29,11 @@ const CARD_STYLE_KEY = '@open_parcels:card_style';
 interface DashboardScreenProps {
   onSelectParcel: (parcel: Parcel) => void;
   onOpenNewParcel: () => void;
-  onUpdateFound?: (info: UpdateInfo) => void;
 }
 
 export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   onSelectParcel,
   onOpenNewParcel,
-  onUpdateFound,
 }) => {
   const { t, lang, toggleLang } = useI18n();
   const [parcels, setParcels] = useState<Parcel[]>([]);
@@ -44,7 +41,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [cardStyle, setCardStyle] = useState<CardStyle>('bento');
   const [isLocalMode, setIsLocalMode] = useState(trackingEngineManager.isLocalFirst());
   const [renamingParcel, setRenamingParcel] = useState<Parcel | null>(null);
@@ -95,18 +91,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     const next = !isLocalMode;
     trackingEngineManager.setLocalFirst(next);
     setIsLocalMode(next);
-  };
-
-  const handleManualUpdateCheck = async () => {
-    setIsCheckingUpdate(true);
-    try {
-      const info = await updateService.checkForUpdate(true);
-      if (info && onUpdateFound) {
-        onUpdateFound(info);
-      }
-    } finally {
-      setIsCheckingUpdate(false);
-    }
   };
 
   const handleUpdateAlias = async (id: string, newAlias: string) => {
@@ -167,19 +151,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 <Cpu size={11} color="#000000" strokeWidth={2.5} />
                 <Text style={styles.engineToggleText} numberOfLines={1}>
                   {isLocalMode ? t.engine.local : t.engine.rest}
-                </Text>
-              </Pressable>
-
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Buscar actualizaciones de la app"
-                onPress={handleManualUpdateCheck}
-                disabled={isCheckingUpdate}
-                style={({ pressed }) => [styles.updateCheckBtn, pressed && styles.pressed]}
-              >
-                <Download size={11} color="#000000" strokeWidth={2.5} />
-                <Text style={styles.updateCheckText} numberOfLines={1}>
-                  {isCheckingUpdate ? t.engine.checking : t.engine.updateBtn}
                 </Text>
               </Pressable>
 
@@ -531,13 +502,6 @@ const styles = StyleSheet.create({
     borderColor: '#000000',
     alignSelf: 'flex-start',
     ...Theme.shadows.sm,
-  },
-  updateCheckText: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: '#000000',
-    marginLeft: 3,
-    letterSpacing: 0.5,
   },
   langToggleBtn: {
     flexDirection: 'row',

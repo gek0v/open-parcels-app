@@ -4,7 +4,7 @@ import { isNewerVersion } from '../../domain/validators/version';
 
 export { isNewerVersion };
 
-export const CURRENT_APP_VERSION = '1.1.0';
+export const CURRENT_APP_VERSION = '1.1.1';
 export const GITHUB_REPO = 'gek0v/open-parcels-app';
 
 const LAST_CHECK_KEY = '@open_parcels:last_update_check';
