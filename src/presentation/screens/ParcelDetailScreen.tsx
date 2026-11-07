@@ -17,6 +17,7 @@ import { ProgressBar } from '../components/common/ProgressBar';
 import { JourneyFlow } from '../components/detail/JourneyFlow';
 import { EventTimeline } from '../components/detail/EventTimeline';
 import { RenameParcelModal } from '../components/common/RenameParcelModal';
+import { DeleteParcelModal } from '../components/common/DeleteParcelModal';
 import { trackingEngineManager } from '../../infrastructure/engine';
 import { parcelRepository } from '../../infrastructure/storage/ParcelRepository';
 import {
@@ -49,6 +50,7 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
   onParcelUpdated,
 }) => {
   const [renameModalVisible, setRenameModalVisible] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleFetchUpdate = async () => {
@@ -98,21 +100,7 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
   };
 
   const confirmDelete = () => {
-    Alert.alert(
-      'Eliminar Envío',
-      '¿Estás seguro de que deseas eliminar este envío de tu historial?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: () => {
-            onDelete(parcel.id);
-            onBack();
-          },
-        },
-      ]
-    );
+    setDeleteModalVisible(true);
   };
 
   const formatUpdatedAt = (isoStr: string) => {
@@ -132,56 +120,86 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
     <View style={styles.container}>
       {/* Top Navigation Bar */}
       <View style={styles.navBar}>
-        <Pressable onPress={onBack} style={styles.navButton}>
-          <ArrowLeft size={20} color="#000000" strokeWidth={2.5} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Volver al listado"
+          onPress={onBack}
+          style={({ pressed }) => [styles.navButton, pressed && styles.pressed]}
+        >
+          <ArrowLeft size={20} color="#000000" strokeWidth={3} />
         </Pressable>
 
         <View style={styles.navTitleBox}>
           <Text style={styles.navTitle} numberOfLines={1}>
             {parcel.customAlias || parcel.trackingNumber}
           </Text>
-          <Text style={styles.navSubtitle}>{parcel.carrier.name.toUpperCase()}</Text>
+          <Text style={styles.navSubtitle} numberOfLines={1}>
+            {parcel.carrier.name.toUpperCase()}
+          </Text>
         </View>
 
         <View style={styles.navActions}>
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Actualizar estado"
             onPress={handleFetchUpdate}
             disabled={isRefreshing}
-            style={[styles.navButton, styles.refreshNavButton]}
+            style={({ pressed }) => [
+              styles.navButton,
+              styles.refreshNavButton,
+              pressed && !isRefreshing && styles.pressed,
+            ]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             {isRefreshing ? (
               <ActivityIndicator size="small" color="#000000" />
             ) : (
-              <RefreshCw size={16} color="#000000" strokeWidth={2.5} />
+              <RefreshCw size={16} color="#000000" strokeWidth={3} />
             )}
           </Pressable>
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Editar alias"
             onPress={() => setRenameModalVisible(true)}
-            style={styles.navButton}
+            style={({ pressed }) => [styles.navButton, pressed && styles.pressed]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Edit2 size={16} color="#000000" />
-          </Pressable>
-          <Pressable onPress={handleShare} style={styles.navButton}>
-            <Share2 size={16} color="#000000" />
+            <Edit2 size={16} color="#000000" strokeWidth={2.5} />
           </Pressable>
           <Pressable
-            onPress={() => onToggleArchive(parcel.id)}
-            style={[styles.navButton, parcel.isArchived && styles.navButtonActive]}
+            accessibilityRole="button"
+            accessibilityLabel="Compartir envío"
+            onPress={handleShare}
+            style={({ pressed }) => [styles.navButton, pressed && styles.pressed]}
           >
-            <Archive size={16} color="#000000" />
+            <Share2 size={16} color="#000000" strokeWidth={2.5} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={parcel.isArchived ? 'Desarchivar envío' : 'Archivar envío'}
+            onPress={() => onToggleArchive(parcel.id)}
+            style={({ pressed }) => [
+              styles.navButton,
+              parcel.isArchived && styles.navButtonActive,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Archive size={16} color="#000000" strokeWidth={2.5} />
           </Pressable>
         </View>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Main Status & Progress Hero Card */}
         <View style={styles.heroCard}>
           <View style={styles.statusHeaderGroup}>
             <StatusBadge status={parcel.status} size="medium" />
             <View style={styles.transitBadge}>
-              <Clock size={12} color="#000000" style={styles.clockIcon} />
+              <Clock size={12} color="#000000" strokeWidth={2.5} style={styles.clockIcon} />
               <Text style={styles.transitText}>{parcel.daysInTransit} DÍAS EN TRÁNSITO</Text>
             </View>
           </View>
@@ -205,14 +223,19 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
               <View style={styles.metaLabelRow}>
                 <Text style={styles.metaLabel}>ALIAS DEL PAQUETE</Text>
                 <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Editar alias del paquete"
                   onPress={() => setRenameModalVisible(true)}
-                  style={styles.inlineRenameButton}
+                  style={({ pressed }) => [
+                    styles.inlineRenameButton,
+                    pressed && styles.inlineRenamePressed,
+                  ]}
                 >
-                  <Edit2 size={11} color="#000000" />
+                  <Edit2 size={11} color="#000000" strokeWidth={2.5} />
                   <Text style={styles.inlineRenameText}>EDITAR</Text>
                 </Pressable>
               </View>
-              <Text style={styles.metaAliasText}>
+              <Text style={styles.metaAliasText} numberOfLines={1}>
                 {parcel.customAlias || 'Sin alias personalizado'}
               </Text>
             </View>
@@ -221,7 +244,9 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
           <View style={styles.metaBox}>
             <View style={styles.metaItem}>
               <Text style={styles.metaLabel}>Nº SEGUIMIENTO / ALBARÁN</Text>
-              <Text style={styles.metaValueMono}>{parcel.trackingNumber}</Text>
+              <Text style={styles.metaValueMono} numberOfLines={1}>
+                {parcel.trackingNumber}
+              </Text>
             </View>
             {parcel.postalCode && (
               <View style={[styles.metaItem, styles.postalItem]}>
@@ -232,7 +257,7 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
           </View>
 
           <View style={styles.updateRow}>
-            <Calendar size={12} color="#64748B" />
+            <Calendar size={12} color={Theme.colors.textTertiary} strokeWidth={2.5} />
             <Text style={styles.updateText}>
               Última actualización: {formatUpdatedAt(parcel.updatedAt)}
             </Text>
@@ -240,17 +265,20 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
 
           {/* Explicit Fetch / Refresh Button in Hero Card */}
           <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ disabled: isRefreshing, busy: isRefreshing }}
             onPress={handleFetchUpdate}
             disabled={isRefreshing}
-            style={[
+            style={({ pressed }) => [
               styles.refreshHeroButton,
               isRefreshing && styles.refreshHeroButtonDisabled,
+              pressed && !isRefreshing && styles.pressed,
             ]}
           >
             {isRefreshing ? (
               <ActivityIndicator size="small" color="#000000" style={styles.refreshIcon} />
             ) : (
-              <RefreshCw size={15} color="#000000" strokeWidth={2.5} style={styles.refreshIcon} />
+              <RefreshCw size={15} color="#000000" strokeWidth={3} style={styles.refreshIcon} />
             )}
             <Text style={styles.refreshHeroText}>
               {isRefreshing ? 'CONSULTANDO AL TRANSPORTISTA...' : 'ACTUALIZAR ESTADO DEL PEDIDO'}
@@ -262,31 +290,59 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
         <JourneyFlow parcel={parcel} />
 
         {/* Carrier Official Website Action Button */}
-        <Pressable onPress={handleOpenCarrierWeb} style={styles.carrierLinkButton}>
-          <Text style={styles.carrierLinkText}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Abrir seguimiento oficial en ${parcel.carrier.name}`}
+          onPress={handleOpenCarrierWeb}
+          style={({ pressed }) => [styles.carrierLinkButton, pressed && styles.pressed]}
+        >
+          <Text style={styles.carrierLinkText} numberOfLines={1}>
             SEGUIMIENTO OFICIAL EN {parcel.carrier.name.toUpperCase()}
           </Text>
-          <ExternalLink size={16} color="#000000" strokeWidth={2.5} />
+          <ExternalLink size={16} color="#000000" strokeWidth={3} />
         </Pressable>
 
         {/* Full Event Timeline */}
         <EventTimeline events={parcel.events} />
 
         {/* Delete Shipment Action */}
-        <Pressable onPress={confirmDelete} style={styles.deleteButton}>
-          <Trash2 size={16} color="#FFFFFF" style={styles.deleteIcon} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Eliminar paquete"
+          onPress={confirmDelete}
+          style={({ pressed }) => [styles.deleteButton, pressed && styles.pressed]}
+        >
+          <Trash2 size={16} color="#FFFFFF" strokeWidth={2.5} style={styles.deleteIcon} />
           <Text style={styles.deleteButtonText}>ELIMINAR PAQUETE</Text>
         </Pressable>
       </ScrollView>
 
       {/* Modal to rename shipment */}
-      <RenameParcelModal
-        visible={renameModalVisible}
-        initialAlias={parcel.customAlias}
-        trackingNumber={parcel.trackingNumber}
-        onClose={() => setRenameModalVisible(false)}
-        onSave={(newAlias) => onUpdateAlias(parcel.id, newAlias)}
-      />
+      {renameModalVisible && (
+        <RenameParcelModal
+          visible
+          initialAlias={parcel.customAlias}
+          trackingNumber={parcel.trackingNumber}
+          onClose={() => setRenameModalVisible(false)}
+          onSave={(newAlias) => onUpdateAlias(parcel.id, newAlias)}
+        />
+      )}
+
+      {/* Custom Neo-Brutalist Delete Confirmation Modal */}
+      {deleteModalVisible && (
+        <DeleteParcelModal
+          visible
+          parcelTitle={parcel.customAlias || parcel.trackingNumber}
+          trackingNumber={parcel.trackingNumber}
+          carrierName={parcel.carrier.name}
+          onClose={() => setDeleteModalVisible(false)}
+          onConfirmDelete={() => {
+            setDeleteModalVisible(false);
+            onDelete(parcel.id);
+            onBack();
+          }}
+        />
+      )}
     </View>
   );
 };
@@ -306,28 +362,26 @@ const styles = StyleSheet.create({
     backgroundColor: Theme.colors.background,
   },
   navButton: {
-    padding: 8,
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: Theme.radius.sm,
     backgroundColor: '#FFFFFF',
     borderWidth: 2,
     borderColor: '#000000',
-    shadowColor: '#000000',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 2,
-    marginLeft: 6,
-    ...(Theme.isWeb ? ({ boxShadow: '2px 2px 0px #000000' } as any) : {}),
+    ...Theme.shadows.sm,
   },
   navButtonActive: {
-    backgroundColor: '#FFE600',
+    backgroundColor: Theme.colors.yellow,
   },
   refreshNavButton: {
-    backgroundColor: '#38BDF8', // Electric Sky Blue
+    backgroundColor: Theme.colors.status.in_transit,
   },
   navTitleBox: {
     flex: 1,
     marginHorizontal: 10,
+    minWidth: 0,
   },
   navTitle: {
     fontSize: 16,
@@ -336,14 +390,15 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   navSubtitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#334155',
-    letterSpacing: 0.5,
+    fontSize: 10,
+    fontWeight: '900',
+    color: Theme.colors.textTertiary,
+    letterSpacing: 0.6,
   },
   navActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
   },
   scroll: {
     flex: 1,
@@ -357,31 +412,28 @@ const styles = StyleSheet.create({
     padding: 18,
     marginHorizontal: 20,
     marginBottom: 16,
-    borderWidth: 2.5,
+    borderWidth: Theme.borders.width,
     borderColor: '#000000',
-    shadowColor: '#000000',
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 5,
-    ...(Theme.isWeb ? ({ boxShadow: '4px 4px 0px #000000' } as any) : {}),
+    ...Theme.shadows.md,
   },
   statusHeaderGroup: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 8,
     marginBottom: 14,
   },
   transitBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F1F5F9',
+    backgroundColor: Theme.colors.surfaceSubtle,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: Theme.radius.xs,
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: '#000000',
     alignSelf: 'flex-start',
+    ...Theme.shadows.sm,
   },
   clockIcon: {
     marginRight: 4,
@@ -397,7 +449,8 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#000000',
     marginBottom: 16,
-    letterSpacing: -0.3,
+    letterSpacing: -0.4,
+    lineHeight: 25,
   },
   progressSection: {
     marginBottom: 16,
@@ -406,21 +459,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 9,
   },
   progressLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '900',
-    color: '#64748B',
-    letterSpacing: 0.5,
+    color: Theme.colors.textTertiary,
+    letterSpacing: 0.6,
   },
   progressPercentBadge: {
-    backgroundColor: '#FFE600',
-    paddingHorizontal: 6,
-    paddingVertical: 1,
+    backgroundColor: Theme.colors.yellow,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
     borderRadius: Theme.radius.xs,
     borderWidth: 1.5,
     borderColor: '#000000',
+    ...Theme.shadows.sm,
   },
   progressPercent: {
     fontSize: 12,
@@ -429,25 +483,29 @@ const styles = StyleSheet.create({
   },
   metaBox: {
     flexDirection: 'row',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Theme.colors.surfaceSubtle,
     padding: 12,
     borderRadius: Theme.radius.sm,
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: '#000000',
     marginBottom: 10,
   },
   metaItem: {
     flex: 1,
+    minWidth: 0,
   },
   postalItem: {
-    borderLeftWidth: 1.5,
+    flex: 0.55,
+    borderLeftWidth: 2,
     borderLeftColor: '#000000',
     paddingLeft: 12,
+    marginLeft: 12,
   },
   metaLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 6,
   },
   inlineRenameButton: {
     flexDirection: 'row',
@@ -455,40 +513,46 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     paddingHorizontal: 6,
     borderRadius: Theme.radius.xs,
-    backgroundColor: '#FFE600',
-    borderWidth: 1,
+    backgroundColor: Theme.colors.yellow,
+    borderWidth: 1.5,
     borderColor: '#000000',
+    ...Theme.shadows.sm,
+  },
+  inlineRenamePressed: {
+    ...Theme.pressed,
   },
   inlineRenameText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '900',
     color: '#000000',
     marginLeft: 3,
+    letterSpacing: 0.4,
   },
   metaAliasText: {
     fontSize: 15,
     fontWeight: '900',
     color: '#000000',
-    marginTop: 4,
+    marginTop: 5,
   },
   metaLabel: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '900',
-    color: '#64748B',
-    letterSpacing: 0.5,
+    color: Theme.colors.textTertiary,
+    letterSpacing: 0.6,
   },
   metaValueMono: {
     fontSize: 13,
     fontFamily: Theme.isIOS ? 'Courier' : 'monospace',
     fontWeight: '900',
     color: '#000000',
-    marginTop: 2,
+    marginTop: 3,
+    letterSpacing: 0.2,
   },
   metaValue: {
     fontSize: 13,
     fontWeight: '900',
     color: '#000000',
-    marginTop: 2,
+    marginTop: 3,
   },
   updateRow: {
     flexDirection: 'row',
@@ -497,30 +561,26 @@ const styles = StyleSheet.create({
   },
   updateText: {
     fontSize: 11,
-    fontWeight: '600',
-    color: '#64748B',
-    marginLeft: 4,
+    fontWeight: '700',
+    color: Theme.colors.textTertiary,
+    marginLeft: 5,
+    flexShrink: 1,
   },
   refreshHeroButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFE600', // Cyber Yellow
+    backgroundColor: Theme.colors.yellow,
     marginTop: 14,
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: Theme.radius.sm,
     borderWidth: 2,
     borderColor: '#000000',
-    shadowColor: '#000000',
-    shadowOffset: { width: 2.5, height: 2.5 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 3,
-    ...(Theme.isWeb ? ({ boxShadow: '2.5px 2.5px 0px #000000' } as any) : {}),
+    ...Theme.shadows.md,
   },
   refreshHeroButtonDisabled: {
-    opacity: 0.7,
+    opacity: 0.65,
   },
   refreshIcon: {
     marginRight: 8,
@@ -535,25 +595,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFE600',
+    backgroundColor: Theme.colors.yellow,
     paddingVertical: 14,
+    paddingHorizontal: 16,
     borderRadius: Theme.radius.sm,
     marginHorizontal: 20,
     marginBottom: 16,
-    borderWidth: 2.5,
+    borderWidth: Theme.borders.width,
     borderColor: '#000000',
-    shadowColor: '#000000',
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 3,
-    ...(Theme.isWeb ? ({ boxShadow: '3px 3px 0px #000000' } as any) : {}),
+    ...Theme.shadows.md,
   },
   carrierLinkText: {
+    flexShrink: 1,
     color: '#000000',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '900',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
     marginRight: 8,
   },
   deleteButton: {
@@ -563,16 +620,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginHorizontal: 20,
     marginBottom: 32,
-    backgroundColor: '#FF5C38',
+    backgroundColor: Theme.colors.coral,
     borderRadius: Theme.radius.sm,
     borderWidth: 2,
     borderColor: '#000000',
-    shadowColor: '#000000',
-    shadowOffset: { width: 2.5, height: 2.5 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 2,
-    ...(Theme.isWeb ? ({ boxShadow: '2.5px 2.5px 0px #000000' } as any) : {}),
+    ...Theme.shadows.sm,
   },
   deleteIcon: {
     marginRight: 6,
@@ -582,5 +634,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 0.5,
+  },
+  pressed: {
+    ...Theme.pressed,
   },
 });
