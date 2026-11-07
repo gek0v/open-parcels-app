@@ -12,14 +12,11 @@ import { Parcel } from '../../domain/models/parcel';
 import { parcelRepository } from '../../infrastructure/storage/ParcelRepository';
 import { trackingEngineManager } from '../../infrastructure/engine';
 import { Theme } from '../theme/adaptiveTheme';
-import { ParcelCard } from '../components/dashboard/ParcelCard';
 import { ParcelCardBento } from '../components/dashboard/ParcelCardBento';
-import { ParcelCardRetroOS } from '../components/dashboard/ParcelCardRetroOS';
-import { ParcelCardIndustrial } from '../components/dashboard/ParcelCardIndustrial';
 import { BentoStatsWidget } from '../components/dashboard/BentoStatsWidget';
 import { SegmentedFilter, FilterTab } from '../components/dashboard/SegmentedFilter';
 import { RenameParcelModal } from '../components/common/RenameParcelModal';
-import { Plus, Search, X, Package, Cpu, Layers } from 'lucide-react-native';
+import { Plus, Search, X, Package, Cpu } from 'lucide-react-native';
 
 interface DashboardScreenProps {
   onSelectParcel: (parcel: Parcel) => void;
@@ -37,7 +34,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLocalMode, setIsLocalMode] = useState(trackingEngineManager.isLocalFirst());
   const [renamingParcel, setRenamingParcel] = useState<Parcel | null>(null);
-  const [mockupVariant, setMockupVariant] = useState<'A' | 'B' | 'C'>('A');
 
   const loadParcels = useCallback(async () => {
     const list = await parcelRepository.getAll();
@@ -109,60 +105,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Mockup Switcher Bar */}
-      <View style={styles.mockupSwitcher}>
-        <View style={styles.mockupHeaderRow}>
-          <Layers size={13} color="#000000" strokeWidth={2.5} />
-          <Text style={styles.mockupSwitcherLabel}>MOCKUPS PARA ELEGIR:</Text>
-        </View>
-        <View style={styles.mockupTabs}>
-          <Pressable
-            onPress={() => setMockupVariant('A')}
-            style={[styles.mockupTab, mockupVariant === 'A' && styles.mockupTabActive]}
-          >
-            <Text style={[styles.mockupTabText, mockupVariant === 'A' && styles.mockupTabTextActive]}>
-              1. BENTO HERO
-            </Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => setMockupVariant('B')}
-            style={[styles.mockupTab, mockupVariant === 'B' && styles.mockupTabActive]}
-          >
-            <Text style={[styles.mockupTabText, mockupVariant === 'B' && styles.mockupTabTextActive]}>
-              2. RETRO OS
-            </Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => setMockupVariant('C')}
-            style={[styles.mockupTab, mockupVariant === 'C' && styles.mockupTabActive]}
-          >
-            <Text style={[styles.mockupTabText, mockupVariant === 'C' && styles.mockupTabTextActive]}>
-              3. INDUSTRIAL
-            </Text>
-          </Pressable>
-        </View>
-      </View>
-
-      {/* Top Banner Variant B: Retro OS Matrix Header */}
-      {mockupVariant === 'B' && (
-        <View style={styles.retroOsBanner}>
-          <Text style={styles.retroOsBannerText}>
-            ⚡ OPEN PARCELS OS // v1.0.2 // RED 1.500+ CARRIERS
-          </Text>
-        </View>
-      )}
-
-      {/* Top Banner Variant C: Industrial Hazard Ticker */}
-      {mockupVariant === 'C' && (
-        <View style={styles.hazardBanner}>
-          <Text style={styles.hazardBannerText}>
-            /// MANIFIESTO LOGÍSTICO Y TRACKING UNIVERSAL EN TIEMPO REAL ///
-          </Text>
-        </View>
-      )}
-
       {/* Top Bar with Brand and Mode Toggle */}
       <View style={styles.topBar}>
         <View style={styles.brandRow}>
@@ -186,27 +128,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             </Pressable>
           </View>
         </View>
-
-        {/* Quick Add Button in Header */}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Añadir nuevo envío"
-          onPress={onOpenNewParcel}
-          style={({ pressed }) => [styles.headerAddButton, pressed && styles.pressed]}
-        >
-          <Plus size={22} color="#FFFFFF" strokeWidth={3} />
-        </Pressable>
       </View>
 
-      {/* Variant A Special: Hero Bento Stats Widget */}
-      {mockupVariant === 'A' && (
-        <BentoStatsWidget
-          activeCount={counts.active}
-          outForDeliveryCount={outForDeliveryCount}
-          deliveredCount={counts.delivered}
-          onScanPress={onOpenNewParcel}
-        />
-      )}
+      {/* Hero Bento Stats Widget */}
+      <BentoStatsWidget
+        activeCount={counts.active}
+        outForDeliveryCount={outForDeliveryCount}
+        deliveredCount={counts.delivered}
+        onScanPress={onOpenNewParcel}
+      />
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
@@ -277,37 +207,14 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             </Text>
           </View>
         ) : (
-          filteredParcels.map((parcel) => {
-            if (mockupVariant === 'B') {
-              return (
-                <ParcelCardRetroOS
-                  key={parcel.id}
-                  parcel={parcel}
-                  onPress={() => onSelectParcel(parcel)}
-                  onRename={() => setRenamingParcel(parcel)}
-                />
-              );
-            }
-            if (mockupVariant === 'C') {
-              return (
-                <ParcelCardIndustrial
-                  key={parcel.id}
-                  parcel={parcel}
-                  onPress={() => onSelectParcel(parcel)}
-                  onRename={() => setRenamingParcel(parcel)}
-                />
-              );
-            }
-            // Mockup A (Bento Manifest)
-            return (
-              <ParcelCardBento
-                key={parcel.id}
-                parcel={parcel}
-                onPress={() => onSelectParcel(parcel)}
-                onRename={() => setRenamingParcel(parcel)}
-              />
-            );
-          })
+          filteredParcels.map((parcel) => (
+            <ParcelCardBento
+              key={parcel.id}
+              parcel={parcel}
+              onPress={() => onSelectParcel(parcel)}
+              onRename={() => setRenamingParcel(parcel)}
+            />
+          ))
         )}
       </ScrollView>
 
