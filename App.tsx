@@ -10,6 +10,7 @@ import { ParcelDetailScreen } from './src/presentation/screens/ParcelDetailScree
 import { AppLoadingSplash } from './src/presentation/components/common/AppLoadingSplash';
 import { UpdateAvailableModal } from './src/presentation/components/common/UpdateAvailableModal';
 import { updateService, UpdateInfo } from './src/infrastructure/services/UpdateService';
+import { I18nProvider } from './src/infrastructure/i18n';
 import { Theme } from './src/presentation/theme/adaptiveTheme';
 
 export default function App() {
@@ -57,9 +58,10 @@ export default function App() {
   };
 
   return (
-    <SafeAreaProvider style={styles.provider}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
-        <StatusBar style={Theme.isIOS ? 'dark' : 'auto'} />
+    <I18nProvider>
+      <SafeAreaProvider style={styles.provider}>
+        <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
+          <StatusBar style={Theme.isIOS ? 'dark' : 'auto'} />
 
         {selectedParcel ? (
           <ParcelDetailScreen
@@ -107,6 +109,7 @@ export default function App() {
         )}
       </SafeAreaView>
     </SafeAreaProvider>
+    </I18nProvider>
   );
 }
 

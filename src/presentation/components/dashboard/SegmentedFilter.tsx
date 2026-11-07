@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Theme } from '../../theme/adaptiveTheme';
+import { useI18n } from '../../../infrastructure/i18n';
 
 export type FilterTab = 'active' | 'delivered' | 'archived';
 
@@ -19,10 +20,12 @@ export const SegmentedFilter: React.FC<SegmentedFilterProps> = ({
   onTabChange,
   counts,
 }) => {
+  const { t } = useI18n();
+
   const tabs: { key: FilterTab; label: string; count: number; color: string }[] = [
-    { key: 'active', label: 'En camino', count: counts.active, color: Theme.colors.yellow },
-    { key: 'delivered', label: 'Entregados', count: counts.delivered, color: Theme.colors.status.delivered },
-    { key: 'archived', label: 'Archivados', count: counts.archived, color: Theme.colors.pink },
+    { key: 'active', label: t.filter.active, count: counts.active, color: Theme.colors.yellow },
+    { key: 'delivered', label: t.filter.delivered, count: counts.delivered, color: Theme.colors.status.delivered },
+    { key: 'archived', label: t.filter.archived, count: counts.archived, color: Theme.colors.pink },
   ];
 
   return (

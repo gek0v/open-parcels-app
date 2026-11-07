@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { CanonicalStatus, CANONICAL_STATUS_MAP } from '../../../domain/models/status';
 import { Theme } from '../../theme/adaptiveTheme';
+import { useI18n } from '../../../infrastructure/i18n';
 
 interface StatusBadgeProps {
   status: CanonicalStatus;
@@ -29,10 +30,11 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   size = 'medium',
   style,
 }) => {
+  const { t } = useI18n();
   const meta = CANONICAL_STATUS_MAP[status] || CANONICAL_STATUS_MAP.pending;
   const color = Theme.colors.status[status] || Theme.colors.status.pending;
   const isSmall = size === 'small';
-  const label = SHORT_LABELS[status] ?? meta.labelEs;
+  const label = t?.status?.[status] ? t.status[status].toUpperCase() : (SHORT_LABELS[status] ?? meta.labelEs);
 
   return (
     <View

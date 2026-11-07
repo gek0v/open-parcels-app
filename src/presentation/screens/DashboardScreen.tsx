@@ -19,9 +19,10 @@ import { BentoStatsWidget } from '../components/dashboard/BentoStatsWidget';
 import { SegmentedFilter, FilterTab } from '../components/dashboard/SegmentedFilter';
 import { RenameParcelModal } from '../components/common/RenameParcelModal';
 import { updateService, UpdateInfo } from '../../infrastructure/services/UpdateService';
+import { useI18n } from '../../infrastructure/i18n';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
-import { Plus, Search, X, Package, Cpu, Download, LayoutGrid, Barcode, Monitor } from 'lucide-react-native';
+import { Plus, Search, X, Package, Cpu, Download, LayoutGrid, Barcode, Monitor, Languages } from 'lucide-react-native';
 
 export type CardStyle = 'bento' | 'industrial' | 'retro';
 const CARD_STYLE_KEY = '@open_parcels:card_style';
@@ -37,6 +38,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   onOpenNewParcel,
   onUpdateFound,
 }) => {
+  const { t, lang, toggleLang } = useI18n();
   const [parcels, setParcels] = useState<Parcel[]>([]);
   const [activeTab, setActiveTab] = useState<FilterTab>('active');
   const [searchQuery, setSearchQuery] = useState('');
@@ -158,13 +160,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             <View style={styles.headerChipsRow}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Cambiar motor de seguimiento"
+                accessibilityLabel={t.engine.toggleAria}
                 onPress={toggleEngineMode}
                 style={({ pressed }) => [styles.engineToggle, pressed && styles.pressed]}
               >
                 <Cpu size={11} color="#000000" strokeWidth={2.5} />
                 <Text style={styles.engineToggleText} numberOfLines={1}>
-                  {isLocalMode ? 'GO EMBEBIDO' : 'REST :8080'}
+                  {isLocalMode ? t.engine.local : t.engine.rest}
                 </Text>
               </Pressable>
 
@@ -177,8 +179,18 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               >
                 <Download size={11} color="#000000" strokeWidth={2.5} />
                 <Text style={styles.updateCheckText} numberOfLines={1}>
-                  {isCheckingUpdate ? 'BUSCANDO...' : 'ACTUALIZAR'}
+                  {isCheckingUpdate ? t.engine.checking : t.engine.updateBtn}
                 </Text>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Cambiar idioma"
+                onPress={toggleLang}
+                style={({ pressed }) => [styles.langToggleBtn, pressed && styles.pressed]}
+              >
+                <Languages size={11} color="#000000" strokeWidth={2.5} />
+                <Text style={styles.langToggleText}>{lang.toUpperCase()}</Text>
               </Pressable>
             </View>
           </View>
@@ -198,9 +210,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         <View style={[styles.searchBox, isSearchFocused && styles.searchBoxFocused]}>
           <Search size={18} color="#000000" strokeWidth={2.5} style={styles.searchIcon} />
           <TextInput
-            accessibilityLabel="Buscar envíos"
+            accessibilityLabel={t.search.searchAria}
             style={styles.searchInput}
-            placeholder="Buscar por alias, código o transportista..."
+            placeholder={t.search.placeholder}
             placeholderTextColor="#64748B"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -229,7 +241,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
       {/* Card Style Switcher */}
       <View style={styles.cardStyleRow}>
-        <Text style={styles.cardStyleLabel}>DISEÑO:</Text>
+        <Text style={styles.cardStyleLabel}>{t.filter.design}</Text>
         <View style={styles.cardStyleTabs}>
           <Pressable
             accessibilityRole="button"
@@ -302,27 +314,27 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             </View>
             <Text style={styles.emptyTitle}>
               {searchQuery
-                ? 'SIN RESULTADOS'
+                ? t.empty.noResults
                 : activeTab === 'active'
-                ? 'NO HAY PAQUETES EN CAMINO'
+                ? t.empty.noActive
                 : activeTab === 'delivered'
-                ? 'NO HAY PAQUETES ENTREGADOS'
-                : 'NO HAY ENVÍOS ARCHIVADOS'}
+                ? t.empty.noDelivered
+                : t.empty.noArchived}
             </Text>
             <Text style={styles.emptySubtitle}>
               {searchQuery
-                ? 'Prueba con otro término de búsqueda o número de albarán.'
-                : 'Pulsa el botón "+" o "ESCANEAR" para registrar tu primer paquete escaneando su código de barras o introduciendo el número.'}
+                ? t.empty.subNoResults
+                : t.empty.subActive}
             </Text>
             {!searchQuery && activeTab === 'active' && (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Añadir primer envío"
+                accessibilityLabel={t.empty.trackFirstBtn}
                 onPress={onOpenNewParcel}
                 style={({ pressed }) => [styles.emptyAddBtn, pressed && styles.pressed]}
               >
                 <Plus size={16} color="#FFFFFF" strokeWidth={3} />
-                <Text style={styles.emptyAddBtnText}>RASTREAR PRIMER ENVÍO</Text>
+                <Text style={styles.emptyAddBtnText}>{t.empty.trackFirstBtn}</Text>
               </Pressable>
             )}
           </View>
@@ -521,6 +533,25 @@ const styles = StyleSheet.create({
     ...Theme.shadows.sm,
   },
   updateCheckText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#000000',
+    marginLeft: 3,
+    letterSpacing: 0.5,
+  },
+  langToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Theme.radius.xs,
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    alignSelf: 'flex-start',
+    ...Theme.shadows.sm,
+  },
+  langToggleText: {
     fontSize: 9,
     fontWeight: '900',
     color: '#000000',
