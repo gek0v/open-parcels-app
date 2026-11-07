@@ -12,7 +12,7 @@ interface ProgressBarProps {
 export const ProgressBar: React.FC<ProgressBarProps> = ({
   progress,
   status = 'in_transit',
-  height = 6,
+  height = 12,
 }) => {
   const clamped = Math.min(100, Math.max(0, progress));
   const activeColor = Theme.colors.status[status] || Theme.colors.primary;
@@ -35,12 +35,21 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    backgroundColor: Theme.colors.border,
-    borderRadius: Theme.radius.full,
+    backgroundColor: '#FFFFFF',
+    borderRadius: Theme.radius.sm,
+    borderWidth: 2,
+    borderColor: '#000000',
     overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: { width: 1.5, height: 1.5 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 2,
+    ...(Theme.isWeb ? ({ boxShadow: '1.5px 1.5px 0px #000000' } as any) : {}),
   },
   fill: {
     height: '100%',
-    borderRadius: Theme.radius.full,
+    borderRightWidth: 2,
+    borderRightColor: '#000000',
   },
 });

@@ -3,122 +3,154 @@ import { CanonicalStatus } from '../../domain/models/status';
 
 export const isIOS = Platform.OS === 'ios';
 export const isAndroid = Platform.OS === 'android';
+export const isWeb = Platform.OS === 'web';
 
 export const Theme = {
   isIOS,
   isAndroid,
+  isWeb,
 
   colors: {
-    // Backgrounds & Surfaces
-    background: isIOS ? '#F2F2F7' : '#F6F8FA', // iOS SystemGroupedBackground vs Android MD3 surface
-    backgroundDark: '#0D1117',
+    // Neo-Brutalist Canvas & Surfaces (Acid Lime canvas as seen in Ref 4, clean modular cards)
+    background: '#D9FF38', // Acid Lime canvas
+    backgroundSubtle: '#ECFF82',
     surface: '#FFFFFF',
-    surfaceSubtle: isIOS ? '#E5E5EA' : '#EDF2F7',
-    surfaceElevated: isIOS ? '#FFFFFF' : '#F1F5F9',
+    surfaceSubtle: '#F4F4EB',
+    surfaceElevated: '#FFE600', // Cyber Yellow
+    surfaceDark: '#000000',
 
-    // Text & Hierarchy
-    textPrimary: '#0F172A',
-    textSecondary: '#64748B',
-    textTertiary: '#94A3B8',
+    // Neo-Brutalism Accent Palettes
+    yellow: '#FFE600',
+    coral: '#FF5C38',
+    mint: '#10B981',
+    blue: '#2563EB',
+    purple: '#7C3AED',
+    pink: '#F472B6',
+
+    // High Contrast Text & Hierarchy
+    textPrimary: '#000000',
+    textSecondary: '#1E293B',
+    textTertiary: '#64748B',
     textInverse: '#FFFFFF',
 
-    // Primary Brand Accent (Open Parcels Indigo / Tech Blue)
-    primary: isIOS ? '#007AFF' : '#2563EB',
-    primaryLight: isIOS ? '#EBF5FF' : '#EFF6FF',
-    primaryDark: '#1D4ED8',
+    // Primary Brand Accent (Punchy Electric Blue)
+    primary: '#2563EB',
+    primaryLight: '#DBEAFE',
+    primaryDark: '#1E40AF',
 
-    // Borders & Dividers
-    border: isIOS ? '#E2E8F0' : '#E2E8F0',
-    borderStrong: '#CBD5E1',
+    // Strict 2.5px Solid Black Borders
+    border: '#000000',
+    borderStrong: '#000000',
 
-    // Status Colors (Matching Open Parcels 8 Canonical states)
+    // Neo-Brutalist Canonical Status Tints (Punchy sticker fills with black text)
     status: {
-      pending: '#64748B',
-      info_received: '#8B5CF6',
-      in_transit: '#0284C7',
-      out_for_delivery: '#D97706',
-      delivered: '#059669',
-      failed_attempt: '#DC2626',
-      exception: '#E11D48',
-      expired: '#475569',
+      pending: '#94A3B8',
+      info_received: '#C084FC', // Purple sticker
+      in_transit: '#38BDF8', // Cyan sticker
+      out_for_delivery: '#FF9900', // Bright Amber sticker
+      delivered: '#34D399', // Mint sticker
+      failed_attempt: '#FF5C38', // Neon Coral sticker
+      exception: '#F43F5E', // Rose sticker
+      expired: '#94A3B8',
     } as Record<CanonicalStatus, string>,
 
     statusLight: {
       pending: '#F1F5F9',
-      info_received: '#F5F3FF',
-      in_transit: '#F0F9FF',
-      out_for_delivery: '#FFFBEB',
-      delivered: '#ECFDF5',
-      failed_attempt: '#FEF2F2',
-      exception: '#FFF1F2',
-      expired: '#F8FAFC',
+      info_received: '#F3E8FF',
+      in_transit: '#E0F2FE',
+      out_for_delivery: '#FEF3C7',
+      delivered: '#D1FAE5',
+      failed_attempt: '#FEE2E2',
+      exception: '#FFE4E6',
+      expired: '#F1F5F9',
     } as Record<CanonicalStatus, string>,
   },
 
+  borders: {
+    width: 2.5,
+    thin: 2,
+    color: '#000000',
+  },
+
   radius: {
-    xs: 6,
-    sm: isIOS ? 10 : 8,
-    md: isIOS ? 14 : 16,
-    lg: isIOS ? 18 : 24, // Material 3 uses larger pill/container corners
+    none: 0,
+    xs: 4,
+    sm: 8,
+    md: 14,
+    lg: 20,
     full: 9999,
   },
 
+  // Hard Zero-Blur Drop Shadows (4px 4px 0px #000)
   shadows: {
-    card: isIOS
-      ? {
-          shadowColor: '#000000',
-          shadowOffset: { width: 0, height: 3 },
-          shadowOpacity: 0.06,
-          shadowRadius: 8,
-        }
-      : {
-          elevation: 2,
-        },
-    elevated: isIOS
-      ? {
-          shadowColor: '#000000',
-          shadowOffset: { width: 0, height: 6 },
-          shadowOpacity: 0.1,
-          shadowRadius: 16,
-        }
-      : {
-          elevation: 4,
-        },
+    card: {
+      borderWidth: 2.5,
+      borderColor: '#000000',
+      shadowColor: '#000000',
+      shadowOffset: { width: 4, height: 4 },
+      shadowOpacity: 1,
+      shadowRadius: 0,
+      elevation: 5,
+      ...(isWeb ? ({ boxShadow: '4px 4px 0px #000000' } as any) : {}),
+    },
+    cardSm: {
+      borderWidth: 2,
+      borderColor: '#000000',
+      shadowColor: '#000000',
+      shadowOffset: { width: 2.5, height: 2.5 },
+      shadowOpacity: 1,
+      shadowRadius: 0,
+      elevation: 3,
+      ...(isWeb ? ({ boxShadow: '2.5px 2.5px 0px #000000' } as any) : {}),
+    },
+    elevated: {
+      borderWidth: 3,
+      borderColor: '#000000',
+      shadowColor: '#000000',
+      shadowOffset: { width: 5, height: 5 },
+      shadowOpacity: 1,
+      shadowRadius: 0,
+      elevation: 7,
+      ...(isWeb ? ({ boxShadow: '5px 5px 0px #000000' } as any) : {}),
+    },
   },
 
   typography: {
-    fontFamily: isIOS ? 'System' : 'Roboto',
+    fontFamily: isIOS ? 'System' : 'sans-serif',
     titleLarge: {
-      fontSize: isIOS ? 28 : 24,
-      fontWeight: '700' as const,
-      letterSpacing: isIOS ? 0.35 : 0,
-      lineHeight: isIOS ? 34 : 32,
+      fontSize: 26,
+      fontWeight: '900' as const,
+      letterSpacing: -0.5,
+      lineHeight: 32,
+      color: '#000000',
     },
     titleMedium: {
       fontSize: 18,
-      fontWeight: '600' as const,
-      letterSpacing: 0.15,
+      fontWeight: '800' as const,
+      letterSpacing: -0.2,
       lineHeight: 24,
+      color: '#000000',
     },
     bodyLarge: {
-      fontSize: 16,
-      fontWeight: '400' as const,
+      fontSize: 15,
+      fontWeight: '600' as const,
       lineHeight: 22,
     },
     bodyMedium: {
       fontSize: 14,
-      fontWeight: '400' as const,
+      fontWeight: '500' as const,
       lineHeight: 20,
     },
     bodySmall: {
       fontSize: 12,
-      fontWeight: '400' as const,
+      fontWeight: '600' as const,
       lineHeight: 16,
     },
     caption: {
       fontSize: 11,
-      fontWeight: '500' as const,
-      letterSpacing: 0.4,
+      fontWeight: '700' as const,
+      letterSpacing: 0.5,
+      textTransform: 'uppercase' as const,
     },
   },
 };

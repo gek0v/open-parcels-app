@@ -11,8 +11,6 @@ interface StatusBadgeProps {
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'medium' }) => {
   const meta = CANONICAL_STATUS_MAP[status] || CANONICAL_STATUS_MAP.pending;
   const color = Theme.colors.status[status] || Theme.colors.status.pending;
-  const bgColor = Theme.colors.statusLight[status] || Theme.colors.statusLight.pending;
-
   const isSmall = size === 'small';
 
   return (
@@ -20,25 +18,21 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'medium
       style={[
         styles.badge,
         {
-          backgroundColor: bgColor,
-          borderColor: color + '40',
+          backgroundColor: color,
           paddingVertical: isSmall ? 3 : 5,
-          paddingHorizontal: isSmall ? 8 : 10,
+          paddingHorizontal: isSmall ? 8 : 12,
         },
       ]}
     >
-      <View style={[styles.dot, { backgroundColor: color }]} />
       <Text
         style={[
           styles.text,
           {
-            color: color,
-            fontSize: isSmall ? 11 : 12,
-            fontWeight: '600',
+            fontSize: isSmall ? 10 : 11,
           },
         ]}
       >
-        {meta.labelEs}
+        {meta.labelEs.toUpperCase()}
       </Text>
     </View>
   );
@@ -48,17 +42,20 @@ const styles = StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: Theme.radius.full,
-    borderWidth: 1,
+    borderRadius: Theme.radius.sm,
+    borderWidth: 2,
+    borderColor: '#000000',
     alignSelf: 'flex-start',
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 6,
+    shadowColor: '#000000',
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 2,
+    ...(Theme.isWeb ? ({ boxShadow: '2px 2px 0px #000000' } as any) : {}),
   },
   text: {
-    letterSpacing: 0.2,
+    color: '#000000',
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
 });

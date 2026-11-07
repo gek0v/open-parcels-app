@@ -20,8 +20,8 @@ export const CarrierDetectorBar: React.FC<CarrierDetectorBarProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.labelRow}>
-        <Sparkles size={14} color={Theme.colors.primary} style={styles.sparkleIcon} />
-        <Text style={styles.headerLabel}>Transportistas detectados automáticamente:</Text>
+        <Sparkles size={14} color="#000000" style={styles.sparkleIcon} />
+        <Text style={styles.headerLabel}>TRANSPORTISTAS DETECTADOS:</Text>
       </View>
 
       <ScrollView
@@ -39,22 +39,16 @@ export const CarrierDetectorBar: React.FC<CarrierDetectorBarProps> = ({
               onPress={() => onSelectCarrier(item.carrier.slug)}
               style={[
                 styles.chip,
-                isSelected && styles.chipSelected,
+                isSelected ? styles.chipSelected : styles.chipUnselected,
               ]}
             >
-              <View
-                style={[
-                  styles.carrierDot,
-                  { backgroundColor: item.carrier.color || Theme.colors.primary },
-                ]}
-              />
               <Text
                 style={[
                   styles.carrierName,
                   isSelected && styles.carrierNameSelected,
                 ]}
               >
-                {item.carrier.name}
+                {item.carrier.name.toUpperCase()}
               </Text>
               <View
                 style={[
@@ -72,7 +66,7 @@ export const CarrierDetectorBar: React.FC<CarrierDetectorBarProps> = ({
                 </Text>
               </View>
               {isSelected && (
-                <Check size={14} color={Theme.colors.primary} style={styles.checkIcon} />
+                <Check size={14} color="#000000" strokeWidth={3} style={styles.checkIcon} />
               )}
             </Pressable>
           );
@@ -95,63 +89,64 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   headerLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Theme.colors.textSecondary,
-    textTransform: 'uppercase',
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#000000',
     letterSpacing: 0.5,
   },
   scrollList: {
     flexDirection: 'row',
-    paddingVertical: 2,
+    paddingVertical: 4,
   },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: Theme.radius.full,
-    backgroundColor: Theme.colors.surface,
-    borderWidth: 1,
-    borderColor: Theme.colors.border,
+    paddingVertical: 8,
+    borderRadius: Theme.radius.sm,
+    borderWidth: 2,
+    borderColor: '#000000',
     marginRight: 8,
+    shadowColor: '#000000',
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 2,
+    ...(Theme.isWeb ? ({ boxShadow: '2px 2px 0px #000000' } as any) : {}),
+  },
+  chipUnselected: {
+    backgroundColor: '#FFFFFF',
   },
   chipSelected: {
-    backgroundColor: Theme.colors.primaryLight,
-    borderColor: Theme.colors.primary,
-  },
-  carrierDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
+    backgroundColor: '#FFE600', // Cyber Yellow
+    shadowOffset: { width: 3, height: 3 },
+    ...(Theme.isWeb ? ({ boxShadow: '3px 3px 0px #000000' } as any) : {}),
   },
   carrierName: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: Theme.colors.textPrimary,
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#000000',
   },
   carrierNameSelected: {
-    fontWeight: '700',
-    color: Theme.colors.primary,
+    color: '#000000',
   },
   confidenceBadge: {
     marginLeft: 6,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: Theme.radius.sm,
-    backgroundColor: Theme.colors.surfaceSubtle,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Theme.radius.xs,
+    backgroundColor: '#000000',
   },
   confidenceBadgeSelected: {
-    backgroundColor: '#DBEAFE',
+    backgroundColor: '#000000',
   },
   confidenceText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: Theme.colors.textSecondary,
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#FFFFFF',
   },
   confidenceTextSelected: {
-    color: Theme.colors.primary,
+    color: '#FFE600',
   },
   checkIcon: {
     marginLeft: 4,

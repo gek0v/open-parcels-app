@@ -19,10 +19,10 @@ export const SegmentedFilter: React.FC<SegmentedFilterProps> = ({
   onTabChange,
   counts,
 }) => {
-  const tabs: { key: FilterTab; label: string; count: number }[] = [
-    { key: 'active', label: 'En camino', count: counts.active },
-    { key: 'delivered', label: 'Entregados', count: counts.delivered },
-    { key: 'archived', label: 'Archivados', count: counts.archived },
+  const tabs: { key: FilterTab; label: string; count: number; color: string }[] = [
+    { key: 'active', label: 'En camino', count: counts.active, color: '#FFE600' },
+    { key: 'delivered', label: 'Entregados', count: counts.delivered, color: '#34D399' },
+    { key: 'archived', label: 'Archivados', count: counts.archived, color: '#F472B6' },
   ];
 
   return (
@@ -35,7 +35,7 @@ export const SegmentedFilter: React.FC<SegmentedFilterProps> = ({
             onPress={() => onTabChange(tab.key)}
             style={[
               styles.tab,
-              isActive && styles.activeTab,
+              isActive && [styles.activeTab, { backgroundColor: tab.color }],
             ]}
           >
             <Text style={[styles.tabLabel, isActive && styles.activeTabLabel]}>
@@ -48,12 +48,7 @@ export const SegmentedFilter: React.FC<SegmentedFilterProps> = ({
                   isActive && styles.activeCountBadge,
                 ]}
               >
-                <Text
-                  style={[
-                    styles.countText,
-                    isActive && styles.activeCountText,
-                  ]}
-                >
+                <Text style={styles.countText}>
                   {tab.count}
                 </Text>
               </View>
@@ -68,9 +63,7 @@ export const SegmentedFilter: React.FC<SegmentedFilterProps> = ({
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    backgroundColor: Theme.isIOS ? '#E2E8F0' : '#E2E8F0',
-    borderRadius: Theme.radius.lg,
-    padding: 3,
+    gap: 8,
     marginHorizontal: 20,
     marginBottom: 16,
   },
@@ -79,47 +72,46 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    borderRadius: Theme.radius.md,
+    paddingVertical: 10,
+    borderRadius: Theme.radius.sm,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#000000',
+    shadowColor: '#000000',
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 2,
+    ...(Theme.isWeb ? ({ boxShadow: '2px 2px 0px #000000' } as any) : {}),
   },
   activeTab: {
-    backgroundColor: Theme.colors.surface,
-    ...(Theme.isIOS
-      ? {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.08,
-          shadowRadius: 4,
-        }
-      : {
-          elevation: 2,
-        }),
+    shadowOffset: { width: 3, height: 3 },
+    ...(Theme.isWeb ? ({ boxShadow: '3px 3px 0px #000000' } as any) : {}),
   },
   tabLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: Theme.colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#000000',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
   activeTabLabel: {
-    fontWeight: '700',
-    color: Theme.colors.textPrimary,
+    fontWeight: '900',
+    color: '#000000',
   },
   countBadge: {
     marginLeft: 6,
     paddingHorizontal: 6,
     paddingVertical: 1,
-    borderRadius: Theme.radius.full,
-    backgroundColor: Theme.colors.border,
+    borderRadius: Theme.radius.xs,
+    backgroundColor: '#000000',
   },
   activeCountBadge: {
-    backgroundColor: Theme.colors.primaryLight,
+    backgroundColor: '#000000',
   },
   countText: {
     fontSize: 11,
-    fontWeight: '600',
-    color: Theme.colors.textSecondary,
-  },
-  activeCountText: {
-    color: Theme.colors.primary,
+    fontWeight: '900',
+    color: '#FFFFFF',
   },
 });

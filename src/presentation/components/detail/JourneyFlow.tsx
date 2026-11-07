@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Parcel } from '../../../domain/models/parcel';
 import { Theme } from '../../theme/adaptiveTheme';
-import { Plane, Truck, MapPin, CheckCircle2, ArrowRight } from 'lucide-react-native';
+import { Plane, Truck, MapPin, ArrowRight } from 'lucide-react-native';
 
 interface JourneyFlowProps {
   parcel: Parcel;
@@ -10,29 +10,36 @@ interface JourneyFlowProps {
 
 export const JourneyFlow: React.FC<JourneyFlowProps> = ({ parcel }) => {
   const isChained = !!(parcel.additionalCarriers && parcel.additionalCarriers.length > 0);
-  const isDelivered = parcel.status === 'delivered';
 
   return (
     <View style={styles.card}>
-      <Text style={styles.cardTitle}>Trayecto Multitransportista (Journey)</Text>
+      {/* Retro window header */}
+      <View style={styles.cardHeader}>
+        <View style={styles.dotsRow}>
+          <View style={[styles.dot, { backgroundColor: '#FF5C38' }]} />
+          <View style={[styles.dot, { backgroundColor: '#FFE600' }]} />
+          <View style={[styles.dot, { backgroundColor: '#10B981' }]} />
+        </View>
+        <Text style={styles.cardTitle}>TRAYECTO MULTITRANSPORTISTA</Text>
+      </View>
 
       {/* Origin -> Destination Banner */}
       <View style={styles.routeHeader}>
         <View style={styles.locationNode}>
-          <MapPin size={16} color={Theme.colors.primary} />
+          <MapPin size={16} color="#000000" />
           <Text style={styles.countryText}>
-            {parcel.origin ? `${parcel.origin.name} (${parcel.origin.code})` : 'Origen'}
+            {parcel.origin ? `${parcel.origin.name} (${parcel.origin.code})` : 'ORIGEN'}
           </Text>
         </View>
 
-        <ArrowRight size={16} color={Theme.colors.textTertiary} style={styles.routeArrow} />
+        <ArrowRight size={18} color="#000000" strokeWidth={2.5} style={styles.routeArrow} />
 
         <View style={styles.locationNode}>
-          <MapPin size={16} color={Theme.colors.status.delivered} />
+          <MapPin size={16} color="#000000" />
           <Text style={styles.countryText}>
             {parcel.destination
               ? `${parcel.destination.name} (${parcel.destination.code})`
-              : 'Destino'}
+              : 'DESTINO'}
           </Text>
         </View>
       </View>
@@ -41,11 +48,11 @@ export const JourneyFlow: React.FC<JourneyFlowProps> = ({ parcel }) => {
       <View style={styles.carrierChainContainer}>
         {/* First Leg Carrier */}
         <View style={styles.carrierLeg}>
-          <View style={[styles.carrierIconBox, { backgroundColor: '#EFF6FF' }]}>
-            <Plane size={18} color="#2563EB" />
+          <View style={[styles.carrierIconBox, { backgroundColor: '#38BDF8' }]}>
+            <Plane size={18} color="#000000" />
           </View>
           <View style={styles.carrierDetails}>
-            <Text style={styles.legRole}>Tramo Internacional</Text>
+            <Text style={styles.legRole}>TRAMO INTERNACIONAL</Text>
             <Text style={styles.carrierLegName}>{parcel.carrier.name}</Text>
           </View>
         </View>
@@ -56,16 +63,16 @@ export const JourneyFlow: React.FC<JourneyFlowProps> = ({ parcel }) => {
             <View style={styles.chainConnector}>
               <View style={styles.chainDottedLine} />
               <View style={styles.transferBadge}>
-                <Text style={styles.transferText}>Fusión & Traspaso</Text>
+                <Text style={styles.transferText}>FUSIÓN & RELEVO</Text>
               </View>
             </View>
 
             <View style={styles.carrierLeg}>
-              <View style={[styles.carrierIconBox, { backgroundColor: '#ECFDF5' }]}>
-                <Truck size={18} color="#059669" />
+              <View style={[styles.carrierIconBox, { backgroundColor: '#34D399' }]}>
+                <Truck size={18} color="#000000" />
               </View>
               <View style={styles.carrierDetails}>
-                <Text style={styles.legRole}>Última Milla Local</Text>
+                <Text style={styles.legRole}>ÚLTIMA MILLA LOCAL</Text>
                 <Text style={styles.carrierLegName}>{parcel.lastMileCarrier.name}</Text>
               </View>
             </View>
@@ -78,29 +85,56 @@ export const JourneyFlow: React.FC<JourneyFlowProps> = ({ parcel }) => {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: Theme.colors.surface,
+    backgroundColor: '#FFFFFF',
     borderRadius: Theme.radius.md,
     padding: 16,
     marginHorizontal: 20,
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: Theme.colors.border,
-    ...Theme.shadows.card,
+    borderWidth: 2.5,
+    borderColor: '#000000',
+    shadowColor: '#000000',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 5,
+    ...(Theme.isWeb ? ({ boxShadow: '4px 4px 0px #000000' } as any) : {}),
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom: 10,
+    marginBottom: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: '#000000',
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginRight: 10,
+  },
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: '#000000',
   },
   cardTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Theme.colors.textPrimary,
-    marginBottom: 12,
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: 0.5,
   },
   routeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: Theme.colors.surfaceSubtle,
+    backgroundColor: '#FFE600',
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: Theme.radius.sm,
+    borderWidth: 2,
+    borderColor: '#000000',
     marginBottom: 14,
   },
   locationNode: {
@@ -112,8 +146,8 @@ const styles = StyleSheet.create({
   },
   countryText: {
     fontSize: 13,
-    fontWeight: '600',
-    color: Theme.colors.textPrimary,
+    fontWeight: '900',
+    color: '#000000',
     marginLeft: 6,
   },
   carrierChainContainer: {
@@ -125,26 +159,28 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   carrierIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: Theme.radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+    borderWidth: 2,
+    borderColor: '#000000',
   },
   carrierDetails: {
     flex: 1,
   },
   legRole: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: Theme.colors.textSecondary,
-    textTransform: 'uppercase',
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#64748B',
+    letterSpacing: 0.5,
   },
   carrierLegName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Theme.colors.textPrimary,
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#000000',
   },
   chainConnector: {
     flexDirection: 'row',
@@ -153,20 +189,21 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   chainDottedLine: {
-    width: 2,
-    height: 20,
-    backgroundColor: Theme.colors.borderStrong,
+    width: 2.5,
+    height: 22,
+    backgroundColor: '#000000',
   },
   transferBadge: {
     marginLeft: 14,
-    backgroundColor: Theme.colors.surfaceSubtle,
+    backgroundColor: '#000000',
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: Theme.radius.full,
+    borderRadius: Theme.radius.xs,
   },
   transferText: {
     fontSize: 10,
-    fontWeight: '600',
-    color: Theme.colors.textSecondary,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
 });

@@ -5,7 +5,7 @@ import { AdaptiveCard } from '../common/AdaptiveCard';
 import { StatusBadge } from '../common/StatusBadge';
 import { ProgressBar } from '../common/ProgressBar';
 import { Theme } from '../../theme/adaptiveTheme';
-import { ArrowRight, Clock, Box, Edit2 } from 'lucide-react-native';
+import { ArrowRight, Clock, Edit2 } from 'lucide-react-native';
 
 interface ParcelCardProps {
   parcel: Parcel;
@@ -18,23 +18,17 @@ export const ParcelCard: React.FC<ParcelCardProps> = ({ parcel, onPress, onRenam
   const isChained = !!(parcel.additionalCarriers && parcel.additionalCarriers.length > 0);
 
   return (
-    <AdaptiveCard onPress={onPress}>
+    <AdaptiveCard onPress={onPress} hasWindowHeader>
       {/* Top Header: Carrier info & Status */}
       <View style={styles.headerRow}>
-        <View style={styles.carrierBadge}>
-          <View
-            style={[
-              styles.carrierDot,
-              { backgroundColor: parcel.carrier.color || Theme.colors.primary },
-            ]}
-          />
+        <View style={styles.carrierTag}>
           <Text style={styles.carrierName} numberOfLines={1}>
             {parcel.carrier.name}
           </Text>
 
           {isChained && parcel.lastMileCarrier && (
             <View style={styles.chainedRow}>
-              <ArrowRight size={12} color={Theme.colors.textTertiary} style={styles.chainArrow} />
+              <ArrowRight size={13} color="#000" style={styles.chainArrow} />
               <Text style={styles.lastMileText} numberOfLines={1}>
                 {parcel.lastMileCarrier.name}
               </Text>
@@ -60,18 +54,19 @@ export const ParcelCard: React.FC<ParcelCardProps> = ({ parcel, onPress, onRenam
               style={styles.cardRenameButton}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Edit2 size={13} color={Theme.colors.textTertiary} />
+              <Edit2 size={13} color="#000000" />
             </Pressable>
           )}
         </View>
-        {parcel.customAlias && (
+
+        <View style={styles.trackingBox}>
           <Text style={styles.trackingNumber}>{parcel.trackingNumber}</Text>
-        )}
+        </View>
       </View>
 
       {/* Progress Bar */}
       <View style={styles.progressContainer}>
-        <ProgressBar progress={parcel.progress} status={parcel.status} height={5} />
+        <ProgressBar progress={parcel.progress} status={parcel.status} height={10} />
       </View>
 
       {/* Footer: Latest Event and Days in Transit */}
@@ -83,7 +78,7 @@ export const ParcelCard: React.FC<ParcelCardProps> = ({ parcel, onPress, onRenam
         </View>
 
         <View style={styles.daysBadge}>
-          <Clock size={12} color={Theme.colors.textSecondary} style={styles.clockIcon} />
+          <Clock size={12} color="#000000" style={styles.clockIcon} />
           <Text style={styles.daysText}>{parcel.daysInTransit}d</Text>
         </View>
       </View>
@@ -96,24 +91,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 10,
   },
-  carrierBadge: {
+  carrierTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
+    backgroundColor: '#FFE600',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: Theme.radius.xs,
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    flexShrink: 1,
     marginRight: 8,
   },
-  carrierDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
   carrierName: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Theme.colors.textPrimary,
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#000000',
+    textTransform: 'uppercase',
   },
   chainedRow: {
     flexDirection: 'row',
@@ -125,11 +121,12 @@ const styles = StyleSheet.create({
   },
   lastMileText: {
     fontSize: 11,
-    fontWeight: '500',
-    color: Theme.colors.textSecondary,
+    fontWeight: '800',
+    color: '#000000',
+    textTransform: 'uppercase',
   },
   titleSection: {
-    marginBottom: 10,
+    marginBottom: 8,
   },
   titleRow: {
     flexDirection: 'row',
@@ -137,26 +134,45 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   cardRenameButton: {
-    padding: 4,
-    borderRadius: Theme.radius.sm,
-    backgroundColor: Theme.colors.surfaceSubtle,
+    padding: 5,
+    borderRadius: Theme.radius.xs,
+    backgroundColor: '#FFE600',
+    borderWidth: 1.5,
+    borderColor: '#000000',
     marginLeft: 8,
+    shadowColor: '#000000',
+    shadowOffset: { width: 1.5, height: 1.5 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 2,
+    ...(Theme.isWeb ? ({ boxShadow: '1.5px 1.5px 0px #000000' } as any) : {}),
   },
   alias: {
     flex: 1,
-    fontSize: 16,
-    fontWeight: '700',
-    color: Theme.colors.textPrimary,
-    letterSpacing: 0.1,
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: -0.3,
+  },
+  trackingBox: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Theme.radius.xs,
+    borderWidth: 1,
+    borderColor: '#000000',
+    marginTop: 4,
   },
   trackingNumber: {
     fontSize: 12,
     fontFamily: Theme.isIOS ? 'Courier' : 'monospace',
-    color: Theme.colors.textSecondary,
-    marginTop: 2,
+    fontWeight: '700',
+    color: '#000000',
+    letterSpacing: 0.5,
   },
   progressContainer: {
-    marginVertical: 8,
+    marginVertical: 10,
   },
   footerRow: {
     flexDirection: 'row',
@@ -170,22 +186,31 @@ const styles = StyleSheet.create({
   },
   latestEventText: {
     fontSize: 12,
-    color: Theme.colors.textSecondary,
+    fontWeight: '600',
+    color: '#334155',
   },
   daysBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: Theme.radius.sm,
-    backgroundColor: Theme.colors.surfaceSubtle,
+    borderRadius: Theme.radius.xs,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    shadowColor: '#000000',
+    shadowOffset: { width: 1.5, height: 1.5 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 1,
+    ...(Theme.isWeb ? ({ boxShadow: '1.5px 1.5px 0px #000000' } as any) : {}),
   },
   clockIcon: {
     marginRight: 4,
   },
   daysText: {
     fontSize: 11,
-    fontWeight: '600',
-    color: Theme.colors.textSecondary,
+    fontWeight: '900',
+    color: '#000000',
   },
 });

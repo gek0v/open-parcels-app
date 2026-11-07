@@ -43,6 +43,7 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
   onUpdateAlias,
 }) => {
   const [renameModalVisible, setRenameModalVisible] = useState(false);
+
   const handleOpenCarrierWeb = () => {
     const url = parcel.carrier.website || 'https://openparcels.com';
     Linking.openURL(url).catch(() => {
@@ -53,7 +54,7 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `Seguimiento de envío Open Parcels:\n${parcel.customAlias || ''} (${parcel.trackingNumber})\nEstado: ${parcel.statusText} (${parcel.progress}%)\nTransportista: ${parcel.carrier.name}`,
+        message: `📦 Envío Open Parcels: ${parcel.customAlias || ''} (${parcel.trackingNumber})\nEstado: ${parcel.statusText} (${parcel.progress}%)\nTransportista: ${parcel.carrier.name}`,
       });
     } catch {}
   };
@@ -81,7 +82,7 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
       const d = new Date(isoStr);
       return (
         d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) +
-        ' a las ' +
+        ' · ' +
         d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
       );
     } catch {
@@ -94,14 +95,14 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
       {/* Top Navigation Bar */}
       <View style={styles.navBar}>
         <Pressable onPress={onBack} style={styles.navButton}>
-          <ArrowLeft size={22} color={Theme.colors.textPrimary} />
+          <ArrowLeft size={20} color="#000000" strokeWidth={2.5} />
         </Pressable>
 
         <View style={styles.navTitleBox}>
           <Text style={styles.navTitle} numberOfLines={1}>
             {parcel.customAlias || parcel.trackingNumber}
           </Text>
-          <Text style={styles.navSubtitle}>{parcel.carrier.name}</Text>
+          <Text style={styles.navSubtitle}>{parcel.carrier.name.toUpperCase()}</Text>
         </View>
 
         <View style={styles.navActions}>
@@ -110,19 +111,16 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
             style={styles.navButton}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Edit2 size={18} color={Theme.colors.primary} />
+            <Edit2 size={16} color="#000000" />
           </Pressable>
           <Pressable onPress={handleShare} style={styles.navButton}>
-            <Share2 size={20} color={Theme.colors.textSecondary} />
+            <Share2 size={16} color="#000000" />
           </Pressable>
           <Pressable
             onPress={() => onToggleArchive(parcel.id)}
             style={[styles.navButton, parcel.isArchived && styles.navButtonActive]}
           >
-            <Archive
-              size={20}
-              color={parcel.isArchived ? Theme.colors.primary : Theme.colors.textSecondary}
-            />
+            <Archive size={16} color="#000000" />
           </Pressable>
         </View>
       </View>
@@ -133,8 +131,8 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
           <View style={styles.heroTopRow}>
             <StatusBadge status={parcel.status} size="medium" />
             <View style={styles.transitBadge}>
-              <Clock size={13} color={Theme.colors.textSecondary} style={styles.clockIcon} />
-              <Text style={styles.transitText}>{parcel.daysInTransit} días en tránsito</Text>
+              <Clock size={12} color="#000000" style={styles.clockIcon} />
+              <Text style={styles.transitText}>{parcel.daysInTransit} DÍAS EN TRÁNSITO</Text>
             </View>
           </View>
 
@@ -143,46 +141,48 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
           {/* Large Progress Bar with Numerical Percentage */}
           <View style={styles.progressSection}>
             <View style={styles.progressHeader}>
-              <Text style={styles.progressLabel}>Progreso del Envío</Text>
-              <Text style={styles.progressPercent}>{parcel.progress}%</Text>
+              <Text style={styles.progressLabel}>PROGRESO DEL ENVÍO</Text>
+              <View style={styles.progressPercentBadge}>
+                <Text style={styles.progressPercent}>{parcel.progress}%</Text>
+              </View>
             </View>
-            <ProgressBar progress={parcel.progress} status={parcel.status} height={8} />
+            <ProgressBar progress={parcel.progress} status={parcel.status} height={14} />
           </View>
 
           {/* Monospaced Tracking Number and Postal Code */}
           <View style={styles.metaBox}>
             <View style={styles.metaItem}>
               <View style={styles.metaLabelRow}>
-                <Text style={styles.metaLabel}>Alias</Text>
+                <Text style={styles.metaLabel}>ALIAS DEL PAQUETE</Text>
                 <Pressable
                   onPress={() => setRenameModalVisible(true)}
                   style={styles.inlineRenameButton}
                 >
-                  <Edit2 size={12} color={Theme.colors.primary} />
-                  <Text style={styles.inlineRenameText}>Renombrar</Text>
+                  <Edit2 size={11} color="#000000" />
+                  <Text style={styles.inlineRenameText}>EDITAR</Text>
                 </Pressable>
               </View>
               <Text style={styles.metaAliasText}>
-                {parcel.customAlias || 'Sin alias (toca para renombrar)'}
+                {parcel.customAlias || 'Sin alias personalizado'}
               </Text>
             </View>
           </View>
 
           <View style={styles.metaBox}>
             <View style={styles.metaItem}>
-              <Text style={styles.metaLabel}>Nº Seguimiento</Text>
+              <Text style={styles.metaLabel}>Nº SEGUIMIENTO / ALBARÁN</Text>
               <Text style={styles.metaValueMono}>{parcel.trackingNumber}</Text>
             </View>
             {parcel.postalCode && (
-              <View style={styles.metaItem}>
-                <Text style={styles.metaLabel}>C.P. Destino</Text>
+              <View style={[styles.metaItem, styles.postalItem]}>
+                <Text style={styles.metaLabel}>C.P. DESTINO</Text>
                 <Text style={styles.metaValue}>{parcel.postalCode}</Text>
               </View>
             )}
           </View>
 
           <View style={styles.updateRow}>
-            <Calendar size={12} color={Theme.colors.textTertiary} />
+            <Calendar size={12} color="#64748B" />
             <Text style={styles.updateText}>
               Última actualización: {formatUpdatedAt(parcel.updatedAt)}
             </Text>
@@ -195,9 +195,9 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
         {/* Carrier Official Website Action Button */}
         <Pressable onPress={handleOpenCarrierWeb} style={styles.carrierLinkButton}>
           <Text style={styles.carrierLinkText}>
-            Ver seguimiento oficial en {parcel.carrier.name}
+            SEGUIMIENTO OFICIAL EN {parcel.carrier.name.toUpperCase()}
           </Text>
-          <ExternalLink size={16} color={Theme.colors.primary} />
+          <ExternalLink size={16} color="#000000" strokeWidth={2.5} />
         </Pressable>
 
         {/* Full Event Timeline */}
@@ -205,8 +205,8 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
 
         {/* Delete Shipment Action */}
         <Pressable onPress={confirmDelete} style={styles.deleteButton}>
-          <Trash2 size={18} color="#DC2626" style={styles.deleteIcon} />
-          <Text style={styles.deleteButtonText}>Eliminar paquete del dispositivo</Text>
+          <Trash2 size={16} color="#FFFFFF" style={styles.deleteIcon} />
+          <Text style={styles.deleteButtonText}>ELIMINAR PAQUETE</Text>
         </Pressable>
       </ScrollView>
 
@@ -234,29 +234,40 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: Theme.isIOS ? 54 : 20,
     paddingBottom: 14,
-    backgroundColor: Theme.colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Theme.colors.border,
+    backgroundColor: Theme.colors.background,
   },
   navButton: {
     padding: 8,
-    borderRadius: Theme.radius.full,
+    borderRadius: Theme.radius.sm,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#000000',
+    shadowColor: '#000000',
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 2,
+    marginLeft: 6,
+    ...(Theme.isWeb ? ({ boxShadow: '2px 2px 0px #000000' } as any) : {}),
   },
   navButtonActive: {
-    backgroundColor: Theme.colors.primaryLight,
+    backgroundColor: '#FFE600',
   },
   navTitleBox: {
     flex: 1,
-    marginHorizontal: 12,
+    marginHorizontal: 10,
   },
   navTitle: {
     fontSize: 16,
-    fontWeight: '700',
-    color: Theme.colors.textPrimary,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: -0.3,
   },
   navSubtitle: {
-    fontSize: 12,
-    color: Theme.colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#334155',
+    letterSpacing: 0.5,
   },
   navActions: {
     flexDirection: 'row',
@@ -266,45 +277,54 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingVertical: 16,
+    paddingVertical: 12,
   },
   heroCard: {
-    backgroundColor: Theme.colors.surface,
+    backgroundColor: '#FFFFFF',
     borderRadius: Theme.radius.md,
-    padding: 20,
+    padding: 18,
     marginHorizontal: 20,
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: Theme.colors.border,
-    ...Theme.shadows.card,
+    borderWidth: 2.5,
+    borderColor: '#000000',
+    shadowColor: '#000000',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 5,
+    ...(Theme.isWeb ? ({ boxShadow: '4px 4px 0px #000000' } as any) : {}),
   },
   heroTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 12,
   },
   transitBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Theme.colors.surfaceSubtle,
+    backgroundColor: '#F1F5F9',
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: Theme.radius.sm,
+    paddingVertical: 3,
+    borderRadius: Theme.radius.xs,
+    borderWidth: 1.5,
+    borderColor: '#000000',
   },
   clockIcon: {
     marginRight: 4,
   },
   transitText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Theme.colors.textSecondary,
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: 0.4,
   },
   statusDescription: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Theme.colors.textPrimary,
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#000000',
     marginBottom: 16,
+    letterSpacing: -0.3,
   },
   progressSection: {
     marginBottom: 16,
@@ -312,27 +332,44 @@ const styles = StyleSheet.create({
   progressHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    alignItems: 'center',
+    marginBottom: 8,
   },
   progressLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Theme.colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#64748B',
+    letterSpacing: 0.5,
+  },
+  progressPercentBadge: {
+    backgroundColor: '#FFE600',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: Theme.radius.xs,
+    borderWidth: 1.5,
+    borderColor: '#000000',
   },
   progressPercent: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Theme.colors.textPrimary,
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#000000',
   },
   metaBox: {
     flexDirection: 'row',
-    backgroundColor: Theme.colors.surfaceSubtle,
+    backgroundColor: '#F8FAFC',
     padding: 12,
     borderRadius: Theme.radius.sm,
-    marginBottom: 12,
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    marginBottom: 10,
   },
   metaItem: {
     flex: 1,
+  },
+  postalItem: {
+    borderLeftWidth: 1.5,
+    borderLeftColor: '#000000',
+    paddingLeft: 12,
   },
   metaLabelRow: {
     flexDirection: 'row',
@@ -344,79 +381,103 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 2,
     paddingHorizontal: 6,
-    borderRadius: Theme.radius.sm,
-    backgroundColor: Theme.colors.primaryLight,
+    borderRadius: Theme.radius.xs,
+    backgroundColor: '#FFE600',
+    borderWidth: 1,
+    borderColor: '#000000',
   },
   inlineRenameText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: Theme.colors.primary,
-    marginLeft: 4,
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#000000',
+    marginLeft: 3,
   },
   metaAliasText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Theme.colors.textPrimary,
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#000000',
     marginTop: 4,
   },
   metaLabel: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: Theme.colors.textTertiary,
-    textTransform: 'uppercase',
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#64748B',
+    letterSpacing: 0.5,
   },
   metaValueMono: {
     fontSize: 13,
     fontFamily: Theme.isIOS ? 'Courier' : 'monospace',
-    fontWeight: '600',
-    color: Theme.colors.textPrimary,
+    fontWeight: '900',
+    color: '#000000',
     marginTop: 2,
   },
   metaValue: {
     fontSize: 13,
-    fontWeight: '600',
-    color: Theme.colors.textPrimary,
+    fontWeight: '900',
+    color: '#000000',
     marginTop: 2,
   },
   updateRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 4,
   },
   updateText: {
     fontSize: 11,
-    color: Theme.colors.textTertiary,
+    fontWeight: '600',
+    color: '#64748B',
     marginLeft: 4,
   },
   carrierLinkButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Theme.colors.primaryLight,
+    backgroundColor: '#FFE600',
     paddingVertical: 14,
-    borderRadius: Theme.radius.md,
+    borderRadius: Theme.radius.sm,
     marginHorizontal: 20,
     marginBottom: 16,
+    borderWidth: 2.5,
+    borderColor: '#000000',
+    shadowColor: '#000000',
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 3,
+    ...(Theme.isWeb ? ({ boxShadow: '3px 3px 0px #000000' } as any) : {}),
   },
   carrierLinkText: {
-    color: Theme.colors.primary,
-    fontSize: 14,
-    fontWeight: '600',
+    color: '#000000',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.5,
     marginRight: 8,
   },
   deleteButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
+    paddingVertical: 12,
     marginHorizontal: 20,
     marginBottom: 32,
+    backgroundColor: '#FF5C38',
+    borderRadius: Theme.radius.sm,
+    borderWidth: 2,
+    borderColor: '#000000',
+    shadowColor: '#000000',
+    shadowOffset: { width: 2.5, height: 2.5 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 2,
+    ...(Theme.isWeb ? ({ boxShadow: '2.5px 2.5px 0px #000000' } as any) : {}),
   },
   deleteIcon: {
     marginRight: 6,
   },
   deleteButtonText: {
-    color: '#DC2626',
-    fontSize: 14,
-    fontWeight: '600',
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
 });

@@ -8,7 +8,6 @@ import {
   Pressable,
   ScrollView,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -19,7 +18,7 @@ import { trackingEngineManager } from '../../infrastructure/engine';
 import { parcelRepository } from '../../infrastructure/storage/ParcelRepository';
 import { DetectedCarrier } from '../../domain/models/carrier';
 import { Parcel } from '../../domain/models/parcel';
-import { X, Camera, Clipboard, Plus, ShieldAlert, Cpu } from 'lucide-react-native';
+import { X, Camera, Plus, ShieldAlert, Cpu } from 'lucide-react-native';
 
 interface NewParcelModalProps {
   visible: boolean;
@@ -41,7 +40,6 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
   const [cameraVisible, setCameraVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Trigger real-time carrier detection when tracking number changes
   useEffect(() => {
     const clean = trackingNumber.trim();
     if (clean.length >= 4) {
@@ -57,7 +55,6 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
     }
   }, [trackingNumber]);
 
-  // Determine if the selected carrier requires a postal code (e.g. InPost)
   const currentSelectedCandidate = candidates.find(
     (c) => c.carrier.slug === selectedCarrierSlug
   );
@@ -120,11 +117,16 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
           {/* Header */}
           <View style={styles.header}>
             <View>
-              <Text style={styles.headerTitle}>Nuevo Envío</Text>
+              <View style={styles.windowDots}>
+                <View style={[styles.dot, { backgroundColor: '#FF5C38' }]} />
+                <View style={[styles.dot, { backgroundColor: '#FFE600' }]} />
+                <View style={[styles.dot, { backgroundColor: '#10B981' }]} />
+                <Text style={styles.headerTitle}>NUEVO ENVÍO</Text>
+              </View>
               <View style={styles.engineBadge}>
-                <Cpu size={12} color={Theme.colors.primary} />
+                <Cpu size={12} color="#000000" />
                 <Text style={styles.engineBadgeText}>
-                  {trackingEngineManager.current.engineName}
+                  {trackingEngineManager.current.engineName.toUpperCase()}
                 </Text>
               </View>
             </View>
@@ -135,19 +137,19 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
               }}
               style={styles.closeButton}
             >
-              <X size={20} color={Theme.colors.textSecondary} />
+              <X size={18} color="#000000" strokeWidth={2.5} />
             </Pressable>
           </View>
 
           <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
             {/* Tracking Number Input & Scanner Trigger */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>Número de Seguimiento *</Text>
+              <Text style={styles.fieldLabel}>NÚMERO DE SEGUIMIENTO *</Text>
               <View style={styles.inputWithActions}>
                 <TextInput
                   style={styles.mainInput}
                   placeholder="Ej: LP00561234567890, 75616714..."
-                  placeholderTextColor={Theme.colors.textTertiary}
+                  placeholderTextColor="#64748B"
                   value={trackingNumber}
                   onChangeText={(text) => {
                     setTrackingNumber(text);
@@ -160,7 +162,7 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
                   onPress={() => setCameraVisible(true)}
                   style={styles.scannerIconButton}
                 >
-                  <Camera size={20} color={Theme.colors.primary} />
+                  <Camera size={20} color="#000000" strokeWidth={2.5} />
                 </Pressable>
               </View>
             </View>
@@ -176,15 +178,15 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
             {requiresPostalCode && (
               <View style={[styles.fieldGroup, styles.conditionalBox]}>
                 <View style={styles.conditionalHeader}>
-                  <ShieldAlert size={16} color={Theme.colors.status.out_for_delivery} />
+                  <ShieldAlert size={16} color="#000000" strokeWidth={2.5} />
                   <Text style={styles.conditionalTitle}>
-                    Código Postal Obligatorio para {currentSelectedCandidate?.carrier.name}
+                    CÓDIGO POSTAL OBLIGATORIO ({currentSelectedCandidate?.carrier.name.toUpperCase()})
                   </Text>
                 </View>
                 <TextInput
                   style={styles.standardInput}
                   placeholder="Ej: 47140, 28001..."
-                  placeholderTextColor={Theme.colors.textTertiary}
+                  placeholderTextColor="#64748B"
                   value={postalCode}
                   onChangeText={setPostalCode}
                   keyboardType="numeric"
@@ -195,11 +197,11 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
 
             {/* Custom Alias Input */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>Nombre / Alias personalizado (opcional)</Text>
+              <Text style={styles.fieldLabel}>ALIAS PERSONALIZADO (OPCIONAL)</Text>
               <TextInput
                 style={styles.standardInput}
                 placeholder="Ej: Zapatillas Nike, Teclado AliExpress..."
-                placeholderTextColor={Theme.colors.textTertiary}
+                placeholderTextColor="#64748B"
                 value={customAlias}
                 onChangeText={setCustomAlias}
               />
@@ -222,11 +224,11 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
               ]}
             >
               {isLoading ? (
-                <ActivityIndicator color="#FFF" size="small" />
+                <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
                 <>
-                  <Plus size={20} color="#FFF" style={styles.submitIcon} />
-                  <Text style={styles.submitButtonText}>Rastrear y Guardar</Text>
+                  <Plus size={20} color="#FFFFFF" strokeWidth={3} style={styles.submitIcon} />
+                  <Text style={styles.submitButtonText}>RASTREAR Y GUARDAR</Text>
                 </>
               )}
             </Pressable>
@@ -259,30 +261,59 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: Theme.colors.border,
-    backgroundColor: Theme.colors.surface,
+    borderBottomWidth: 2.5,
+    borderBottomColor: '#000000',
+    backgroundColor: '#FFFFFF',
+  },
+  windowDots: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: '#000000',
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: Theme.colors.textPrimary,
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#000000',
+    marginLeft: 6,
+    letterSpacing: -0.3,
   },
   engineBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 6,
+    backgroundColor: '#FFE600',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Theme.radius.xs,
+    borderWidth: 1,
+    borderColor: '#000000',
+    alignSelf: 'flex-start',
   },
   engineBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: Theme.colors.primary,
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#000000',
     marginLeft: 4,
   },
   closeButton: {
     padding: 8,
-    borderRadius: Theme.radius.full,
-    backgroundColor: Theme.colors.surfaceSubtle,
+    borderRadius: Theme.radius.sm,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#000000',
+    shadowColor: '#000000',
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 2,
+    ...(Theme.isWeb ? ({ boxShadow: '2px 2px 0px #000000' } as any) : {}),
   },
   content: {
     flex: 1,
@@ -294,49 +325,72 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   fieldLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Theme.colors.textPrimary,
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#000000',
     marginBottom: 6,
+    letterSpacing: 0.5,
   },
   inputWithActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Theme.colors.surface,
-    borderRadius: Theme.radius.md,
-    borderWidth: 1,
-    borderColor: Theme.colors.border,
+    backgroundColor: '#FFFFFF',
+    borderRadius: Theme.radius.sm,
+    borderWidth: 2.5,
+    borderColor: '#000000',
     paddingHorizontal: 12,
+    shadowColor: '#000000',
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 3,
+    ...(Theme.isWeb ? ({ boxShadow: '3px 3px 0px #000000' } as any) : {}),
   },
   mainInput: {
     flex: 1,
-    height: 48,
-    fontSize: 15,
+    height: 50,
+    fontSize: 14,
     fontFamily: Theme.isIOS ? 'Courier' : 'monospace',
-    color: Theme.colors.textPrimary,
+    fontWeight: '700',
+    color: '#000000',
   },
   scannerIconButton: {
     padding: 8,
-    backgroundColor: Theme.colors.primaryLight,
-    borderRadius: Theme.radius.sm,
+    backgroundColor: '#FFE600',
+    borderRadius: Theme.radius.xs,
+    borderWidth: 1.5,
+    borderColor: '#000000',
     marginLeft: 8,
   },
   standardInput: {
-    backgroundColor: Theme.colors.surface,
-    height: 48,
-    borderRadius: Theme.radius.md,
-    borderWidth: 1,
-    borderColor: Theme.colors.border,
+    backgroundColor: '#FFFFFF',
+    height: 50,
+    borderRadius: Theme.radius.sm,
+    borderWidth: 2.5,
+    borderColor: '#000000',
     paddingHorizontal: 14,
-    fontSize: 15,
-    color: Theme.colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#000000',
+    shadowColor: '#000000',
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 3,
+    ...(Theme.isWeb ? ({ boxShadow: '3px 3px 0px #000000' } as any) : {}),
   },
   conditionalBox: {
-    backgroundColor: '#FEF3C7',
-    padding: 12,
-    borderRadius: Theme.radius.md,
-    borderWidth: 1,
-    borderColor: '#FDE68A',
+    backgroundColor: '#FFE600',
+    padding: 14,
+    borderRadius: Theme.radius.sm,
+    borderWidth: 2.5,
+    borderColor: '#000000',
+    shadowColor: '#000000',
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 3,
+    ...(Theme.isWeb ? ({ boxShadow: '3px 3px 0px #000000' } as any) : {}),
   },
   conditionalHeader: {
     flexDirection: 'row',
@@ -344,33 +398,47 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   conditionalTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#92400E',
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#000000',
     marginLeft: 6,
+    letterSpacing: 0.5,
   },
   errorContainer: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#FF5C38',
     padding: 12,
-    borderRadius: Theme.radius.md,
+    borderRadius: Theme.radius.sm,
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#FCA5A5',
+    borderWidth: 2,
+    borderColor: '#000000',
+    shadowColor: '#000000',
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 3,
+    ...(Theme.isWeb ? ({ boxShadow: '3px 3px 0px #000000' } as any) : {}),
   },
   errorText: {
-    color: '#B91C1C',
+    color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: '800',
   },
   submitButton: {
-    backgroundColor: Theme.colors.primary,
+    backgroundColor: '#2563EB',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 52,
-    borderRadius: Theme.radius.md,
+    height: 54,
+    borderRadius: Theme.radius.sm,
     marginTop: 8,
-    ...Theme.shadows.card,
+    borderWidth: 2.5,
+    borderColor: '#000000',
+    shadowColor: '#000000',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 5,
+    ...(Theme.isWeb ? ({ boxShadow: '4px 4px 0px #000000' } as any) : {}),
   },
   submitButtonDisabled: {
     opacity: 0.5,
@@ -379,8 +447,9 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   submitButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '700',
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
 });

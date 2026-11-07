@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, ViewStyle, Pressable, Platform } from 'react-native';
+import { View, StyleSheet, ViewStyle, Pressable } from 'react-native';
 import { Theme } from '../../theme/adaptiveTheme';
 
 interface AdaptiveCardProps {
@@ -7,6 +7,8 @@ interface AdaptiveCardProps {
   onPress?: () => void;
   style?: ViewStyle | ViewStyle[];
   elevated?: boolean;
+  backgroundColor?: string;
+  hasWindowHeader?: boolean;
 }
 
 export const AdaptiveCard: React.FC<AdaptiveCardProps> = ({
@@ -14,12 +16,31 @@ export const AdaptiveCard: React.FC<AdaptiveCardProps> = ({
   onPress,
   style,
   elevated = false,
+  backgroundColor = Theme.colors.surface,
+  hasWindowHeader = false,
 }) => {
   const cardStyle = [
     styles.card,
     elevated ? Theme.shadows.elevated : Theme.shadows.card,
+    { backgroundColor },
     style,
   ];
+
+  const content = (
+    <>
+      {hasWindowHeader && (
+        <View style={styles.windowHeader}>
+          <View style={styles.dotsRow}>
+            <View style={[styles.dot, { backgroundColor: '#FF5C38' }]} />
+            <View style={[styles.dot, { backgroundColor: '#FFE600' }]} />
+            <View style={[styles.dot, { backgroundColor: '#10B981' }]} />
+          </View>
+          <View style={styles.windowGrip} />
+        </View>
+      )}
+      {children}
+    </>
+  );
 
   if (onPress) {
     return (
@@ -27,29 +48,53 @@ export const AdaptiveCard: React.FC<AdaptiveCardProps> = ({
         onPress={onPress}
         style={({ pressed }) => [
           cardStyle,
-          pressed && Platform.OS === 'ios' && styles.iosPressed,
+          pressed && styles.pressed,
         ]}
-        android_ripple={{ color: '#E2E8F0', borderless: false }}
       >
-        {children}
+        {content}
       </Pressable>
     );
   }
 
-  return <View style={cardStyle}>{children}</View>;
+  return <View style={cardStyle}>{content}</View>;
 };
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: Theme.colors.surface,
     borderRadius: Theme.radius.md,
     padding: 16,
-    borderWidth: Theme.isIOS ? 1 : 0.5,
-    borderColor: Theme.colors.border,
-    marginBottom: 12,
+    marginBottom: 14,
+    borderWidth: 2.5,
+    borderColor: '#000000',
+    overflow: 'hidden',
   },
-  iosPressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.99 }],
+  pressed: {
+    transform: [{ translateX: 2 }, { translateY: 2 }],
+  },
+  windowHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 10,
+    marginBottom: 10,
+    borderBottomWidth: 2,
+    borderBottomColor: '#000000',
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: '#000000',
+  },
+  windowGrip: {
+    width: 32,
+    height: 4,
+    backgroundColor: '#000000',
+    borderRadius: 2,
   },
 });

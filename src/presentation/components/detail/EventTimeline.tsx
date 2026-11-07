@@ -17,12 +17,11 @@ interface EventTimelineProps {
 }
 
 export const EventTimeline: React.FC<EventTimelineProps> = ({ events }) => {
-  // Sort reverse chronologically (most recent on top)
   const sorted = [...events].reverse();
 
   const getStageIcon = (stage: EventStage, isLatest: boolean) => {
-    const size = 16;
-    const color = isLatest ? Theme.colors.primary : Theme.colors.textSecondary;
+    const size = 15;
+    const color = '#000000';
 
     switch (stage) {
       case 'created':
@@ -36,12 +35,19 @@ export const EventTimeline: React.FC<EventTimelineProps> = ({ events }) => {
       case 'delivery':
         return <Truck size={size} color={color} />;
       case 'completed':
-        return <CheckCircle size={size} color={Theme.colors.status.delivered} />;
+        return <CheckCircle size={size} color={color} />;
       case 'exception':
-        return <AlertTriangle size={size} color={Theme.colors.status.exception} />;
+        return <AlertTriangle size={size} color={color} />;
       default:
         return <Package size={size} color={color} />;
     }
+  };
+
+  const getStageBg = (stage: EventStage, isLatest: boolean) => {
+    if (stage === 'completed') return '#34D399';
+    if (stage === 'exception') return '#FF5C38';
+    if (isLatest) return '#FFE600';
+    return '#FFFFFF';
   };
 
   const formatDate = (isoStr: string) => {
@@ -59,7 +65,15 @@ export const EventTimeline: React.FC<EventTimelineProps> = ({ events }) => {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.cardTitle}>Línea de Tiempo de Eventos</Text>
+      {/* Retro window header */}
+      <View style={styles.cardHeader}>
+        <View style={styles.dotsRow}>
+          <View style={[styles.dot, { backgroundColor: '#FF5C38' }]} />
+          <View style={[styles.dot, { backgroundColor: '#FFE600' }]} />
+          <View style={[styles.dot, { backgroundColor: '#10B981' }]} />
+        </View>
+        <Text style={styles.cardTitle}>HISTORIAL DE EVENTOS</Text>
+      </View>
 
       <View style={styles.timelineContainer}>
         {sorted.map((ev, index) => {
@@ -72,8 +86,9 @@ export const EventTimeline: React.FC<EventTimelineProps> = ({ events }) => {
               <View style={styles.indicatorCol}>
                 <View
                   style={[
-                    styles.iconCircle,
-                    isLatest && styles.iconCircleActive,
+                    styles.iconBox,
+                    { backgroundColor: getStageBg(ev.stage, isLatest) },
+                    isLatest && styles.iconBoxActive,
                   ]}
                 >
                   {getStageIcon(ev.stage, isLatest)}
@@ -97,7 +112,9 @@ export const EventTimeline: React.FC<EventTimelineProps> = ({ events }) => {
                 </Text>
 
                 {ev.location && (
-                  <Text style={styles.locationText}>{ev.location}</Text>
+                  <View style={styles.locationBox}>
+                    <Text style={styles.locationText}>{ev.location}</Text>
+                  </View>
                 )}
               </View>
             </View>
@@ -110,20 +127,45 @@ export const EventTimeline: React.FC<EventTimelineProps> = ({ events }) => {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: Theme.colors.surface,
+    backgroundColor: '#FFFFFF',
     borderRadius: Theme.radius.md,
     padding: 16,
     marginHorizontal: 20,
     marginBottom: 32,
-    borderWidth: 1,
-    borderColor: Theme.colors.border,
-    ...Theme.shadows.card,
+    borderWidth: 2.5,
+    borderColor: '#000000',
+    shadowColor: '#000000',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 5,
+    ...(Theme.isWeb ? ({ boxShadow: '4px 4px 0px #000000' } as any) : {}),
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom: 10,
+    marginBottom: 16,
+    borderBottomWidth: 2,
+    borderBottomColor: '#000000',
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginRight: 10,
+  },
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: '#000000',
   },
   cardTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Theme.colors.textPrimary,
-    marginBottom: 16,
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: 0.5,
   },
   timelineContainer: {
     paddingLeft: 4,
@@ -133,26 +175,32 @@ const styles = StyleSheet.create({
   },
   indicatorCol: {
     alignItems: 'center',
-    width: 32,
+    width: 34,
   },
-  iconCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: Theme.colors.surfaceSubtle,
+  iconBox: {
+    width: 30,
+    height: 30,
+    borderRadius: Theme.radius.xs,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: Theme.colors.border,
+    borderWidth: 2,
+    borderColor: '#000000',
+    shadowColor: '#000000',
+    shadowOffset: { width: 1.5, height: 1.5 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 2,
+    ...(Theme.isWeb ? ({ boxShadow: '1.5px 1.5px 0px #000000' } as any) : {}),
   },
-  iconCircleActive: {
-    backgroundColor: Theme.colors.primaryLight,
-    borderColor: Theme.colors.primary,
+  iconBoxActive: {
+    shadowOffset: { width: 2.5, height: 2.5 },
+    ...(Theme.isWeb ? ({ boxShadow: '2.5px 2.5px 0px #000000' } as any) : {}),
   },
   verticalLine: {
     flex: 1,
-    width: 2,
-    backgroundColor: Theme.colors.border,
+    width: 2.5,
+    backgroundColor: '#000000',
     marginVertical: 4,
   },
   contentCol: {
@@ -171,37 +219,50 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: 12,
-    color: Theme.colors.textSecondary,
-    fontWeight: '500',
-  },
-  dateTextActive: {
-    color: Theme.colors.primary,
+    color: '#64748B',
     fontWeight: '700',
   },
+  dateTextActive: {
+    color: '#000000',
+    fontWeight: '900',
+  },
   carrierTag: {
-    backgroundColor: Theme.colors.surfaceSubtle,
+    backgroundColor: '#FFE600',
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: Theme.radius.xs,
+    borderWidth: 1,
+    borderColor: '#000000',
   },
   carrierTagText: {
     fontSize: 10,
-    fontWeight: '600',
-    color: Theme.colors.textSecondary,
+    fontWeight: '900',
+    color: '#000000',
+    textTransform: 'uppercase',
   },
   description: {
     fontSize: 13,
-    color: Theme.colors.textSecondary,
+    color: '#334155',
+    fontWeight: '600',
     lineHeight: 18,
   },
   descriptionActive: {
-    color: Theme.colors.textPrimary,
-    fontWeight: '600',
+    color: '#000000',
+    fontWeight: '800',
+  },
+  locationBox: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Theme.radius.xs,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    marginTop: 4,
   },
   locationText: {
     fontSize: 11,
-    color: Theme.colors.textTertiary,
-    marginTop: 4,
-    fontStyle: 'italic',
+    fontWeight: '700',
+    color: '#475569',
   },
 });
