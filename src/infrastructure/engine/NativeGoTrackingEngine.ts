@@ -34,7 +34,7 @@ export class NativeGoTrackingEngine implements ITrackingEngine {
     return this.fallbackEngine.track(params);
   }
 
-  async detect(trackingNumber: string): Promise<DetectedCarrier[]> {
+  async detect(trackingNumber: string, countryHint?: string): Promise<DetectedCarrier[]> {
     if (this.isNativeLoaded && NativeOpenParcelsCore) {
       try {
         const rawJson = await NativeOpenParcelsCore.detectCarriers(trackingNumber);
@@ -45,7 +45,7 @@ export class NativeGoTrackingEngine implements ITrackingEngine {
       }
     }
 
-    return this.fallbackEngine.detect(trackingNumber);
+    return this.fallbackEngine.detect(trackingNumber, countryHint);
   }
 
   async getCarriers(): Promise<Carrier[]> {

@@ -28,10 +28,11 @@ export class RestTrackingEngine implements ITrackingEngine {
     }
   }
 
-  async detect(trackingNumber: string): Promise<DetectedCarrier[]> {
+  async detect(trackingNumber: string, countryHint?: string): Promise<DetectedCarrier[]> {
     try {
+      const countryParam = countryHint ? `&country=${encodeURIComponent(countryHint)}` : '';
       const res = await fetch(
-        `${this.baseUrl}/api/v1/detect?number=${encodeURIComponent(trackingNumber)}`
+        `${this.baseUrl}/api/v1/detect?number=${encodeURIComponent(trackingNumber)}${countryParam}`
       );
       if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
       const data = await res.json();

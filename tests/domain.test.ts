@@ -52,6 +52,14 @@ describe('Carrier Auto-Detection Engine', () => {
     expect(candidates.length).toBeGreaterThan(0);
     expect(candidates[0].carrier.slug).toBe('correos-es');
   });
+
+  it('boosts carrier confidence when destination country matches', () => {
+    // Digits that could match multiple carriers
+    const baseCandidates = detectCandidateCarriers('6912345678901234');
+    const boostedCandidates = detectCandidateCarriers('6912345678901234', 'ES');
+    expect(boostedCandidates[0].carrier.slug).toBe('correos-express');
+    expect(boostedCandidates[0].confidence).toBeGreaterThanOrEqual(baseCandidates[0].confidence);
+  });
 });
 
 describe('LocalTrackingEngine (Local-First)', () => {

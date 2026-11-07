@@ -13,8 +13,8 @@ export class LocalTrackingEngine implements ITrackingEngine {
     return CARRIERS_CATALOG;
   }
 
-  async detect(trackingNumber: string): Promise<DetectedCarrier[]> {
-    return detectCandidateCarriers(trackingNumber);
+  async detect(trackingNumber: string, countryHint?: string): Promise<DetectedCarrier[]> {
+    return detectCandidateCarriers(trackingNumber, countryHint);
   }
 
   async track(params: TrackRequestParams): Promise<Parcel> {
@@ -23,8 +23,8 @@ export class LocalTrackingEngine implements ITrackingEngine {
       throw new Error('El número de seguimiento no puede estar vacío');
     }
 
-    // Auto-detect or use carrier hint
-    const candidates = await this.detect(rawNumber);
+    // Auto-detect with destination country boost or use carrier hint
+    const candidates = await this.detect(rawNumber, params.destinationCountry);
     let selectedCarrier: Carrier;
 
     if (params.carrierHint) {

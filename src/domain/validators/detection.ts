@@ -95,9 +95,10 @@ export function findCarrierBySlug(slug: string): Carrier {
 
 /**
  * Real-time carrier auto-detection engine
- * Analyzes format, lengths, prefixes, and mathematical checksums.
+ * Analyzes format, lengths, prefixes, mathematical checksums, and destination country boost.
+ * Synced with Open Parcels Go Engine (pkg/detector/detector.go).
  */
-export function detectCandidateCarriers(rawNumber: string): DetectedCarrier[] {
+export function detectCandidateCarriers(rawNumber: string, countryHint?: string): DetectedCarrier[] {
   const clean = rawNumber.trim().toUpperCase().replace(/[\s-]/g, '');
   if (!clean || clean.length < 4) return [];
 
@@ -220,6 +221,19 @@ export function detectCandidateCarriers(rawNumber: string): DetectedCarrier[] {
         matchedRule: 'Generic Courier Heuristic',
       }
     );
+  }
+
+  // Apply destination country boost (+0.35) matching Open Parcels Go detector.go logic
+  if (countryHint && countryHint.trim().length > 0) {
+    const hintUpper = countryHint.trim().toUpperCase();
+    for (const cand of candidates) {
+      const region = cand.carrier.region?.toUpperCase();
+      if (region && (region === hintUpper || (hintUpper === 'ES' && region === 'EU'))) {
+        cand.confidence = Math.min(1.0, Math.round((cand.confidence + 0.35) * 100) / 100);
+      } else if (cand.carrier.region && cand.carrier.region !== 'global' && cand.carrier.region !== 'china') {
+        cand.confidence = Math.max(0.3, Math.round((cand.confidence - 0.10) * 100) / 100);
+      }
+    }
   }
 
   // Sort descending by confidence score

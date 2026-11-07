@@ -6,6 +6,6 @@ export interface ITrackingEngine {
   readonly isLocal: boolean;
 
   track(params: TrackRequestParams): Promise<Parcel>;
-  detect(trackingNumber: string): Promise<DetectedCarrier[]>;
+  detect(trackingNumber: string, countryHint?: string): Promise<DetectedCarrier[]>;
   getCarriers(): Promise<Carrier[]>;
 }
