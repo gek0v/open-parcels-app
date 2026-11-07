@@ -15,6 +15,7 @@ import { trackingEngineManager } from '../../infrastructure/engine';
 import { Theme } from '../theme/adaptiveTheme';
 import { ParcelCard } from '../components/dashboard/ParcelCard';
 import { SegmentedFilter, FilterTab } from '../components/dashboard/SegmentedFilter';
+import { RenameParcelModal } from '../components/common/RenameParcelModal';
 import {
   Plus,
   Search,
@@ -40,6 +41,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLocalMode, setIsLocalMode] = useState(trackingEngineManager.isLocalFirst());
+  const [renamingParcel, setRenamingParcel] = useState<Parcel | null>(null);
 
   const loadParcels = useCallback(async () => {
     const list = await parcelRepository.getAll();
@@ -60,6 +62,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     const next = !isLocalMode;
     trackingEngineManager.setLocalFirst(next);
     setIsLocalMode(next);
+  };
+
+  const handleUpdateAlias = async (id: string, newAlias: string) => {
+    await parcelRepository.updateAlias(id, newAlias);
+    await loadParcels();
   };
 
   // Filter parcels according to active tab and search query
@@ -183,6 +190,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               key={parcel.id}
               parcel={parcel}
               onPress={() => onSelectParcel(parcel)}
+              onRename={() => setRenamingParcel(parcel)}
             />
           ))
         )}
@@ -196,6 +204,20 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       >
         <Plus size={24} color="#FFF" />
       </Pressable>
+
+      {/* Modal to rename shipment directly from Dashboard */}
+      {renamingParcel && (
+        <RenameParcelModal
+          visible={!!renamingParcel}
+          initialAlias={renamingParcel.customAlias}
+          trackingNumber={renamingParcel.trackingNumber}
+          onClose={() => setRenamingParcel(null)}
+          onSave={(newAlias) => {
+            handleUpdateAlias(renamingParcel.id, newAlias);
+            setRenamingParcel(null);
+          }}
+        />
+      )}
     </View>
   );
 };

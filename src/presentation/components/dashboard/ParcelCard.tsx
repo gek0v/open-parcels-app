@@ -1,18 +1,19 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Parcel } from '../../../domain/models/parcel';
 import { AdaptiveCard } from '../common/AdaptiveCard';
 import { StatusBadge } from '../common/StatusBadge';
 import { ProgressBar } from '../common/ProgressBar';
 import { Theme } from '../../theme/adaptiveTheme';
-import { ArrowRight, Clock, Box } from 'lucide-react-native';
+import { ArrowRight, Clock, Box, Edit2 } from 'lucide-react-native';
 
 interface ParcelCardProps {
   parcel: Parcel;
   onPress: () => void;
+  onRename?: () => void;
 }
 
-export const ParcelCard: React.FC<ParcelCardProps> = ({ parcel, onPress }) => {
+export const ParcelCard: React.FC<ParcelCardProps> = ({ parcel, onPress, onRename }) => {
   const latestEvent = parcel.events[parcel.events.length - 1];
   const isChained = !!(parcel.additionalCarriers && parcel.additionalCarriers.length > 0);
 
@@ -46,9 +47,23 @@ export const ParcelCard: React.FC<ParcelCardProps> = ({ parcel, onPress }) => {
 
       {/* Main Info: Custom Alias & Tracking Number */}
       <View style={styles.titleSection}>
-        <Text style={styles.alias} numberOfLines={1}>
-          {parcel.customAlias || parcel.trackingNumber}
-        </Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.alias} numberOfLines={1}>
+            {parcel.customAlias || parcel.trackingNumber}
+          </Text>
+          {onRename && (
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation();
+                onRename();
+              }}
+              style={styles.cardRenameButton}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Edit2 size={13} color={Theme.colors.textTertiary} />
+            </Pressable>
+          )}
+        </View>
         {parcel.customAlias && (
           <Text style={styles.trackingNumber}>{parcel.trackingNumber}</Text>
         )}
@@ -116,7 +131,19 @@ const styles = StyleSheet.create({
   titleSection: {
     marginBottom: 10,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  cardRenameButton: {
+    padding: 4,
+    borderRadius: Theme.radius.sm,
+    backgroundColor: Theme.colors.surfaceSubtle,
+    marginLeft: 8,
+  },
   alias: {
+    flex: 1,
     fontSize: 16,
     fontWeight: '700',
     color: Theme.colors.textPrimary,

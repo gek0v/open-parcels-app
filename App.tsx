@@ -33,6 +33,14 @@ export default function App() {
     setRefreshTrigger((prev) => prev + 1);
   };
 
+  const handleUpdateAlias = async (id: string, newAlias: string) => {
+    const updated = await parcelRepository.updateAlias(id, newAlias);
+    if (updated && selectedParcel?.id === id) {
+      setSelectedParcel({ ...updated });
+    }
+    setRefreshTrigger((prev) => prev + 1);
+  };
+
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
@@ -47,6 +55,7 @@ export default function App() {
             }}
             onToggleArchive={handleToggleArchive}
             onDelete={handleDeleteParcel}
+            onUpdateAlias={handleUpdateAlias}
           />
         ) : (
           <DashboardScreen

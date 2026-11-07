@@ -56,6 +56,17 @@ export class ParcelRepository {
     return null;
   }
 
+  async updateAlias(id: string, newAlias: string): Promise<Parcel | null> {
+    const all = await this.getAll();
+    const target = all.find((p) => p.id === id);
+    if (target) {
+      target.customAlias = newAlias.trim() || undefined;
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+      return target;
+    }
+    return null;
+  }
+
   private async seedInitialParcels(): Promise<Parcel[]> {
     const now = new Date();
 

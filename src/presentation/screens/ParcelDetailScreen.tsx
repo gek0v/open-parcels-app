@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { StatusBadge } from '../components/common/StatusBadge';
 import { ProgressBar } from '../components/common/ProgressBar';
 import { JourneyFlow } from '../components/detail/JourneyFlow';
 import { EventTimeline } from '../components/detail/EventTimeline';
+import { RenameParcelModal } from '../components/common/RenameParcelModal';
 import {
   ArrowLeft,
   ExternalLink,
@@ -23,6 +24,7 @@ import {
   Share2,
   Clock,
   Calendar,
+  Edit2,
 } from 'lucide-react-native';
 
 interface ParcelDetailScreenProps {
@@ -30,6 +32,7 @@ interface ParcelDetailScreenProps {
   onBack: () => void;
   onToggleArchive: (id: string) => void;
   onDelete: (id: string) => void;
+  onUpdateAlias: (id: string, newAlias: string) => void;
 }
 
 export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
@@ -37,7 +40,9 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
   onBack,
   onToggleArchive,
   onDelete,
+  onUpdateAlias,
 }) => {
+  const [renameModalVisible, setRenameModalVisible] = useState(false);
   const handleOpenCarrierWeb = () => {
     const url = parcel.carrier.website || 'https://openparcels.com';
     Linking.openURL(url).catch(() => {
@@ -100,6 +105,13 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
         </View>
 
         <View style={styles.navActions}>
+          <Pressable
+            onPress={() => setRenameModalVisible(true)}
+            style={styles.navButton}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Edit2 size={18} color={Theme.colors.primary} />
+          </Pressable>
           <Pressable onPress={handleShare} style={styles.navButton}>
             <Share2 size={20} color={Theme.colors.textSecondary} />
           </Pressable>
@@ -138,6 +150,24 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
           </View>
 
           {/* Monospaced Tracking Number and Postal Code */}
+          <View style={styles.metaBox}>
+            <View style={styles.metaItem}>
+              <View style={styles.metaLabelRow}>
+                <Text style={styles.metaLabel}>Alias</Text>
+                <Pressable
+                  onPress={() => setRenameModalVisible(true)}
+                  style={styles.inlineRenameButton}
+                >
+                  <Edit2 size={12} color={Theme.colors.primary} />
+                  <Text style={styles.inlineRenameText}>Renombrar</Text>
+                </Pressable>
+              </View>
+              <Text style={styles.metaAliasText}>
+                {parcel.customAlias || 'Sin alias (toca para renombrar)'}
+              </Text>
+            </View>
+          </View>
+
           <View style={styles.metaBox}>
             <View style={styles.metaItem}>
               <Text style={styles.metaLabel}>Nº Seguimiento</Text>
@@ -179,6 +209,15 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
           <Text style={styles.deleteButtonText}>Eliminar paquete del dispositivo</Text>
         </Pressable>
       </ScrollView>
+
+      {/* Modal to rename shipment */}
+      <RenameParcelModal
+        visible={renameModalVisible}
+        initialAlias={parcel.customAlias}
+        trackingNumber={parcel.trackingNumber}
+        onClose={() => setRenameModalVisible(false)}
+        onSave={(newAlias) => onUpdateAlias(parcel.id, newAlias)}
+      />
     </View>
   );
 };
@@ -294,6 +333,31 @@ const styles = StyleSheet.create({
   },
   metaItem: {
     flex: 1,
+  },
+  metaLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  inlineRenameButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: Theme.radius.sm,
+    backgroundColor: Theme.colors.primaryLight,
+  },
+  inlineRenameText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Theme.colors.primary,
+    marginLeft: 4,
+  },
+  metaAliasText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Theme.colors.textPrimary,
+    marginTop: 4,
   },
   metaLabel: {
     fontSize: 11,
