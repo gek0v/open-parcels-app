@@ -9,7 +9,7 @@ export class ParcelRepository {
     try {
       const raw = await AsyncStorage.getItem(STORAGE_KEY);
       if (!raw) {
-        return this.seedInitialParcels();
+        return [];
       }
       const parsed: Parcel[] = JSON.parse(raw);
       return parsed;

@@ -203,8 +203,19 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             <Text style={styles.emptySubtitle}>
               {searchQuery
                 ? 'Prueba con otro término de búsqueda o número de albarán.'
-                : 'Pulsa el botón "+" para registrar un nuevo paquete escaneando su código de barras o introduciendo el número.'}
+                : 'Pulsa el botón "+" o "ESCANEAR" para registrar tu primer paquete escaneando su código de barras o introduciendo el número.'}
             </Text>
+            {!searchQuery && activeTab === 'active' && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Añadir primer envío"
+                onPress={onOpenNewParcel}
+                style={({ pressed }) => [styles.emptyAddBtn, pressed && styles.pressed]}
+              >
+                <Plus size={16} color="#FFFFFF" strokeWidth={3} />
+                <Text style={styles.emptyAddBtnText}>RASTREAR PRIMER ENVÍO</Text>
+              </Pressable>
+            )}
           </View>
         ) : (
           filteredParcels.map((parcel) => (
@@ -479,6 +490,25 @@ const styles = StyleSheet.create({
     color: Theme.colors.textSecondary,
     textAlign: 'center',
     lineHeight: 19,
+  },
+  emptyAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Theme.colors.coral,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: Theme.radius.sm,
+    marginTop: 16,
+    borderWidth: 2,
+    borderColor: '#000000',
+    ...Theme.shadows.sm,
+  },
+  emptyAddBtnText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
   fab: {
     position: 'absolute',

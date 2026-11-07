@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Image, Animated } from 'react-native';
+import { View, Text, StyleSheet, Image, Animated, Platform } from 'react-native';
 import { Theme } from '../../theme/adaptiveTheme';
 
 interface AppLoadingSplashProps {
