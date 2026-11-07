@@ -7,9 +7,11 @@ import { parcelRepository } from './src/infrastructure/storage/ParcelRepository'
 import { DashboardScreen } from './src/presentation/screens/DashboardScreen';
 import { NewParcelModal } from './src/presentation/screens/NewParcelModal';
 import { ParcelDetailScreen } from './src/presentation/screens/ParcelDetailScreen';
+import { AppLoadingSplash } from './src/presentation/components/common/AppLoadingSplash';
 import { Theme } from './src/presentation/theme/adaptiveTheme';
 
 export default function App() {
+  const [isLoadingSplash, setIsLoadingSplash] = useState(true);
   const [selectedParcel, setSelectedParcel] = useState<Parcel | null>(null);
   const [newParcelModalVisible, setNewParcelModalVisible] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -75,6 +77,11 @@ export default function App() {
           onClose={() => setNewParcelModalVisible(false)}
           onParcelCreated={handleParcelCreated}
         />
+
+        {/* Branded Neo-Brutalist Loading Splash Screen */}
+        {isLoadingSplash && (
+          <AppLoadingSplash onFinish={() => setIsLoadingSplash(false)} minDurationMs={1100} />
+        )}
       </SafeAreaView>
     </SafeAreaProvider>
   );
