@@ -8,8 +8,9 @@ import {
   Platform,
 } from 'react-native';
 import { Theme } from '../../theme/adaptiveTheme';
-import { UpdateInfo } from '../../../infrastructure/services/UpdateService';
-import { Sparkles, Download, X } from 'lucide-react-native';
+import { UpdateInfo, updateService } from '../../../infrastructure/services/UpdateService';
+import { Sparkles, Download, X, Check } from 'lucide-react-native';
+import { useI18n } from '../../../infrastructure/i18n';
 
 interface UpdateToastProps {
   updateInfo: UpdateInfo;
@@ -22,8 +23,22 @@ export const UpdateToast: React.FC<UpdateToastProps> = ({
   onPress,
   onDismiss,
 }) => {
+  const { t } = useI18n();
   const [slideAnim] = useState(() => new Animated.Value(-120));
   const [opacityAnim] = useState(() => new Animated.Value(0));
+  const [isDownloaded, setIsDownloaded] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    updateService.isApkDownloaded(updateInfo.version, updateInfo.apkSizeMb).then((ready) => {
+      if (isMounted) {
+        setIsDownloaded(ready);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [updateInfo.version, updateInfo.apkSizeMb]);
 
   useEffect(() => {
     // Slide in from top
@@ -70,20 +85,24 @@ export const UpdateToast: React.FC<UpdateToastProps> = ({
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Nueva actualización disponible. Toca para ver detalles o actualizar"
+        accessibilityLabel={`${t.updateModal.title}: v${updateInfo.version}. ${isDownloaded ? t.updateModal.toastReadySubtitle : t.updateModal.toastSubtitle}`}
         onPress={onPress}
         style={({ pressed }) => [styles.toastCard, pressed && styles.pressed]}
       >
         {/* Left Badge Icon */}
-        <View style={styles.iconCircle}>
-          <Sparkles size={16} color="#000000" strokeWidth={2.5} />
+        <View style={[styles.iconCircle, isDownloaded && styles.iconCircleReady]}>
+          {isDownloaded ? (
+            <Check size={16} color="#000000" strokeWidth={3} />
+          ) : (
+            <Sparkles size={16} color="#000000" strokeWidth={2.5} />
+          )}
         </View>
 
         {/* Content Body */}
         <View style={styles.contentCol}>
           <View style={styles.titleRow}>
             <Text style={styles.toastTitle} numberOfLines={1}>
-              NUEVA VERSIÓN v{updateInfo.version}
+              {t.updateModal.toastTitlePrefix} v{updateInfo.version}
             </Text>
             {updateInfo.apkSizeMb && (
               <View style={styles.sizePill}>
@@ -92,20 +111,22 @@ export const UpdateToast: React.FC<UpdateToastProps> = ({
             )}
           </View>
           <Text style={styles.toastSubtitle} numberOfLines={1}>
-            Toca aquí para descargar e instalar
+            {isDownloaded ? t.updateModal.toastReadySubtitle : t.updateModal.toastSubtitle}
           </Text>
         </View>
 
         {/* Action Button */}
-        <View style={styles.actionBtn}>
+        <View style={[styles.actionBtn, isDownloaded && styles.actionBtnReady]}>
           <Download size={13} color="#FFFFFF" strokeWidth={3} />
-          <Text style={styles.actionBtnText}>ACTUALIZAR</Text>
+          <Text style={styles.actionBtnText}>
+            {isDownloaded ? t.updateModal.installNowBtn : t.updateModal.updateBtn}
+          </Text>
         </View>
 
         {/* Dismiss Button */}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Descartar aviso de actualización"
+          accessibilityLabel={t.updateModal.laterBtn}
           onPress={handleDismiss}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           style={({ pressed }) => [styles.dismissBtn, pressed && styles.pressed]}
@@ -149,6 +170,9 @@ const styles = StyleSheet.create({
     marginRight: 10,
     borderWidth: 1.5,
     borderColor: '#000000',
+  },
+  iconCircleReady: {
+    backgroundColor: Theme.colors.mint,
   },
   contentCol: {
     flex: 1,
@@ -196,6 +220,9 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#000000',
     marginRight: 6,
+  },
+  actionBtnReady: {
+    backgroundColor: '#059669', // Darker Mint for contrast
   },
   actionBtnText: {
     fontSize: 10,

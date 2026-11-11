@@ -300,6 +300,8 @@ describe('RestTrackingEngine Go Engine Alignment', () => {
   it('handles NativeGoTrackingEngine fallback and Go JSON payload mapping', async () => {
     let available = false;
     mock.module('react-native', () => ({
+      Platform: { OS: 'ios', select: (obj: any) => obj.ios || obj.default },
+      Linking: { openURL: async () => {} },
       TurboModuleRegistry: {
         get: () => ({
           isAvailable: () => available,
