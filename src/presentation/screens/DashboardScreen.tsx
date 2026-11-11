@@ -7,6 +7,9 @@ import {
   RefreshControl,
   Pressable,
   TextInput,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Parcel } from '../../domain/models/parcel';
 import { parcelRepository } from '../../infrastructure/storage/ParcelRepository';
@@ -21,10 +24,11 @@ import { RenameParcelModal } from '../components/common/RenameParcelModal';
 import { useI18n } from '../../infrastructure/i18n';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
-import { Plus, Search, X, Package, Cpu, LayoutGrid, Barcode, Monitor, Languages } from 'lucide-react-native';
+import { Plus, Search, X, Package, Cpu, LayoutGrid, Barcode, Monitor, Languages, Settings, Check } from 'lucide-react-native';
 
 export type CardStyle = 'bento' | 'industrial' | 'retro';
 const CARD_STYLE_KEY = '@open_parcels:card_style';
+const REST_BASE_URL_KEY = '@open_parcels:rest_base_url';
 
 interface DashboardScreenProps {
   onSelectParcel: (parcel: Parcel) => void;
@@ -44,11 +48,19 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const [cardStyle, setCardStyle] = useState<CardStyle>('bento');
   const [isLocalMode, setIsLocalMode] = useState(trackingEngineManager.isLocalFirst());
   const [renamingParcel, setRenamingParcel] = useState<Parcel | null>(null);
+  const [restModalVisible, setRestModalVisible] = useState(false);
+  const [restUrlInput, setRestUrlInput] = useState(trackingEngineManager.rest.getBaseUrl());
 
   useEffect(() => {
     AsyncStorage.getItem(CARD_STYLE_KEY).then((stored) => {
       if (stored === 'bento' || stored === 'industrial' || stored === 'retro') {
         setCardStyle(stored);
+      }
+    });
+    AsyncStorage.getItem(REST_BASE_URL_KEY).then((storedUrl) => {
+      if (storedUrl && storedUrl.trim()) {
+        trackingEngineManager.rest.setBaseUrl(storedUrl.trim());
+        setRestUrlInput(storedUrl.trim());
       }
     });
   }, []);
@@ -91,6 +103,14 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     const next = !isLocalMode;
     trackingEngineManager.setLocalFirst(next);
     setIsLocalMode(next);
+  };
+
+  const handleSaveRestUrl = async () => {
+    const trimmed = restUrlInput.trim() || 'http://localhost:8080';
+    trackingEngineManager.rest.setBaseUrl(trimmed);
+    setRestUrlInput(trimmed);
+    await AsyncStorage.setItem(REST_BASE_URL_KEY, trimmed);
+    setRestModalVisible(false);
   };
 
   const handleUpdateAlias = async (id: string, newAlias: string) => {
@@ -153,6 +173,20 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                   {isLocalMode ? t.engine.local : t.engine.rest}
                 </Text>
               </Pressable>
+
+              {!isLocalMode && (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Configurar servidor REST"
+                  onPress={() => {
+                    setRestUrlInput(trackingEngineManager.rest.getBaseUrl());
+                    setRestModalVisible(true);
+                  }}
+                  style={({ pressed }) => [styles.langToggleBtn, pressed && styles.pressed]}
+                >
+                  <Settings size={11} color="#000000" strokeWidth={2.5} />
+                </Pressable>
+              )}
 
               <Pressable
                 accessibilityRole="button"
@@ -351,6 +385,51 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           }}
         />
       )}
+
+      <Modal
+        visible={restModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRestModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.restBackdrop}
+        >
+          <Pressable style={styles.restDismiss} onPress={() => setRestModalVisible(false)} />
+          <View style={styles.restDialog} accessibilityViewIsModal>
+            <Text style={styles.restTitle}>SERVIDOR OPEN PARCELS REST</Text>
+            <Text style={styles.restHint}>
+              Introduce la URL o IP local donde corre open-parcels (ej. http://192.168.1.50:8080)
+            </Text>
+            <TextInput
+              style={styles.restInput}
+              value={restUrlInput}
+              onChangeText={setRestUrlInput}
+              placeholder="http://localhost:8080"
+              placeholderTextColor="#64748B"
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+            />
+            <View style={styles.restActions}>
+              <Pressable
+                onPress={() => setRestModalVisible(false)}
+                style={({ pressed }) => [styles.restCancelBtn, pressed && styles.pressed]}
+              >
+                <Text style={styles.restCancelText}>CANCELAR</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleSaveRestUrl}
+                style={({ pressed }) => [styles.restSaveBtn, pressed && styles.pressed]}
+              >
+                <Check size={14} color="#FFFFFF" strokeWidth={3} />
+                <Text style={styles.restSaveText}>GUARDAR</Text>
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 };
@@ -703,5 +782,90 @@ const styles = StyleSheet.create({
   },
   pressed: {
     ...Theme.pressed,
+  },
+  restBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  restDismiss: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  restDialog: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: '#FFFFFF',
+    borderRadius: Theme.radius.md,
+    padding: 20,
+    borderWidth: Theme.borders.width,
+    borderColor: '#000000',
+    ...Theme.shadows.lg,
+  },
+  restTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#000000',
+    marginBottom: 6,
+  },
+  restHint: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Theme.colors.textSecondary,
+    marginBottom: 12,
+    lineHeight: 16,
+  },
+  restInput: {
+    backgroundColor: '#FFFFFF',
+    height: 46,
+    borderRadius: Theme.radius.sm,
+    borderWidth: 2,
+    borderColor: '#000000',
+    paddingHorizontal: 12,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#000000',
+    marginBottom: 14,
+  },
+  restActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  restCancelBtn: {
+    flex: 1,
+    height: 42,
+    borderRadius: Theme.radius.sm,
+    borderWidth: 2,
+    borderColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  restCancelText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#000000',
+  },
+  restSaveBtn: {
+    flex: 1,
+    height: 42,
+    borderRadius: Theme.radius.sm,
+    borderWidth: 2,
+    borderColor: '#000000',
+    backgroundColor: Theme.colors.blue,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  restSaveText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#FFFFFF',
   },
 });

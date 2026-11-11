@@ -60,7 +60,9 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
       setSelectedCarrierSlug((previous) => {
         if (results.length === 0) return undefined;
         const stillAvailable = results.some((r) => r.carrier.slug === previous);
-        return stillAvailable ? previous : results[0].carrier.slug;
+        if (stillAvailable) return previous;
+        const liveCandidate = results.find((r) => r.carrier.hasLiveTracking);
+        return (liveCandidate || results[0]).carrier.slug;
       });
     }, 180);
 

@@ -137,6 +137,7 @@ describe('LocalTrackingEngine (Local-First)', () => {
       trackingNumber: '7561674',
       carrierHint: 'inpost',
       postalCode: '47140',
+      allowSimulated: true,
     });
     expect(parcel.carrier.slug).toBe('inpost');
     expect(parcel.status).toBe('info_received');

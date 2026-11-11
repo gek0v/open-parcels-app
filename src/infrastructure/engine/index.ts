@@ -46,6 +46,7 @@ export const defaultEngine = trackingEngineManager.current;
 export * from './ITrackingEngine';
 export * from './errors';
 export * from './mapper';
+export * from './inpostLive';
 export * from './LocalTrackingEngine';
 export * from './RestTrackingEngine';
 export * from './NativeGoTrackingEngine';

@@ -26,6 +26,10 @@ export class RestTrackingEngine implements ITrackingEngine {
     this.baseUrl = baseUrl.replace(/\/+$/, '');
   }
 
+  getBaseUrl(): string {
+    return this.baseUrl;
+  }
+
   setBaseUrl(url: string) {
     this.baseUrl = url.replace(/\/+$/, '');
   }

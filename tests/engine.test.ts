@@ -352,3 +352,57 @@ describe('RestTrackingEngine Go Engine Alignment', () => {
     expect(tracked.carrier.requiresPostalCode).toBe(true);
   });
 });
+describe('InPost Live Parser & Local Engine Integration', () => {
+  const sampleInPostHtml = `<!DOCTYPE html><html><body>
+<astro-island uid="test-inpost" props="{&quot;locale&quot;:[0,&quot;es&quot;],&quot;country&quot;:[0,&quot;ES&quot;],&quot;zipCode&quot;:[0,&quot;47140&quot;],&quot;trackingDetails&quot;:[0,{&quot;packageId&quot;:[0,&quot;75616714&quot;],&quot;milestones&quot;:[1,[[0,{&quot;type&quot;:[0,&quot;IN_TRANSIT&quot;],&quot;name&quot;:[0,&quot;En camino&quot;],&quot;date&quot;:[0,&quot;2026-11-11T12:53:58.564Z&quot;],&quot;events&quot;:[1,[[0,{&quot;code&quot;:[0,&quot;MMD.1001&quot;],&quot;name&quot;:[0,&quot;Recibido en el centro logístico&quot;],&quot;date&quot;:[0,&quot;2026-11-11T12:53:58.564Z&quot;],&quot;description&quot;:[0,&quot;Tu paquete ha sido recibido en uno de nuestros centros logísticos.&quot;]}],[0,{&quot;code&quot;:[0,&quot;FMD.1002&quot;],&quot;name&quot;:[0,&quot;Recogido por el mensajero&quot;],&quot;date&quot;:[0,&quot;2026-11-11T10:56:51.253Z&quot;],&quot;description&quot;:[0,&quot;Tu paquete ha iniciado el tránsito y se dirige a uno de nuestros centros logísticos.&quot;]}]]]}],[0,{&quot;type&quot;:[0,&quot;AT_THE_ORIGIN&quot;],&quot;name&quot;:[0,&quot;En preparación&quot;],&quot;date&quot;:[0,&quot;2026-11-10T19:01:43.002Z&quot;],&quot;events&quot;:[1,[[0,{&quot;code&quot;:[0,&quot;FMD.1001&quot;],&quot;name&quot;:[0,&quot;Listo para ser recogido por el mensajero&quot;],&quot;date&quot;:[0,&quot;2026-11-10T19:01:43.002Z&quot;],&quot;description&quot;:[0,&quot;Tu paquete está preparado y será recogido por nuestros mensajeros pronto.&quot;]}],[0,{&quot;code&quot;:[0,&quot;CRE.1001&quot;],&quot;name&quot;:[0,&quot;En preparación&quot;],&quot;date&quot;:[0,&quot;2026-11-06T18:52:46Z&quot;],&quot;description&quot;:[0,&quot;El envío ha sido registrado informáticamente y estamos a la espera de recibir el paquete.&quot;]}]]]}]]]}],&quot;trackingDetailsStatus&quot;:[0,200]}" client="load"></astro-island>
+</body></html>`;
+
+  it('correctly extracts Astro props and normalizes InPost live events without false delivered status', async () => {
+    const { parseInPostHtmlToParcel } = await import('../src/infrastructure/engine/inpostLive');
+    const { findCarrierBySlug } = await import('../src/domain/validators/detection');
+
+    const parcel = parseInPostHtmlToParcel(
+      sampleInPostHtml,
+      '75616714',
+      '47140',
+      findCarrierBySlug('inpost'),
+      'ES',
+      'es'
+    );
+
+    expect(parcel.trackingNumber).toBe('75616714');
+    expect(parcel.status).toBe('in_transit');
+    expect(parcel.statusText).toBe('En tránsito');
+    expect(parcel.progress).toBe(35);
+    expect(parcel.isLiveData).toBe(true);
+    expect(parcel.events.length).toBe(4);
+    expect(parcel.events[0].eventCode).toBe('MMD.1001');
+    expect(parcel.events[0].status).toBe('in_transit');
+    expect(parcel.events[2].eventCode).toBe('FMD.1001');
+    expect(parcel.events[2].status).toBe('info_received');
+    expect(parcel.events[3].eventCode).toBe('CRE.1001');
+    expect(parcel.events[3].status).toBe('info_received');
+  });
+
+  it('LocalTrackingEngine calls live InPost fetch when online', async () => {
+    globalThis.fetch = (async () =>
+      new Response(sampleInPostHtml, { status: 200, headers: { 'Content-Type': 'text/html' } })
+    ) as unknown as typeof fetch;
+
+    const { LocalTrackingEngine } = await import('../src/infrastructure/engine/LocalTrackingEngine');
+    const engine = new LocalTrackingEngine();
+
+    const parcel = await engine.track({
+      trackingNumber: '75616714',
+      carrierHint: 'inpost',
+      postalCode: '47140',
+    });
+
+    expect(parcel.trackingNumber).toBe('75616714');
+    expect(parcel.status).toBe('in_transit');
+    expect(parcel.isLiveData).toBe(true);
+    expect(parcel.events[0].description).toBe(
+      'Tu paquete ha sido recibido en uno de nuestros centros logísticos.'
+    );
+  });
+});

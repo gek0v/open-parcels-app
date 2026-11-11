@@ -992,8 +992,8 @@ const RAW_RULES = [
     "country": "GLOBAL",
     "countryName": "Global",
     "carrierType": "CarrierTypeLogistics",
-    "priority": 74,
-    "confidenceBase": 0.85,
+    "priority": 78,
+    "confidenceBase": 0.88,
     "pattern": "^(6\\d{23}|\\d{7,10})$",
     "validatorName": "",
     "description": "InPost Locker / Mondial Relay parcel number"

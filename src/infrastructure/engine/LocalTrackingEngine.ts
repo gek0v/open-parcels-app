@@ -10,6 +10,7 @@ import {
 } from '../../domain/validators/detection';
 import { TrackingEngineError } from './errors';
 import { getLocalizedStatusText } from './mapper';
+import { fetchInPostLive } from './inpostLive';
 
 export class LocalTrackingEngine implements ITrackingEngine {
   readonly engineName = 'Open Parcels Embedded (Local-First)';
@@ -39,7 +40,11 @@ export class LocalTrackingEngine implements ITrackingEngine {
     if (params.carrierHint) {
       selectedCarrier = findCarrierBySlug(params.carrierHint);
     } else if (candidates.length > 0) {
-      selectedCarrier = candidates[0].carrier;
+      const liveCandidate =
+        params.allowSimulated === true
+          ? undefined
+          : candidates.find((c) => c.carrier.hasLiveTracking);
+      selectedCarrier = liveCandidate ? liveCandidate.carrier : candidates[0].carrier;
     } else {
       selectedCarrier = findCarrierBySlug('correos-spain');
     }
@@ -61,6 +66,29 @@ export class LocalTrackingEngine implements ITrackingEngine {
     }
 
     const slug = selectedCarrier.slug;
+    const postalCode = params.postalCode?.trim() || '';
+
+    // Real live tracking for InPost / Mondial Relay (matches Go CLI behavior)
+    if ((slug === 'inpost' || slug === 'inpost-es') && params.allowSimulated !== true) {
+      try {
+        return await fetchInPostLive(
+          rawNumber,
+          postalCode,
+          selectedCarrier,
+          params.destinationCountry,
+          params.lang
+        );
+      } catch (err) {
+        if (err instanceof TrackingEngineError && err.code === 'SHIPMENT_NOT_FOUND') {
+          throw err;
+        }
+        if (params.allowSimulated === false) {
+          throw err;
+        }
+        console.warn('InPost live fetch failed, falling back to local backup:', err);
+      }
+    }
+
     const cleanUpper = rawNumber.toUpperCase();
     const isAliExpress323 = /^323\d{20}$/.test(cleanUpper);
     const isChainedJourney =
@@ -105,7 +133,7 @@ export class LocalTrackingEngine implements ITrackingEngine {
           status: 'info_received',
           stage: 'created',
           description: 'Paquete en espera de entrega en Punto Pack / Locker.',
-          location: `Locker ${params.postalCode || '28001'}`,
+          location: `Locker ${postalCode || '28001'}`,
           carrierSlug: slug,
           carrierName: selectedCarrier.name,
           eventCode: 'INP.LOC.02',
@@ -148,7 +176,7 @@ export class LocalTrackingEngine implements ITrackingEngine {
           status: 'out_for_delivery',
           stage: 'last_mile',
           description: 'En reparto hacia el código postal de destino.',
-          location: `CP ${params.postalCode || ''}, ES`,
+          location: `CP ${postalCode}, ES`,
           carrierSlug: 'seur',
           carrierName: selectedCarrier.name,
           eventCode: 'SEUR.OOTD',
@@ -179,7 +207,7 @@ export class LocalTrackingEngine implements ITrackingEngine {
           status: 'in_transit',
           stage: 'transit',
           description: 'Salida de plataforma hacia agencia de destino.',
-          location: `Delegación CP ${params.postalCode || ''}, ES`,
+          location: `Delegación CP ${postalCode}, ES`,
           carrierSlug: 'asm-gls-spain',
           carrierName: selectedCarrier.name,
           eventCode: 'GLS.02',
@@ -345,7 +373,7 @@ export class LocalTrackingEngine implements ITrackingEngine {
       progress,
       origin,
       destination,
-      postalCode: params.postalCode?.trim() || undefined,
+      postalCode: postalCode || undefined,
       estimatedDelivery,
       daysInTransit: Math.max(1, Math.floor(events.length * 1.2)),
       serviceType,
