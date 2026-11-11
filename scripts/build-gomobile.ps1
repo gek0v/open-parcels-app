@@ -8,11 +8,17 @@ $GoCoreDir = Resolve-Path "$ProjectRoot\..\open-parcels" -ErrorAction SilentlyCo
 $OutputDir = "$ProjectRoot\src\infrastructure\engine\native\binaries"
 
 Write-Host "📦 === Open Parcels Gomobile Build Pipeline (Windows) ===" -ForegroundColor Cyan
-Write-Host "📁 Go Core: $GoCoreDir"
-Write-Host "📁 Output:  $OutputDir"
+Write-Host "📂 Go Core: $GoCoreDir"
+Write-Host "📂 Output:  $OutputDir"
 
 New-Item -ItemType Directory -Force -Path "$OutputDir\android" | Out-Null
 New-Item -ItemType Directory -Force -Path "$OutputDir\ios" | Out-Null
+
+if (-not $GoCoreDir) {
+    Write-Host "⚠️ Go core directory not found at ..\open-parcels." -ForegroundColor Yellow
+    Write-Host "Skipping native compilation; TypeScript fallback engine remains 100% active." -ForegroundColor Yellow
+    exit 0
+}
 
 $gomobileCmd = Get-Command gomobile -ErrorAction SilentlyContinue
 
@@ -26,6 +32,6 @@ if (-not $gomobileCmd) {
 Set-Location $GoCoreDir
 
 Write-Host "🤖 Compiling Android AAR..." -ForegroundColor Green
-& gomobile bind -v -target=android -androidapi 24 -javapkg=com.openparcels.core -o "$OutputDir\android\openparcels.aar" ./pkg/detector ./pkg/model ./pkg/validators
+& gomobile bind -v -target=android -androidapi 24 -javapkg=com.openparcels.core -o "$OutputDir\android\openparcels.aar" ./pkg/models ./pkg/detector ./pkg/carriers ./pkg/engine
 
 Write-Host "✅ Gomobile compilation complete." -ForegroundColor Green

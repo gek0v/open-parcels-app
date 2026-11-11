@@ -4,15 +4,32 @@
  * - UPS 1Z (Modulo 10 with alternating weights 1, 2)
  * - IATA Air Waybill (AWB Modulo 7)
  * - ISO 6346 Shipping Containers
+ *
+ * Synced with Open Parcels Go Engine (pkg/detector/detector.go).
  */
 
 /**
+ * Cleans a tracking number matching Go CleanTrackingNumber:
+ * Retains hyphen if matching 3 digits - 8 digits (AWB format),
+ * otherwise removes spaces, dashes and non-alphanumeric chars.
+ */
+export function cleanTrackingNumber(raw: string): string {
+  const trimmed = raw.trim();
+  if (/^\d{3}-\d{8}$/.test(trimmed)) {
+    return trimmed;
+  }
+  return trimmed.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+}
+
+/**
  * UPU S10 Modulo 11 check digit verification
- * Format: 2 letters + 9 digits + 2 letters (e.g., RR123456785ES)
+ * Format: 2 letters + 8 digits + 1 check digit + 2 country letters (e.g. RR123456785ES)
  */
 export function verifyUpuS10(number: string): boolean {
-  const clean = number.trim().toUpperCase();
-  const upuRegex = /^[A-Z]{2}(\d{8})(\d)([A-Z]{2})$/;
+  const clean = cleanTrackingNumber(number);
+  if (clean.length !== 13) return false;
+
+  const upuRegex = /^[A-Z]{2}(\d{8})(\d)[A-Z]{2}$/;
   const match = clean.match(upuRegex);
   if (!match) return false;
 
@@ -35,10 +52,10 @@ export function verifyUpuS10(number: string): boolean {
 
 /**
  * UPS 1Z Modulo 10 verification
- * Format: 1Z + 6 alphanumeric (shipper account) + 2 alphanumeric (service) + 7 digits (package id) + 1 check digit
+ * Format: 1Z + 15 alphanumeric chars + 1 check digit (total 18)
  */
 export function verifyUps1Z(number: string): boolean {
-  const clean = number.trim().toUpperCase();
+  const clean = cleanTrackingNumber(number);
   if (!clean.startsWith('1Z') || clean.length !== 18) return false;
 
   const payload = clean.slice(2, 17);
@@ -69,14 +86,31 @@ export function verifyUps1Z(number: string): boolean {
 
 /**
  * IATA Air Waybill Modulo 7 verification
- * Format: 3 prefix digits + 8 digits (last is check digit = remainder of first 7 mod 7)
+ * Accepts both hyphenated 'NNN-NNNNNNNN' (12 chars) or clean 11 digits
  */
 export function verifyIataAwb(number: string): boolean {
-  const clean = number.replace(/[\s-]/g, '');
+  const trimmed = number.trim();
+  if (/^\d{3}-\d{8}$/.test(trimmed)) {
+    const serial = parseInt(trimmed.slice(4, 11), 10);
+    const check = parseInt(trimmed.slice(11, 12), 10);
+    return serial % 7 === check;
+  }
+
+  const clean = trimmed.replace(/[\s-]/g, '');
   if (!/^\d{11}$/.test(clean)) return false;
 
   const first7 = parseInt(clean.slice(3, 10), 10);
   const expectedCheck = parseInt(clean[10], 10);
-
   return first7 % 7 === expectedCheck;
+}
+
+/**
+ * ISO 6346 Shipping Container validation
+ * 4 letters (category U, J, or Z for freight containers) + 7 digits
+ */
+export function verifyContainerIso6346(number: string): boolean {
+  const clean = cleanTrackingNumber(number);
+  if (clean.length !== 11) return false;
+  if (!/^[A-Z]{3}[UJZ]\d{7}$/.test(clean)) return false;
+  return true;
 }

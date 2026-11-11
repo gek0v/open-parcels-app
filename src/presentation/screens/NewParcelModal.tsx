@@ -84,7 +84,8 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
     }
 
     if (requiresPostalCode && !postalCode.trim()) {
-      setErrorMessage('Este transportista (InPost / Mondial Relay) requiere el código postal de destino.');
+      const carrierName = currentSelectedCandidate?.carrier.name || 'este transportista';
+      setErrorMessage('Este transportista (' + carrierName + ') requiere el código postal de destino.');
       return;
     }
 

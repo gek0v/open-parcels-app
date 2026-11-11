@@ -1,8 +1,21 @@
 import { ITrackingEngine } from './ITrackingEngine';
 import { Carrier, DetectedCarrier } from '../../domain/models/carrier';
 import { Parcel, TrackRequestParams, TrackResponsePayload } from '../../domain/models/parcel';
-import { CARRIERS_CATALOG, findCarrierBySlug } from '../../domain/validators/detection';
-import { CANONICAL_STATUS_MAP } from '../../domain/models/status';
+import { CARRIERS_CATALOG } from '../../domain/validators/detection';
+import { TrackingEngineError, normalizeTrackingErrorCode, parseApiError } from './errors';
+import {
+  ParcelsAppResponse,
+  ParcelsAppTrackingRequest,
+  mapCarrierFromApi,
+  mapParcelsAppShipmentToParcel,
+  mapTrackResponseToParcel,
+} from './mapper';
+
+export interface AsyncTrackingOptions {
+  pollIntervalMs?: number;
+  timeoutMs?: number;
+  webhookUrl?: string;
+}
 
 export class RestTrackingEngine implements ITrackingEngine {
   readonly engineName = 'Open Parcels REST API Daemon';
@@ -10,19 +23,23 @@ export class RestTrackingEngine implements ITrackingEngine {
   private baseUrl: string;
 
   constructor(baseUrl: string = 'http://localhost:8080') {
-    this.baseUrl = baseUrl;
+    this.baseUrl = baseUrl.replace(/\/+$/, '');
   }
 
   setBaseUrl(url: string) {
-    this.baseUrl = url;
+    this.baseUrl = url.replace(/\/+$/, '');
   }
 
-  async getCarriers(): Promise<Carrier[]> {
+  async getCarriers(query?: string): Promise<Carrier[]> {
     try {
-      const res = await fetch(`${this.baseUrl}/api/v1/carriers`);
+      const queryParam = query ? `?query=${encodeURIComponent(query)}` : '';
+      const res = await fetch(`${this.baseUrl}/api/v1/carriers${queryParam}`);
       if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
       const data = await res.json();
-      return data.carriers || CARRIERS_CATALOG;
+      if (!Array.isArray(data.carriers)) {
+        return CARRIERS_CATALOG;
+      }
+      return data.carriers.map((c: any) => mapCarrierFromApi(c));
     } catch {
       return CARRIERS_CATALOG;
     }
@@ -36,24 +53,37 @@ export class RestTrackingEngine implements ITrackingEngine {
       );
       if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
       const data = await res.json();
-      return (data.candidates || []).map((c: any) => ({
-        carrier: findCarrierBySlug(c.slug || c.carrier?.slug),
-        confidence: c.confidence || 0.9,
-        matchedRule: c.matched_rule || 'API Detection',
-      }));
+      return (data.candidates || []).map((c: any) => {
+        const carrierPayload = c.carrier || {
+          slug: c.slug || '',
+          name: c.name || '',
+        };
+        return {
+          carrier: mapCarrierFromApi(carrierPayload),
+          confidence: typeof c.confidence === 'number' ? c.confidence : 0.9,
+          matchedRule: c.matched_pattern || c.matched_rule || 'API Detection',
+          reason: c.reason,
+        };
+      });
     } catch {
       return [];
     }
   }
 
   async track(params: TrackRequestParams): Promise<Parcel> {
-    const payload = {
+    const payload: Record<string, unknown> = {
       tracking_number: params.trackingNumber,
-      carrier_hint: params.carrierHint,
-      postal_code: params.postalCode,
-      destination_country: params.destinationCountry,
-      lang: params.lang || 'es',
+      language: params.lang || 'es',
     };
+
+    if (params.carrierHint) payload.carrier_hint = params.carrierHint;
+    if (params.postalCode) payload.postal_code = params.postalCode;
+    if (params.destinationCountry) payload.destination_country = params.destinationCountry;
+    if (params.allowSimulated !== undefined) payload.allow_simulated = params.allowSimulated;
+    if (params.forceRefresh !== undefined) payload.force_refresh = params.forceRefresh;
+    if (params.email) payload.email = params.email;
+    if (params.phone) payload.phone = params.phone;
+    if (params.additionalFields) payload.additional_fields = params.additionalFields;
 
     const res = await fetch(`${this.baseUrl}/api/v1/track`, {
       method: 'POST',
@@ -63,44 +93,97 @@ export class RestTrackingEngine implements ITrackingEngine {
 
     if (!res.ok) {
       const errorJson = await res.json().catch(() => ({}));
-      const err = new Error(errorJson.error || `Error ${res.status} al rastrear paquete`);
-      (err as any).code = errorJson.code || 'UNKNOWN_ERROR';
-      throw err;
+      throw parseApiError(res.status, errorJson);
     }
 
     const data: TrackResponsePayload = await res.json();
+    return mapTrackResponseToParcel(data, params);
+  }
 
-    const parcel: Parcel = {
-      id: 'p-' + Math.random().toString(36).substring(2, 9),
-      trackingNumber: data.tracking_number,
-      carrier: findCarrierBySlug(data.carrier.slug),
-      additionalCarriers: data.additional_carriers?.map((c) => findCarrierBySlug(c.slug)),
-      lastMileCarrier: data.last_mile_carrier
-        ? findCarrierBySlug(data.last_mile_carrier.slug)
-        : undefined,
-      status: data.status,
-      statusText: data.status_text || CANONICAL_STATUS_MAP[data.status]?.labelEs || data.status,
-      progress: data.progress,
-      origin: data.origin,
-      destination: data.destination,
-      deliveredAt: data.delivered_at,
-      daysInTransit: data.days_in_transit,
-      events: data.events.map((e, idx) => ({
-        id: `ev-${idx}-${Date.now()}`,
-        date: e.date,
-        status: e.status,
-        stage: (e.stage as any) || 'transit',
-        description: e.description,
-        location: e.location,
-        carrierSlug: e.carrier_slug,
-        carrierName: e.carrier_name,
-        eventCode: e.event_code,
-      })),
-      updatedAt: data.updated_at || new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      isArchived: false,
+  async getTrackingRequest(requestId: string): Promise<ParcelsAppResponse> {
+    const res = await fetch(
+      `${this.baseUrl}/trackings/${encodeURIComponent(requestId)}`
+    );
+    if (!res.ok) {
+      const errorJson = await res.json().catch(() => ({}));
+      throw parseApiError(res.status, errorJson);
+    }
+    return (await res.json()) as ParcelsAppResponse;
+  }
+
+  async trackAsync(
+    params: TrackRequestParams,
+    options: AsyncTrackingOptions = {}
+  ): Promise<Parcel> {
+    const pollIntervalMs = options.pollIntervalMs ?? 400;
+    const timeoutMs = options.timeoutMs ?? 30000;
+
+    const reqBody: ParcelsAppTrackingRequest = {
+      language: params.lang || 'es',
+      webhook_url: options.webhookUrl,
+      shipments: [
+        {
+          tracking_number: params.trackingNumber,
+          carrier_hint: params.carrierHint,
+          destination_country: params.destinationCountry,
+          postal_code: params.postalCode,
+          allow_simulated: params.allowSimulated,
+          email: params.email,
+          phone: params.phone,
+          additional_fields: params.additionalFields,
+        },
+      ],
     };
 
-    return parcel;
+    const res = await fetch(`${this.baseUrl}/trackings?async=true`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(reqBody),
+    });
+
+    if (!res.ok) {
+      const errorJson = await res.json().catch(() => ({}));
+      throw parseApiError(res.status, errorJson);
+    }
+
+    let current = (await res.json()) as ParcelsAppResponse;
+    const deadline = Date.now() + timeoutMs;
+
+    while (!current.done && current.status === 'processing') {
+      if (Date.now() >= deadline) {
+        throw new TrackingEngineError(
+          `Tiempo de espera agotado para la solicitud asíncrona ${current.request_id}`,
+          'ASYNC_TIMEOUT',
+          408
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+      current = await this.getTrackingRequest(current.request_id);
+    }
+
+    if (
+      (!current.results || current.results.length === 0) &&
+      Array.isArray(current.rejected) &&
+      current.rejected.length > 0
+    ) {
+      const rej = current.rejected[0];
+      throw new TrackingEngineError(
+        rej.message || 'Tracking rejected',
+        normalizeTrackingErrorCode(rej.code, 422),
+        422,
+        current.rejected,
+        rej.code
+      );
+    }
+
+    if (!current.results || current.results.length === 0 || !current.results[0].shipment) {
+      throw new TrackingEngineError(
+        'No se recibieron resultados de seguimiento.',
+        'SHIPMENT_NOT_FOUND',
+        404
+      );
+    }
+
+    return mapParcelsAppShipmentToParcel(current.results[0], params);
   }
 }

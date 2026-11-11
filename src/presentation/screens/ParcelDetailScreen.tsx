@@ -256,6 +256,29 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
             )}
           </View>
 
+          {(!!parcel.serviceType || !!parcel.weight || !!parcel.lastMileTrackingNumber) && (
+            <View style={styles.metaBox}>
+              {!!parcel.serviceType && (
+                <View style={styles.metaItem}>
+                  <Text style={styles.metaLabel}>SERVICIO</Text>
+                  <Text style={styles.metaValue} numberOfLines={1}>{parcel.serviceType}</Text>
+                </View>
+              )}
+              {!!parcel.weight && (
+                <View style={[styles.metaItem, styles.postalItem]}>
+                  <Text style={styles.metaLabel}>PESO</Text>
+                  <Text style={styles.metaValue}>{parcel.weight}</Text>
+                </View>
+              )}
+              {!!parcel.lastMileTrackingNumber && !parcel.weight && (
+                <View style={[styles.metaItem, styles.postalItem]}>
+                  <Text style={styles.metaLabel}>ÚLTIMA MILLA</Text>
+                  <Text style={styles.metaValueMono} numberOfLines={1}>{parcel.lastMileTrackingNumber}</Text>
+                </View>
+              )}
+            </View>
+          )}
+
           <View style={styles.updateRow}>
             <Calendar size={12} color={Theme.colors.textTertiary} strokeWidth={2.5} />
             <Text style={styles.updateText}>

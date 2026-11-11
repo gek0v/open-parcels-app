@@ -40,6 +40,13 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
       is_archived INTEGER NOT NULL DEFAULT 0,
       additional_carriers_json TEXT,
       last_mile_carrier_json TEXT,
+      last_mile_tracking_number TEXT,
+      estimated_delivery TEXT,
+      weight TEXT,
+      service_type TEXT,
+      flight_legs_json TEXT,
+      from_cache INTEGER DEFAULT 0,
+      is_live_data INTEGER DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -62,6 +69,24 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
     CREATE INDEX IF NOT EXISTS idx_parcels_archived ON parcels(is_archived);
     CREATE INDEX IF NOT EXISTS idx_events_parcel ON tracking_events(parcel_id);
   `);
+
+  // Safe migration for newly added columns if table already existed
+  const alterColumns = [
+    'ALTER TABLE parcels ADD COLUMN last_mile_tracking_number TEXT;',
+    'ALTER TABLE parcels ADD COLUMN estimated_delivery TEXT;',
+    'ALTER TABLE parcels ADD COLUMN weight TEXT;',
+    'ALTER TABLE parcels ADD COLUMN service_type TEXT;',
+    'ALTER TABLE parcels ADD COLUMN flight_legs_json TEXT;',
+    'ALTER TABLE parcels ADD COLUMN from_cache INTEGER DEFAULT 0;',
+    'ALTER TABLE parcels ADD COLUMN is_live_data INTEGER DEFAULT 0;',
+  ];
+  for (const q of alterColumns) {
+    try {
+      await db.execAsync(q);
+    } catch {
+      // Column already exists, safe to ignore
+    }
+  }
 
   // Migrate from AsyncStorage if previous parcels exist
   await migrateFromAsyncStorage(db);
@@ -88,8 +113,10 @@ async function migrateFromAsyncStorage(db: SQLite.SQLiteDatabase): Promise<void>
                 id, tracking_number, custom_alias, carrier_slug, carrier_name, carrier_website, carrier_color,
                 requires_postal_code, status, status_text, progress, origin_code, origin_name,
                 destination_code, destination_name, postal_code, delivered_at, days_in_transit,
-                is_archived, additional_carriers_json, last_mile_carrier_json, created_at, updated_at
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+                is_archived, additional_carriers_json, last_mile_carrier_json, last_mile_tracking_number,
+                estimated_delivery, weight, service_type, flight_legs_json, from_cache, is_live_data,
+                created_at, updated_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
               [
                 p.id,
                 p.trackingNumber,
@@ -112,6 +139,13 @@ async function migrateFromAsyncStorage(db: SQLite.SQLiteDatabase): Promise<void>
                 p.isArchived ? 1 : 0,
                 p.additionalCarriers ? JSON.stringify(p.additionalCarriers) : null,
                 p.lastMileCarrier ? JSON.stringify(p.lastMileCarrier) : null,
+                p.lastMileTrackingNumber || null,
+                p.estimatedDelivery || null,
+                p.weight || null,
+                p.serviceType || null,
+                p.flightLegs ? JSON.stringify(p.flightLegs) : null,
+                p.fromCache ? 1 : 0,
+                p.isLiveData ? 1 : 0,
                 p.createdAt,
                 p.updatedAt,
               ]
@@ -147,6 +181,6 @@ async function migrateFromAsyncStorage(db: SQLite.SQLiteDatabase): Promise<void>
 
     await AsyncStorage.setItem(MIGRATION_KEY, 'true');
   } catch (err) {
-    console.warn('Migration from AsyncStorage to SQLite encountered an error:', err);
+    console.warn('SQLite migration warning:', err);
   }
 }

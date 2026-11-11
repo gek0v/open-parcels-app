@@ -1,5 +1,7 @@
 import { Parcel } from '../../../domain/models/parcel';
-import { TrackingEvent } from '../../../domain/models/event';
+import { TrackingEvent, EventStage } from '../../../domain/models/event';
+import { CanonicalStatus } from '../../../domain/models/status';
+import { findCarrierBySlug } from '../../../domain/validators/detection';
 import { getDatabase } from './database';
 
 export class SqliteParcelRepository {
@@ -21,8 +23,8 @@ export class SqliteParcelRepository {
         list.push({
           id: ev.id,
           date: ev.date,
-          status: ev.status,
-          stage: ev.stage,
+          status: ev.status as CanonicalStatus,
+          stage: ev.stage as EventStage,
           description: ev.description,
           location: ev.location || undefined,
           carrierSlug: ev.carrier_slug,
@@ -57,8 +59,8 @@ export class SqliteParcelRepository {
       const events: TrackingEvent[] = eventRows.map((ev) => ({
         id: ev.id,
         date: ev.date,
-        status: ev.status,
-        stage: ev.stage,
+        status: ev.status as CanonicalStatus,
+        stage: ev.stage as EventStage,
         description: ev.description,
         location: ev.location || undefined,
         carrierSlug: ev.carrier_slug,
@@ -82,8 +84,10 @@ export class SqliteParcelRepository {
           id, tracking_number, custom_alias, carrier_slug, carrier_name, carrier_website, carrier_color,
           requires_postal_code, status, status_text, progress, origin_code, origin_name,
           destination_code, destination_name, postal_code, delivered_at, days_in_transit,
-          is_archived, additional_carriers_json, last_mile_carrier_json, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+          is_archived, additional_carriers_json, last_mile_carrier_json, last_mile_tracking_number,
+          estimated_delivery, weight, service_type, flight_legs_json, from_cache, is_live_data,
+          created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
         [
           parcel.id,
           parcel.trackingNumber,
@@ -106,6 +110,13 @@ export class SqliteParcelRepository {
           parcel.isArchived ? 1 : 0,
           parcel.additionalCarriers ? JSON.stringify(parcel.additionalCarriers) : null,
           parcel.lastMileCarrier ? JSON.stringify(parcel.lastMileCarrier) : null,
+          parcel.lastMileTrackingNumber || null,
+          parcel.estimatedDelivery || null,
+          parcel.weight || null,
+          parcel.serviceType || null,
+          parcel.flightLegs ? JSON.stringify(parcel.flightLegs) : null,
+          parcel.fromCache ? 1 : 0,
+          parcel.isLiveData ? 1 : 0,
           parcel.createdAt,
           parcel.updatedAt,
         ]
@@ -169,24 +180,30 @@ export class SqliteParcelRepository {
   }
 
   private mapRowToParcel(row: any, events: TrackingEvent[]): Parcel {
+    const baseCarrier = findCarrierBySlug(row.carrier_slug);
+    const requiresPostalCode =
+      row.requires_postal_code === 1 || !!baseCarrier.requiresPostalCode;
+
     return {
       id: row.id,
       trackingNumber: row.tracking_number,
       customAlias: row.custom_alias || undefined,
       carrier: {
+        ...baseCarrier,
         slug: row.carrier_slug,
-        name: row.carrier_name,
-        website: row.carrier_website || undefined,
-        color: row.carrier_color || undefined,
-        requiresPostalCode: row.requires_postal_code === 1,
+        name: row.carrier_name || baseCarrier.name,
+        website: row.carrier_website || baseCarrier.website,
+        color: row.carrier_color || baseCarrier.color,
+        requiresPostalCode,
       },
       additionalCarriers: row.additional_carriers_json
         ? JSON.parse(row.additional_carriers_json)
         : undefined,
+      lastMileTrackingNumber: row.last_mile_tracking_number || undefined,
       lastMileCarrier: row.last_mile_carrier_json
         ? JSON.parse(row.last_mile_carrier_json)
         : undefined,
-      status: row.status,
+      status: row.status as CanonicalStatus,
       statusText: row.status_text,
       progress: row.progress,
       origin: row.origin_code ? { code: row.origin_code, name: row.origin_name || '' } : undefined,
@@ -194,8 +211,14 @@ export class SqliteParcelRepository {
         ? { code: row.destination_code, name: row.destination_name || '' }
         : undefined,
       postalCode: row.postal_code || undefined,
+      estimatedDelivery: row.estimated_delivery || undefined,
       deliveredAt: row.delivered_at || null,
       daysInTransit: row.days_in_transit,
+      weight: row.weight || undefined,
+      serviceType: row.service_type || undefined,
+      flightLegs: row.flight_legs_json ? JSON.parse(row.flight_legs_json) : undefined,
+      fromCache: row.from_cache === 1,
+      isLiveData: row.is_live_data === 1,
       events,
       updatedAt: row.updated_at,
       isArchived: row.is_archived === 1,
