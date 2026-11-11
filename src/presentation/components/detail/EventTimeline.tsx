@@ -10,6 +10,7 @@ import {
   Truck,
   CheckCircle,
   AlertTriangle,
+  ArrowRightLeft,
 } from 'lucide-react-native';
 
 interface EventTimelineProps {
@@ -17,7 +18,14 @@ interface EventTimelineProps {
 }
 
 export const EventTimeline: React.FC<EventTimelineProps> = ({ events }) => {
-  const sorted = [...events].reverse();
+  const sorted = [...events].sort((a, b) => {
+    const ta = new Date(a.date).getTime();
+    const tb = new Date(b.date).getTime();
+    if (!isNaN(ta) && !isNaN(tb) && ta !== tb) {
+      return tb - ta;
+    }
+    return 0;
+  });
 
   const getStageIcon = (stage: EventStage) => {
     const size = 15;
@@ -26,12 +34,16 @@ export const EventTimeline: React.FC<EventTimelineProps> = ({ events }) => {
     switch (stage) {
       case 'created':
         return <FileText size={size} color={color} strokeWidth={2.5} />;
+      case 'picked_up':
       case 'pickup':
         return <Package size={size} color={color} strokeWidth={2.5} />;
       case 'customs':
         return <ShieldCheck size={size} color={color} strokeWidth={2.5} />;
       case 'transit':
         return <Plane size={size} color={color} strokeWidth={2.5} />;
+      case 'handover':
+        return <ArrowRightLeft size={size} color={color} strokeWidth={2.5} />;
+      case 'last_mile':
       case 'delivery':
         return <Truck size={size} color={color} strokeWidth={2.5} />;
       case 'completed':

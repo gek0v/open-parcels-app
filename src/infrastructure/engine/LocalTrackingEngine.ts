@@ -2,8 +2,14 @@ import { ITrackingEngine } from './ITrackingEngine';
 import { Carrier, DetectedCarrier } from '../../domain/models/carrier';
 import { Parcel, TrackRequestParams } from '../../domain/models/parcel';
 import { TrackingEvent } from '../../domain/models/event';
-import { CanonicalStatus, CANONICAL_STATUS_MAP } from '../../domain/models/status';
-import { CARRIERS_CATALOG, detectCandidateCarriers, findCarrierBySlug } from '../../domain/validators/detection';
+import { CanonicalStatus } from '../../domain/models/status';
+import {
+  CARRIERS_CATALOG,
+  detectCandidateCarriers,
+  findCarrierBySlug,
+} from '../../domain/validators/detection';
+import { TrackingEngineError } from './errors';
+import { getLocalizedStatusText } from './mapper';
 
 export class LocalTrackingEngine implements ITrackingEngine {
   readonly engineName = 'Open Parcels Embedded (Local-First)';
@@ -20,10 +26,13 @@ export class LocalTrackingEngine implements ITrackingEngine {
   async track(params: TrackRequestParams): Promise<Parcel> {
     const rawNumber = params.trackingNumber.trim();
     if (!rawNumber) {
-      throw new Error('El número de seguimiento no puede estar vacío');
+      throw new TrackingEngineError(
+        'El número de seguimiento no puede estar vacío',
+        'MISSING_NUMBER',
+        400
+      );
     }
 
-    // Auto-detect with destination country boost or use carrier hint
     const candidates = await this.detect(rawNumber, params.destinationCountry);
     let selectedCarrier: Carrier;
 
@@ -32,33 +41,51 @@ export class LocalTrackingEngine implements ITrackingEngine {
     } else if (candidates.length > 0) {
       selectedCarrier = candidates[0].carrier;
     } else {
-      selectedCarrier = findCarrierBySlug('correos-es');
+      selectedCarrier = findCarrierBySlug('correos-spain');
     }
 
-    // Check mandatory parameters (Open Parcels requirement: InPost / CTT require postal code)
-    if (selectedCarrier.requiresPostalCode && !params.postalCode) {
-      const err = new Error('Código postal obligatorio para ' + selectedCarrier.name);
-      (err as any).code = 'MISSING_POSTAL_CODE';
-      throw err;
+    if (selectedCarrier.requiresPostalCode && !params.postalCode?.trim()) {
+      throw new TrackingEngineError(
+        `Código postal obligatorio para ${selectedCarrier.name}`,
+        'POSTAL_CODE_REQUIRED',
+        422
+      );
     }
 
-    // Generate accurate Open Parcels v1.0.2 events and journey
-    const isChainedJourney = selectedCarrier.slug === 'cainiao' || rawNumber.startsWith('LP');
+    if (params.allowSimulated === false && !selectedCarrier.hasLiveTracking) {
+      throw new TrackingEngineError(
+        `El transportista ${selectedCarrier.name} no dispone de adaptador en vivo`,
+        'CARRIER_NOT_IMPLEMENTED',
+        501
+      );
+    }
+
+    const slug = selectedCarrier.slug;
+    const cleanUpper = rawNumber.toUpperCase();
+    const isAliExpress323 = /^323\d{20}$/.test(cleanUpper);
+    const isChainedJourney =
+      slug === 'cainiao' ||
+      cleanUpper.startsWith('LP') ||
+      (isAliExpress323 && (slug === 'cainiao' || slug === 'correosexpress'));
+
     const now = new Date();
-
-    let additionalCarriers: Carrier[] | undefined = undefined;
-    let lastMileCarrier: Carrier | undefined = undefined;
+    let additionalCarriers: Carrier[] | undefined;
+    let lastMileCarrier: Carrier | undefined;
+    let lastMileTrackingNumber: string | undefined;
     let events: TrackingEvent[] = [];
     let status: CanonicalStatus = 'in_transit';
     let progress = 45;
     let origin = { code: 'CN', name: 'China' };
     let destination = { code: 'ES', name: 'España' };
+    let serviceType: string | undefined;
+    let estimatedDelivery: string | undefined;
 
-    if (selectedCarrier.slug === 'inpost') {
+    if (slug === 'inpost' || slug === 'inpost-es') {
       origin = { code: 'ES', name: 'España' };
       destination = { code: 'ES', name: 'España' };
       status = 'info_received';
-      progress = 20;
+      progress = 15;
+      serviceType = 'Punto Pack / Locker';
 
       events = [
         {
@@ -68,7 +95,7 @@ export class LocalTrackingEngine implements ITrackingEngine {
           stage: 'created',
           description: 'El envío ha sido registrado telemáticamente por el remitente.',
           location: 'Hub Central InPost',
-          carrierSlug: 'inpost',
+          carrierSlug: slug,
           carrierName: selectedCarrier.name,
           eventCode: 'INP.REG.01',
         },
@@ -78,18 +105,102 @@ export class LocalTrackingEngine implements ITrackingEngine {
           status: 'info_received',
           stage: 'created',
           description: 'Paquete en espera de entrega en Punto Pack / Locker.',
-          location: 'Locker 47140',
-          carrierSlug: 'inpost',
+          location: `Locker ${params.postalCode || '28001'}`,
+          carrierSlug: slug,
           carrierName: selectedCarrier.name,
           eventCode: 'INP.LOC.02',
         },
       ];
-    } else if (isChainedJourney) {
-      // Multi-Carrier Chaining: Cainiao Global -> Correos Express (ES)
-      lastMileCarrier = findCarrierBySlug('correos-express');
-      additionalCarriers = [lastMileCarrier];
+    } else if (slug === 'seur') {
+      origin = { code: 'ES', name: 'España' };
+      destination = { code: 'ES', name: 'España' };
       status = 'out_for_delivery';
       progress = 85;
+      serviceType = 'SEUR 24';
+      estimatedDelivery = new Date(now.getTime() + 3600 * 1000 * 8).toISOString();
+
+      events = [
+        {
+          id: 'ev-1',
+          date: new Date(now.getTime() - 86400 * 1000 * 2).toISOString(),
+          status: 'info_received',
+          stage: 'created',
+          description: 'Envío documentado en origen.',
+          location: 'Madrid, ES',
+          carrierSlug: 'seur',
+          carrierName: selectedCarrier.name,
+          eventCode: 'SEUR.REG',
+        },
+        {
+          id: 'ev-2',
+          date: new Date(now.getTime() - 86400 * 1000 * 1).toISOString(),
+          status: 'in_transit',
+          stage: 'transit',
+          description: 'En tránsito por red nacional SEUR.',
+          location: 'Centro Logístico Nacional, ES',
+          carrierSlug: 'seur',
+          carrierName: selectedCarrier.name,
+          eventCode: 'SEUR.TR',
+        },
+        {
+          id: 'ev-3',
+          date: new Date(now.getTime() - 3600 * 1000 * 2).toISOString(),
+          status: 'out_for_delivery',
+          stage: 'last_mile',
+          description: 'En reparto hacia el código postal de destino.',
+          location: `CP ${params.postalCode || ''}, ES`,
+          carrierSlug: 'seur',
+          carrierName: selectedCarrier.name,
+          eventCode: 'SEUR.OOTD',
+        },
+      ];
+    } else if (slug === 'asm-gls-spain') {
+      origin = { code: 'ES', name: 'España' };
+      destination = { code: 'ES', name: 'España' };
+      status = 'in_transit';
+      progress = 55;
+      serviceType = 'BusinessParcel';
+
+      events = [
+        {
+          id: 'ev-1',
+          date: new Date(now.getTime() - 86400 * 1000 * 1).toISOString(),
+          status: 'info_received',
+          stage: 'created',
+          description: 'Información del envío recibida en GLS Spain.',
+          location: 'Barcelona Hub, ES',
+          carrierSlug: 'asm-gls-spain',
+          carrierName: selectedCarrier.name,
+          eventCode: 'GLS.01',
+        },
+        {
+          id: 'ev-2',
+          date: new Date(now.getTime() - 3600 * 1000 * 10).toISOString(),
+          status: 'in_transit',
+          stage: 'transit',
+          description: 'Salida de plataforma hacia agencia de destino.',
+          location: `Delegación CP ${params.postalCode || ''}, ES`,
+          carrierSlug: 'asm-gls-spain',
+          carrierName: selectedCarrier.name,
+          eventCode: 'GLS.02',
+        },
+      ];
+    } else if (isChainedJourney) {
+      const cainiaoCarrier = findCarrierBySlug('cainiao');
+      const ceCarrier = findCarrierBySlug('correosexpress');
+      if (slug === 'correosexpress') {
+        additionalCarriers = [cainiaoCarrier];
+        lastMileCarrier = ceCarrier;
+      } else {
+        lastMileCarrier = ceCarrier;
+        additionalCarriers = [ceCarrier];
+      }
+      lastMileTrackingNumber = isAliExpress323
+        ? cleanUpper
+        : `69${cleanUpper.replace(/\D/g, '').slice(0, 14).padEnd(14, '0')}`;
+      status = 'out_for_delivery';
+      progress = 85;
+      serviceType = 'AliExpress Standard / Last-Mile Handover';
 
       events = [
         {
@@ -102,6 +213,7 @@ export class LocalTrackingEngine implements ITrackingEngine {
           carrierSlug: 'cainiao',
           carrierName: 'Cainiao Global',
           eventCode: 'CN.WH.01',
+          carrierIndex: 0,
         },
         {
           id: 'ev-2',
@@ -113,6 +225,7 @@ export class LocalTrackingEngine implements ITrackingEngine {
           carrierSlug: 'cainiao',
           carrierName: 'Cainiao Global',
           eventCode: 'CN.AIR.OUT',
+          carrierIndex: 0,
         },
         {
           id: 'ev-3',
@@ -124,36 +237,39 @@ export class LocalTrackingEngine implements ITrackingEngine {
           carrierSlug: 'cainiao',
           carrierName: 'Cainiao Global',
           eventCode: 'ES.CUS.OK',
+          carrierIndex: 0,
         },
         {
           id: 'ev-4',
           date: new Date(now.getTime() - 86400 * 1000 * 1).toISOString(),
           status: 'in_transit',
-          stage: 'pickup',
+          stage: 'handover',
           description: 'Transferido a operador local de última milla.',
           location: 'Centro Logístico Coslada, Madrid',
-          carrierSlug: 'correos-express',
+          carrierSlug: 'correosexpress',
           carrierName: 'Correos Express',
           eventCode: 'CXP.IN.01',
+          carrierIndex: 1,
         },
         {
           id: 'ev-5',
           date: new Date(now.getTime() - 3600 * 1000 * 3).toISOString(),
           status: 'out_for_delivery',
-          stage: 'delivery',
+          stage: 'last_mile',
           description: 'En reparto: el mensajero se encuentra en ruta para entrega en el domicilio.',
           location: 'Delegación Destino',
-          carrierSlug: 'correos-express',
+          carrierSlug: 'correosexpress',
           carrierName: 'Correos Express',
           eventCode: 'CXP.OOTD.05',
+          carrierIndex: 1,
         },
       ];
-    } else if (rawNumber.startsWith('1Z')) {
-      // UPS
+    } else if (slug === 'ups' || cleanUpper.startsWith('1Z')) {
       origin = { code: 'DE', name: 'Alemania' };
       destination = { code: 'ES', name: 'España' };
       status = 'in_transit';
-      progress = 60;
+      progress = 55;
+      serviceType = 'UPS Standard';
 
       events = [
         {
@@ -188,11 +304,10 @@ export class LocalTrackingEngine implements ITrackingEngine {
         },
       ];
     } else {
-      // Default standard journey
       origin = { code: 'ES', name: 'España' };
       destination = { code: 'ES', name: 'España' };
       status = 'in_transit';
-      progress = 45;
+      progress = 35;
 
       events = [
         {
@@ -202,7 +317,7 @@ export class LocalTrackingEngine implements ITrackingEngine {
           stage: 'created',
           description: 'Pre-registrado en el sistema.',
           location: 'Oficina Central',
-          carrierSlug: selectedCarrier.slug,
+          carrierSlug: slug,
           carrierName: selectedCarrier.name,
         },
         {
@@ -212,31 +327,34 @@ export class LocalTrackingEngine implements ITrackingEngine {
           stage: 'transit',
           description: 'En tránsito hacia el centro de distribución provincial.',
           location: 'Centro de Clasificación',
-          carrierSlug: selectedCarrier.slug,
+          carrierSlug: slug,
           carrierName: selectedCarrier.name,
         },
       ];
     }
 
-    const parcel: Parcel = {
+    return {
       id: 'p-' + Math.random().toString(36).substring(2, 9),
       trackingNumber: rawNumber,
       carrier: selectedCarrier,
       additionalCarriers,
+      lastMileTrackingNumber,
       lastMileCarrier,
       status,
-      statusText: CANONICAL_STATUS_MAP[status].labelEs,
+      statusText: getLocalizedStatusText(status, params.lang),
       progress,
       origin,
       destination,
-      postalCode: params.postalCode,
+      postalCode: params.postalCode?.trim() || undefined,
+      estimatedDelivery,
       daysInTransit: Math.max(1, Math.floor(events.length * 1.2)),
+      serviceType,
+      fromCache: false,
+      isLiveData: false,
       events,
       updatedAt: now.toISOString(),
       createdAt: now.toISOString(),
       isArchived: false,
     };
-
-    return parcel;
   }
 }
