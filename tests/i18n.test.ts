@@ -37,5 +37,6 @@ describe('i18n Localization Integrity', () => {
     expect(Object.keys(es.empty).sort()).toEqual(Object.keys(en.empty).sort());
     expect(Object.keys(es.detail).sort()).toEqual(Object.keys(en.detail).sort());
     expect(Object.keys(es.newParcelModal).sort()).toEqual(Object.keys(en.newParcelModal).sort());
+    expect(Object.keys(es.updateModal).sort()).toEqual(Object.keys(en.updateModal).sort());
   });
 });
