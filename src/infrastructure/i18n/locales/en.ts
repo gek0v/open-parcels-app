@@ -142,6 +142,6 @@ export const en: TranslationKey = {
     permissionError: 'Permission required: enable "Install unknown apps" for Open Parcels.',
     toastTitlePrefix: 'NEW VERSION',
     toastSubtitle: 'Tap here to download and install',
-    toastReadySubtitle: 'Downloaded ? Tap to install now',
+    toastReadySubtitle: 'Downloaded • Tap to install now',
   },
 };
