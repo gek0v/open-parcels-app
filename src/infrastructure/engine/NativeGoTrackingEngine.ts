@@ -1,6 +1,6 @@
 import { ITrackingEngine } from './ITrackingEngine';
 import { LocalTrackingEngine } from './LocalTrackingEngine';
-import { NativeOpenParcelsCore } from './native/NativeOpenParcelsCore';
+import { getNativeOpenParcelsCore } from './native/NativeOpenParcelsCore';
 import { Carrier, DetectedCarrier } from '../../domain/models/carrier';
 import { Parcel, TrackRequestParams, TrackResponsePayload } from '../../domain/models/parcel';
 import { parseApiError, TrackingEngineError } from './errors';
@@ -16,14 +16,16 @@ export class NativeGoTrackingEngine implements ITrackingEngine {
 
   get isNativeLoaded(): boolean {
     try {
-      return !!NativeOpenParcelsCore && NativeOpenParcelsCore.isAvailable();
+      const core = getNativeOpenParcelsCore();
+      return !!core && core.isAvailable();
     } catch {
       return false;
     }
   }
 
   async track(params: TrackRequestParams): Promise<Parcel> {
-    if (this.isNativeLoaded && NativeOpenParcelsCore) {
+    const core = getNativeOpenParcelsCore();
+    if (core && core.isAvailable()) {
       try {
         const nativePayload = {
           tracking_number: params.trackingNumber,
@@ -38,7 +40,7 @@ export class NativeGoTrackingEngine implements ITrackingEngine {
           additional_fields: params.additionalFields,
         };
 
-        const rawJson = await NativeOpenParcelsCore.trackShipment(JSON.stringify(nativePayload));
+        const rawJson = await core.trackShipment(JSON.stringify(nativePayload));
         const parsed = JSON.parse(rawJson);
 
         if (parsed && parsed.error) {
@@ -62,9 +64,10 @@ export class NativeGoTrackingEngine implements ITrackingEngine {
   }
 
   async detect(trackingNumber: string, countryHint?: string): Promise<DetectedCarrier[]> {
-    if (this.isNativeLoaded && NativeOpenParcelsCore) {
+    const core = getNativeOpenParcelsCore();
+    if (core && core.isAvailable()) {
       try {
-        const rawJson = await NativeOpenParcelsCore.detectCarriers(trackingNumber, countryHint);
+        const rawJson = await core.detectCarriers(trackingNumber, countryHint);
         const candidates = JSON.parse(rawJson);
         if (Array.isArray(candidates)) {
           return candidates.map((c: any) => ({

@@ -85,9 +85,9 @@ export class SqliteParcelRepository {
           requires_postal_code, status, status_text, progress, origin_code, origin_name,
           destination_code, destination_name, postal_code, delivered_at, days_in_transit,
           is_archived, additional_carriers_json, last_mile_carrier_json, last_mile_tracking_number,
-          estimated_delivery, weight, service_type, flight_legs_json, from_cache, is_live_data,
+          estimated_delivery, weight, service_type, flight_legs_json, from_cache, is_live_data, notes,
           created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
         [
           parcel.id,
           parcel.trackingNumber,
@@ -117,6 +117,7 @@ export class SqliteParcelRepository {
           parcel.flightLegs ? JSON.stringify(parcel.flightLegs) : null,
           parcel.fromCache ? 1 : 0,
           parcel.isLiveData ? 1 : 0,
+          parcel.notes || null,
           parcel.createdAt,
           parcel.updatedAt,
         ]
@@ -222,6 +223,7 @@ export class SqliteParcelRepository {
       events,
       updatedAt: row.updated_at,
       isArchived: row.is_archived === 1,
+      notes: row.notes || undefined,
       createdAt: row.created_at,
     };
   }
