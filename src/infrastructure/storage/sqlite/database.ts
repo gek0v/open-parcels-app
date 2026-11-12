@@ -47,6 +47,7 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
       flight_legs_json TEXT,
       from_cache INTEGER DEFAULT 0,
       is_live_data INTEGER DEFAULT 0,
+      notes TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -79,6 +80,7 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
     'ALTER TABLE parcels ADD COLUMN flight_legs_json TEXT;',
     'ALTER TABLE parcels ADD COLUMN from_cache INTEGER DEFAULT 0;',
     'ALTER TABLE parcels ADD COLUMN is_live_data INTEGER DEFAULT 0;',
+    'ALTER TABLE parcels ADD COLUMN notes TEXT;',
   ];
   for (const q of alterColumns) {
     try {

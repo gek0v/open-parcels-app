@@ -53,11 +53,14 @@ export function normalizeInPostEventStatus(
   const c = `${name} ${typeStr} ${desc}`.toLowerCase();
 
   if (
-    c.includes('entregado') ||
-    c.includes('delivered') ||
-    c.includes('recogido por el destinatario') ||
-    c.includes('recogido por el cliente') ||
-    c.includes('retiré par le destinataire')
+    !c.includes('no entregado') &&
+    !c.includes('not delivered') &&
+    !c.includes('undelivered') &&
+    (c.includes('entregado') ||
+      c.includes('delivered') ||
+      c.includes('recogido por el destinatario') ||
+      c.includes('recogido por el cliente') ||
+      c.includes('retiré par le destinataire'))
   ) {
     return { status: 'delivered', stage: 'delivery' };
   }
@@ -217,7 +220,7 @@ export function parseInPostHtmlToParcel(
         if (!ev || typeof ev !== 'object') continue;
         const evCode = ev.code ? String(ev.code) : undefined;
         const evName = String(ev.name || '');
-        const evDate = String(ev.date || mDate || new Date().toISOString());
+        const evDate = String(ev.date || mDate || '');
         const evDesc = String(ev.description || evName || mName);
         const evLoc = String(
           ev.location || ev.place || ev.city || ev.agency || ev.depot || mLoc || ''
@@ -240,7 +243,7 @@ export function parseInPostHtmlToParcel(
       const norm = normalizeInPostEventStatus(mName, mType, '');
       events.push({
         id: `inpost-${events.length}-${mDate}`,
-        date: mDate || new Date().toISOString(),
+        date: mDate || '',
         rawDate: mDate || undefined,
         status: norm.status,
         stage: norm.stage,
@@ -256,23 +259,35 @@ export function parseInPostHtmlToParcel(
     throw new TrackingEngineError('No se encontraron eventos en InPost.', 'SHIPMENT_NOT_FOUND', 404);
   }
 
-  events.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  events.sort((a, b) => {
+    const ta = new Date(a.date).getTime();
+    const tb = new Date(b.date).getTime();
+    if (Number.isNaN(ta) && Number.isNaN(tb)) return 0;
+    if (Number.isNaN(ta)) return 1;
+    if (Number.isNaN(tb)) return -1;
+    return tb - ta;
+  });
 
   let status: CanonicalStatus = events[0].status;
   let deliveredAt: string | null = null;
   for (const ev of events) {
     if (ev.status === 'delivered') {
       status = 'delivered';
-      if (!deliveredAt) deliveredAt = ev.date;
+      if (!deliveredAt) deliveredAt = ev.date || null;
       break;
     }
   }
 
-  const earliest = events[events.length - 1];
-  const diffHours = Math.max(
-    0,
-    (new Date(deliveredAt || Date.now()).getTime() - new Date(earliest.date).getTime()) / 3600000
-  );
+  const earliestValid = [...events]
+    .reverse()
+    .find((ev) => ev.date && !Number.isNaN(new Date(ev.date).getTime()));
+  const earliestMs = earliestValid ? new Date(earliestValid.date).getTime() : NaN;
+  const endMs = deliveredAt && !Number.isNaN(new Date(deliveredAt).getTime())
+    ? new Date(deliveredAt).getTime()
+    : Date.now();
+  const diffHours = !Number.isNaN(earliestMs)
+    ? Math.max(0, (endMs - earliestMs) / 3600000)
+    : 0;
   let daysInTransit = Math.floor(diffHours / 24);
   if (daysInTransit < 1 && diffHours > 0) daysInTransit = 1;
 

@@ -28,7 +28,6 @@ import { Plus, Search, X, Package, Cpu, LayoutGrid, Barcode, Monitor, Languages,
 
 export type CardStyle = 'bento' | 'industrial' | 'retro';
 const CARD_STYLE_KEY = '@open_parcels:card_style';
-const REST_BASE_URL_KEY = '@open_parcels:rest_base_url';
 
 interface DashboardScreenProps {
   onSelectParcel: (parcel: Parcel) => void;
@@ -57,11 +56,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         setCardStyle(stored);
       }
     });
-    AsyncStorage.getItem(REST_BASE_URL_KEY).then((storedUrl) => {
-      if (storedUrl && storedUrl.trim()) {
-        trackingEngineManager.rest.setBaseUrl(storedUrl.trim());
-        setRestUrlInput(storedUrl.trim());
-      }
+    trackingEngineManager.hydrate().then(() => {
+      setIsLocalMode(trackingEngineManager.isLocalFirst());
+      setRestUrlInput(trackingEngineManager.rest.getBaseUrl());
     });
   }, []);
 
@@ -101,15 +98,14 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
   const toggleEngineMode = () => {
     const next = !isLocalMode;
-    trackingEngineManager.setLocalFirst(next);
     setIsLocalMode(next);
+    void trackingEngineManager.setLocalFirst(next);
   };
 
   const handleSaveRestUrl = async () => {
     const trimmed = restUrlInput.trim() || 'http://localhost:8080';
-    trackingEngineManager.rest.setBaseUrl(trimmed);
     setRestUrlInput(trimmed);
-    await AsyncStorage.setItem(REST_BASE_URL_KEY, trimmed);
+    await trackingEngineManager.setRestBaseUrl(trimmed);
     setRestModalVisible(false);
   };
 

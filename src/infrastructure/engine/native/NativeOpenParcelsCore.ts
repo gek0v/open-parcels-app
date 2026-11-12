@@ -23,4 +23,8 @@ export interface Spec extends TurboModule {
   isAvailable(): boolean;
 }
 
-export const NativeOpenParcelsCore = TurboModuleRegistry.get<Spec>('OpenParcelsCore');
+export function getNativeOpenParcelsCore(): Spec | null {
+  return TurboModuleRegistry?.get<Spec>('OpenParcelsCore') ?? null;
+}
+
+export const NativeOpenParcelsCore = getNativeOpenParcelsCore();

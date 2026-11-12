@@ -116,11 +116,28 @@ export function normalizeEventStage(rawStage?: string): EventStage {
 }
 
 export function normalizeCanonicalStatus(rawStatus?: string): CanonicalStatus {
-  const s = (rawStatus || '').trim().toLowerCase() as CanonicalStatus;
+  const s = (rawStatus || '').trim().toLowerCase();
   if (s in CANONICAL_STATUS_MAP) {
-    return s;
+    return s as CanonicalStatus;
   }
-  return 'in_transit';
+  if (s === 'in transit' || s === 'intransit' || s === 'transit') {
+    return 'in_transit';
+  }
+  if (
+    s === 'out for delivery' ||
+    s === 'outfordelivery' ||
+    s === 'available_for_pickup' ||
+    s === 'ready_for_pickup'
+  ) {
+    return 'out_for_delivery';
+  }
+  if (s === 'info received' || s === 'inforeceived' || s === 'pre_transit' || s === 'created') {
+    return 'info_received';
+  }
+  if (s === 'failed attempt' || s === 'failedattempt' || s === 'delivery_attempted') {
+    return 'failed_attempt';
+  }
+  return 'pending';
 }
 
 export function inferStatusFromDescription(
@@ -238,7 +255,7 @@ export function mapTrackResponseToParcel(
   const status = normalizeCanonicalStatus(data.status);
 
   const events: TrackingEvent[] = (data.events || []).map((e, idx) => ({
-    id: `ev-${idx}-${e.date || Date.now()}`,
+    id: `ev-${idx}-${e.date || e.event_code || 'nodate'}`,
     date: e.date,
     rawDate: e.raw_date,
     status: normalizeCanonicalStatus(e.status),
@@ -314,7 +331,7 @@ export function mapParcelsAppShipmentToParcel(
     const svc = shipment.services?.[st.carrier];
     const inferred = inferStatusFromDescription(st.state, status);
     return {
-      id: `ev-${idx}-${st.date || Date.now()}`,
+      id: `ev-${idx}-${st.date || 'nodate'}`,
       date: st.date,
       status: inferred.status,
       stage: inferred.stage,
@@ -357,6 +374,7 @@ export function mapParcelsAppShipmentToParcel(
     daysInTransit: typeof shipment.daysInTransit === 'number' ? shipment.daysInTransit : 0,
     flightLegs: shipment.flight_legs?.map(mapFlightLegFromApi),
     fromCache: item.from_cache,
+    isLiveData: !shipment.error,
     events,
     updatedAt: nowIso,
     createdAt: nowIso,

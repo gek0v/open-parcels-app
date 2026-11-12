@@ -10,6 +10,7 @@ import { UpdateToast } from '../presentation/components/common/UpdateToast';
 import { updateService, UpdateInfo } from '../infrastructure/services/UpdateService';
 import { notificationService } from '../infrastructure/services/NotificationService';
 import { registerBackgroundSync } from '../infrastructure/services/BackgroundSyncService';
+import { trackingEngineManager } from '../infrastructure/engine';
 import { Theme } from '../presentation/theme/adaptiveTheme';
 
 export default function RootLayout() {
@@ -18,6 +19,7 @@ export default function RootLayout() {
   const [updateModalInfo, setUpdateModalInfo] = useState<UpdateInfo | null>(null);
 
   React.useEffect(() => {
+    void trackingEngineManager.hydrate();
     notificationService.requestPermissions().then((granted) => {
       if (granted) {
         registerBackgroundSync();

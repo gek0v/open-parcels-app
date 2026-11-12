@@ -60,14 +60,24 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
         trackingNumber: parcel.trackingNumber,
         carrierHint: parcel.carrier.slug,
         postalCode: parcel.postalCode,
+        destinationCountry: parcel.destination?.code,
+        allowSimulated: parcel.isLiveData ? false : undefined,
         lang: 'es',
       });
+
+      if (parcel.isLiveData && updated.isLiveData === false) {
+        throw new Error('No se recibieron datos en vivo del transportista.');
+      }
 
       // Preserve local metadata
       updated.id = parcel.id;
       updated.customAlias = parcel.customAlias;
+      updated.notes = parcel.notes;
       updated.isArchived = parcel.isArchived;
       updated.createdAt = parcel.createdAt;
+      updated.postalCode = parcel.postalCode || updated.postalCode;
+      updated.origin = updated.origin || parcel.origin;
+      updated.destination = updated.destination || parcel.destination;
       updated.updatedAt = new Date().toISOString();
 
       await parcelRepository.save(updated);
