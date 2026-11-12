@@ -107,7 +107,7 @@ export const DeleteParcelModal: React.FC<DeleteParcelModalProps> = ({
               onPress={onConfirmDelete}
               style={({ pressed }) => [styles.deleteBtn, pressed && styles.pressed]}
             >
-              <Trash2 size={16} color="#FFFFFF" strokeWidth={2.5} style={styles.deleteIcon} />
+              <Trash2 size={16} color="#000000" strokeWidth={2.5} style={styles.deleteIcon} />
               <Text style={styles.deleteText}>SÍ, ELIMINAR</Text>
             </Pressable>
           </View>
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
   deleteText: {
     fontSize: 12,
     fontWeight: '900',
-    color: '#FFFFFF',
+    color: '#000000',
     letterSpacing: 0.5,
   },
   pressed: {

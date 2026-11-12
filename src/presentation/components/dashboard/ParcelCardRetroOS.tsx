@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Parcel } from '../../../domain/models/parcel';
 import { Theme } from '../../theme/adaptiveTheme';
+import { useTheme } from '../../theme/ThemeContext';
 import { StatusBadge } from '../common/StatusBadge';
 import { ProgressBar } from '../common/ProgressBar';
 import { ArrowUpRight, Clock, Edit2 } from 'lucide-react-native';
@@ -17,30 +18,22 @@ export const ParcelCardRetroOS: React.FC<ParcelCardRetroOSProps> = ({
   onPress,
   onRename,
 }) => {
+  const { theme } = useTheme();
   const latestEvent = parcel.events[parcel.events.length - 1];
 
   // Dynamic window title bar color based on status
   const getHeaderColor = () => {
-    switch (parcel.status) {
-      case 'out_for_delivery':
-        return '#FF9900'; // Amber
-      case 'delivered':
-        return '#34D399'; // Mint
-      case 'info_received':
-        return '#C084FC'; // Purple
-      default:
-        return '#38BDF8'; // Sky Blue
-    }
+    return theme.status[parcel.status] || theme.primary;
   };
 
   return (
-    <View style={styles.windowCard}>
+    <View style={[styles.windowCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
       {/* OS Window Colored Title Bar */}
-      <View style={[styles.windowTitleBar, { backgroundColor: getHeaderColor() }]}>
+      <View style={[styles.windowTitleBar, { backgroundColor: getHeaderColor(), borderColor: theme.border }]}>
         <View style={styles.windowControls}>
-          <View style={[styles.dot, { backgroundColor: '#FF5C38' }]} />
-          <View style={[styles.dot, { backgroundColor: '#FFE600' }]} />
-          <View style={[styles.dot, { backgroundColor: '#10B981' }]} />
+          <View style={[styles.dot, { backgroundColor: theme.coral }]} />
+          <View style={[styles.dot, { backgroundColor: theme.yellow }]} />
+          <View style={[styles.dot, { backgroundColor: theme.mint }]} />
         </View>
         <Text style={styles.windowTitleText} numberOfLines={1}>
           {parcel.carrier.name.toUpperCase()}{' // TRACK'}

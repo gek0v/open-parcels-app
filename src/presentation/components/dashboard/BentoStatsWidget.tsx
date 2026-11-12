@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Theme } from '../../theme/adaptiveTheme';
+import { useTheme } from '../../theme/ThemeContext';
 import { useI18n } from '../../../infrastructure/i18n';
 import { Truck, CheckCircle2, Camera } from 'lucide-react-native';
 
@@ -18,18 +19,19 @@ export const BentoStatsWidget: React.FC<BentoStatsWidgetProps> = ({
   onScanPress,
 }) => {
   const { t } = useI18n();
+  const { theme } = useTheme();
 
   return (
     <View style={styles.bentoGrid}>
       {/* Tile 1: Active & In Delivery summary */}
-      <View style={styles.activeTile}>
+      <View style={[styles.activeTile, { backgroundColor: theme.yellow, borderColor: theme.border }]}>
         <View style={styles.tileHeader}>
           <Text style={styles.tileLabel}>{t.stats.active}</Text>
           <Truck size={16} color="#000000" strokeWidth={2.5} />
         </View>
         <Text style={styles.hugeNumber}>{activeCount}</Text>
         <View style={styles.subPill}>
-          <Text style={styles.subPillText}>
+          <Text style={[styles.subPillText, { color: theme.yellow }]}>
             {outForDeliveryCount > 0 ? `⚡ ${outForDeliveryCount} ${t.status.out_for_delivery.toUpperCase()}` : (activeCount > 0 ? t.stats.activeSub : t.stats.noneActive)}
           </Text>
         </View>
@@ -38,20 +40,24 @@ export const BentoStatsWidget: React.FC<BentoStatsWidgetProps> = ({
       {/* Right Column: Delivered & Scan Quick Action */}
       <View style={styles.rightCol}>
         {/* Tile 2: Delivered */}
-        <View style={styles.deliveredTile}>
+        <View style={[styles.deliveredTile, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <View style={styles.tileHeaderSmall}>
-            <Text style={styles.tileLabelSmall}>{t.stats.delivered}</Text>
-            <CheckCircle2 size={13} color="#059669" strokeWidth={2.5} />
+            <Text style={[styles.tileLabelSmall, { color: theme.textSecondary }]}>{t.stats.delivered}</Text>
+            <CheckCircle2 size={13} color={theme.status.delivered} strokeWidth={2.5} />
           </View>
-          <Text style={styles.mediumNumber}>{deliveredCount}</Text>
+          <Text style={[styles.mediumNumber, { color: theme.textPrimary }]}>{deliveredCount}</Text>
         </View>
 
         {/* Tile 3: Quick Scan Button */}
         <Pressable
           onPress={onScanPress}
-          style={({ pressed }) => [styles.scanTile, pressed && styles.scanPressed]}
+          style={({ pressed }) => [
+            styles.scanTile,
+            { backgroundColor: theme.coral, borderColor: theme.border },
+            pressed && styles.scanPressed,
+          ]}
         >
-          <Camera size={16} color="#FFFFFF" strokeWidth={2.5} />
+          <Camera size={16} color="#000000" strokeWidth={2.5} />
           <Text style={styles.scanTileText}>{t.stats.scanBtn}</Text>
         </Pressable>
       </View>

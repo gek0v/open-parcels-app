@@ -468,7 +468,7 @@ const styles = StyleSheet.create({
     ...Theme.shadows.sm,
   },
   errorText: {
-    color: '#FFFFFF',
+    color: '#000000',
     fontSize: 12,
     fontWeight: '800',
     lineHeight: 17,

@@ -21,10 +21,12 @@ import { ParcelCardRetroOS } from '../components/dashboard/ParcelCardRetroOS';
 import { BentoStatsWidget } from '../components/dashboard/BentoStatsWidget';
 import { SegmentedFilter, FilterTab } from '../components/dashboard/SegmentedFilter';
 import { RenameParcelModal } from '../components/common/RenameParcelModal';
+import { ThemeSelectorModal } from '../components/common/ThemeSelectorModal';
 import { useI18n } from '../../infrastructure/i18n';
+import { useTheme } from '../theme/ThemeContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
-import { Plus, Search, X, Package, Cpu, LayoutGrid, Barcode, Monitor, Languages, Settings, Check } from 'lucide-react-native';
+import { Plus, Search, X, Package, Cpu, LayoutGrid, Barcode, Monitor, Languages, Settings, Check, Palette } from 'lucide-react-native';
 
 export type CardStyle = 'bento' | 'industrial' | 'retro';
 const CARD_STYLE_KEY = '@open_parcels:card_style';
@@ -39,6 +41,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   onOpenNewParcel,
 }) => {
   const { t, lang, toggleLang } = useI18n();
+  const { theme } = useTheme();
   const [parcels, setParcels] = useState<Parcel[]>([]);
   const [activeTab, setActiveTab] = useState<FilterTab>('active');
   const [searchQuery, setSearchQuery] = useState('');
@@ -49,6 +52,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const [renamingParcel, setRenamingParcel] = useState<Parcel | null>(null);
   const [restModalVisible, setRestModalVisible] = useState(false);
   const [restUrlInput, setRestUrlInput] = useState(trackingEngineManager.rest.getBaseUrl());
+  const [isThemeModalVisible, setIsThemeModalVisible] = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem(CARD_STYLE_KEY).then((stored) => {
@@ -146,15 +150,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   ).length;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.canvas }]}>
       {/* Top Bar with Brand and Mode Toggle */}
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, { backgroundColor: theme.canvas }]}>
         <View style={styles.brandRow}>
-          <View style={styles.brandBadge}>
+          <View style={[styles.brandBadge, { backgroundColor: theme.yellow, borderColor: theme.border }]}>
             <Package size={22} color="#000000" strokeWidth={2.5} />
           </View>
           <View style={styles.brandCopy}>
-            <Text style={styles.appTitle} numberOfLines={1}>
+            <Text style={[styles.appTitle, { color: theme.textPrimary }]} numberOfLines={1}>
               OPEN PARCELS
             </Text>
             <View style={styles.headerChipsRow}>
@@ -162,9 +166,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 accessibilityRole="button"
                 accessibilityLabel={t.engine.toggleAria}
                 onPress={toggleEngineMode}
-                style={({ pressed }) => [styles.engineToggle, pressed && styles.pressed]}
+                style={({ pressed }) => [styles.engineToggle, { backgroundColor: theme.yellow, borderColor: theme.border }, pressed && styles.pressed]}
+                hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
               >
-                <Cpu size={11} color="#000000" strokeWidth={2.5} />
+                <Cpu size={12} color="#000000" strokeWidth={2.5} />
                 <Text style={styles.engineToggleText} numberOfLines={1}>
                   {isLocalMode ? t.engine.local : t.engine.rest}
                 </Text>
@@ -188,10 +193,22 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 accessibilityRole="button"
                 accessibilityLabel="Cambiar idioma"
                 onPress={toggleLang}
-                style={({ pressed }) => [styles.langToggleBtn, pressed && styles.pressed]}
+                style={({ pressed }) => [styles.langToggleBtn, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }, pressed && styles.pressed]}
+                hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
               >
-                <Languages size={11} color="#000000" strokeWidth={2.5} />
+                <Languages size={12} color="#000000" strokeWidth={2.5} />
                 <Text style={styles.langToggleText}>{lang.toUpperCase()}</Text>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Temas y apariencia de la app"
+                onPress={() => setIsThemeModalVisible(true)}
+                style={({ pressed }) => [styles.langToggleBtn, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }, pressed && styles.pressed]}
+                hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+              >
+                <Palette size={12} color="#000000" strokeWidth={2.5} />
+                <Text style={styles.langToggleText}>TEMAS</Text>
               </Pressable>
             </View>
           </View>
@@ -208,13 +225,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <View style={[styles.searchBox, isSearchFocused && styles.searchBoxFocused]}>
+        <View style={[styles.searchBox, { backgroundColor: theme.surface, borderColor: theme.border }, isSearchFocused && styles.searchBoxFocused]}>
           <Search size={18} color="#000000" strokeWidth={2.5} style={styles.searchIcon} />
           <TextInput
             accessibilityLabel={t.search.searchAria}
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: theme.textPrimary }]}
             placeholder={t.search.placeholder}
-            placeholderTextColor="#64748B"
+            placeholderTextColor={theme.textTertiary}
             value={searchQuery}
             onChangeText={setSearchQuery}
             onFocus={() => setIsSearchFocused(true)}
@@ -242,7 +259,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
       {/* Card Style Switcher */}
       <View style={styles.cardStyleRow}>
-        <Text style={styles.cardStyleLabel}>{t.filter.design}</Text>
+        <Text style={[styles.cardStyleLabel, { color: theme.textSecondary }]}>{t.filter.design}</Text>
         <View style={styles.cardStyleTabs}>
           <Pressable
             accessibilityRole="button"
@@ -250,12 +267,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             onPress={() => handleCardStyleChange('bento')}
             style={({ pressed }) => [
               styles.cardStyleBtn,
-              cardStyle === 'bento' && styles.cardStyleBtnActive,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+              cardStyle === 'bento' && [styles.cardStyleBtnActive, { backgroundColor: theme.yellow }],
               pressed && styles.pressed,
             ]}
           >
-            <LayoutGrid size={11} color={cardStyle === 'bento' ? '#000000' : '#475569'} strokeWidth={2.5} />
-            <Text style={[styles.cardStyleText, cardStyle === 'bento' && styles.cardStyleTextActive]}>
+            <LayoutGrid size={11} color={cardStyle === 'bento' ? '#000000' : theme.textTertiary} strokeWidth={2.5} />
+            <Text style={[styles.cardStyleText, { color: theme.textTertiary }, cardStyle === 'bento' && [styles.cardStyleTextActive, { color: '#000000' }]]}>
               BENTO
             </Text>
           </Pressable>
@@ -266,12 +284,19 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             onPress={() => handleCardStyleChange('industrial')}
             style={({ pressed }) => [
               styles.cardStyleBtn,
-              cardStyle === 'industrial' && styles.cardStyleBtnActive,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+              cardStyle === 'industrial' && [styles.cardStyleBtnActive, { backgroundColor: theme.yellow }],
               pressed && styles.pressed,
             ]}
           >
-            <Barcode size={11} color={cardStyle === 'industrial' ? '#000000' : '#475569'} strokeWidth={2.5} />
-            <Text style={[styles.cardStyleText, cardStyle === 'industrial' && styles.cardStyleTextActive]}>
+            <Barcode size={11} color={cardStyle === 'industrial' ? '#000000' : theme.textTertiary} strokeWidth={2.5} />
+            <Text
+              style={[
+                styles.cardStyleText,
+                { color: theme.textTertiary },
+                cardStyle === 'industrial' && [styles.cardStyleTextActive, { color: '#000000' }],
+              ]}
+            >
               INDUSTRIAL
             </Text>
           </Pressable>
@@ -282,12 +307,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             onPress={() => handleCardStyleChange('retro')}
             style={({ pressed }) => [
               styles.cardStyleBtn,
-              cardStyle === 'retro' && styles.cardStyleBtnActive,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+              cardStyle === 'retro' && [styles.cardStyleBtnActive, { backgroundColor: theme.yellow }],
               pressed && styles.pressed,
             ]}
           >
-            <Monitor size={11} color={cardStyle === 'retro' ? '#000000' : '#475569'} strokeWidth={2.5} />
-            <Text style={[styles.cardStyleText, cardStyle === 'retro' && styles.cardStyleTextActive]}>
+            <Monitor size={11} color={cardStyle === 'retro' ? '#000000' : theme.textTertiary} strokeWidth={2.5} />
+            <Text style={[styles.cardStyleText, { color: theme.textTertiary }, cardStyle === 'retro' && [styles.cardStyleTextActive, { color: '#000000' }]]}>
               RETRO OS
             </Text>
           </Pressable>
@@ -332,9 +358,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 accessibilityRole="button"
                 accessibilityLabel={t.empty.trackFirstBtn}
                 onPress={onOpenNewParcel}
-                style={({ pressed }) => [styles.emptyAddBtn, pressed && styles.pressed]}
+                style={({ pressed }) => [
+                  styles.emptyAddBtn,
+                  { backgroundColor: theme.coral, borderColor: theme.border },
+                  pressed && styles.pressed,
+                ]}
               >
-                <Plus size={16} color="#FFFFFF" strokeWidth={3} />
+                <Plus size={16} color="#000000" strokeWidth={3} />
                 <Text style={styles.emptyAddBtnText}>{t.empty.trackFirstBtn}</Text>
               </Pressable>
             )}
@@ -363,9 +393,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         accessibilityRole="button"
         accessibilityLabel="Nuevo envío"
         onPress={onOpenNewParcel}
-        style={({ pressed }) => [styles.fab, pressed && styles.pressed]}
+        style={({ pressed }) => [
+          styles.fab,
+          { backgroundColor: theme.coral, borderColor: theme.border },
+          pressed && styles.pressed,
+        ]}
       >
-        <Plus size={28} color="#FFFFFF" strokeWidth={3} />
+        <Plus size={28} color="#000000" strokeWidth={3} />
       </Pressable>
 
       {/* Modal to rename shipment */}
@@ -426,6 +460,12 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Modal to explore & select Golden Ratio Themes */}
+      <ThemeSelectorModal
+        visible={isThemeModalVisible}
+        onClose={() => setIsThemeModalVisible(false)}
+      />
     </View>
   );
 };
@@ -558,56 +598,59 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     borderRadius: Theme.radius.xs,
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: '#000000',
     alignSelf: 'flex-start',
+    minHeight: 28,
     ...Theme.shadows.sm,
   },
   updateCheckBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Theme.colors.yellow,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     borderRadius: Theme.radius.xs,
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: '#000000',
     alignSelf: 'flex-start',
+    minHeight: 28,
     ...Theme.shadows.sm,
   },
   langToggleBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     borderRadius: Theme.radius.xs,
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: '#000000',
     alignSelf: 'flex-start',
+    minHeight: 28,
     ...Theme.shadows.sm,
   },
   langToggleText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '900',
     color: '#000000',
-    marginLeft: 3,
+    marginLeft: 4,
     letterSpacing: 0.5,
   },
   engineToggleText: {
     flexShrink: 1,
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '900',
     color: '#000000',
     marginLeft: 4,
     letterSpacing: 0.5,
   },
   headerAddButton: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: Theme.radius.sm,
     backgroundColor: Theme.colors.coral,
     alignItems: 'center',
@@ -759,7 +802,7 @@ const styles = StyleSheet.create({
   emptyAddBtnText: {
     fontSize: 12,
     fontWeight: '900',
-    color: '#FFFFFF',
+    color: '#000000',
     letterSpacing: 0.5,
   },
   fab: {

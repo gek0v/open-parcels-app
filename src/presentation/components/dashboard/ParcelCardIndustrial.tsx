@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Parcel } from '../../../domain/models/parcel';
 import { Theme } from '../../theme/adaptiveTheme';
+import { useTheme } from '../../theme/ThemeContext';
 import { StatusBadge } from '../common/StatusBadge';
 import { ProgressBar } from '../common/ProgressBar';
 import { Tag, Edit2 } from 'lucide-react-native';
@@ -17,12 +18,17 @@ export const ParcelCardIndustrial: React.FC<ParcelCardIndustrialProps> = ({
   onPress,
   onRename,
 }) => {
+  const { theme } = useTheme();
   const latestEvent = parcel.events[parcel.events.length - 1];
 
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.labelContainer, pressed && styles.labelPressed]}
+      style={({ pressed }) => [
+        styles.labelContainer,
+        { backgroundColor: theme.surface, borderColor: theme.border },
+        pressed && styles.labelPressed,
+      ]}
     >
       {/* Top Hazard / Shipping Stripe */}
       <View style={styles.hazardStripe}>
