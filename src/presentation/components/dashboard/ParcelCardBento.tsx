@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Parcel } from '../../../domain/models/parcel';
 import { Theme } from '../../theme/adaptiveTheme';
+import { useTheme } from '../../theme/ThemeContext';
 import { StatusBadge } from '../common/StatusBadge';
 import { ProgressBar } from '../common/ProgressBar';
 import { ArrowRight, Clock, Edit2, MapPin, Barcode } from 'lucide-react-native';
@@ -17,21 +18,26 @@ export const ParcelCardBento: React.FC<ParcelCardBentoProps> = ({
   onPress,
   onRename,
 }) => {
+  const { theme } = useTheme();
   const latestEvent = parcel.events[parcel.events.length - 1];
   const isChained = !!(parcel.additionalCarriers && parcel.additionalCarriers.length > 0);
 
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      style={({ pressed }) => [
+        styles.card,
+        { backgroundColor: theme.surface, borderColor: theme.border },
+        pressed && styles.cardPressed,
+      ]}
     >
       {/* Card Header: Window Controls & Route Pill */}
       <View style={styles.cardTopHeader}>
         <View style={styles.leftMetaGroup}>
           <View style={styles.dotsRow}>
-            <View style={[styles.dot, { backgroundColor: '#FF5C38' }]} />
-            <View style={[styles.dot, { backgroundColor: '#FFE600' }]} />
-            <View style={[styles.dot, { backgroundColor: '#10B981' }]} />
+            <View style={[styles.dot, { backgroundColor: theme.coral }]} />
+            <View style={[styles.dot, { backgroundColor: theme.yellow }]} />
+            <View style={[styles.dot, { backgroundColor: theme.mint }]} />
           </View>
           <View style={styles.serviceTag}>
             <Barcode size={13} color="#000000" strokeWidth={2.2} />
@@ -49,14 +55,14 @@ export const ParcelCardBento: React.FC<ParcelCardBentoProps> = ({
 
       {/* Carrier Info & Status */}
       <View style={styles.headerRow}>
-        <View style={styles.carrierTag}>
-          <Text style={styles.carrierName} numberOfLines={1}>
+        <View style={[styles.carrierTag, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
+          <Text style={[styles.carrierName, { color: theme.textPrimary }]} numberOfLines={1}>
             {parcel.carrier.name}
           </Text>
           {isChained && parcel.lastMileCarrier && (
             <View style={styles.chainedRow}>
               <ArrowRight size={11} color="#000000" strokeWidth={2.5} style={styles.chainArrow} />
-              <Text style={styles.lastMileText} numberOfLines={1}>
+              <Text style={[styles.lastMileText, { color: theme.textSecondary }]} numberOfLines={1}>
                 {parcel.lastMileCarrier.name}
               </Text>
             </View>
@@ -69,7 +75,7 @@ export const ParcelCardBento: React.FC<ParcelCardBentoProps> = ({
       {/* Main Title & Rename */}
       <View style={styles.titleSection}>
         <View style={styles.titleRow}>
-          <Text style={styles.alias} numberOfLines={1}>
+          <Text style={[styles.alias, { color: theme.textPrimary }]} numberOfLines={1}>
             {parcel.customAlias || parcel.trackingNumber}
           </Text>
           {onRename && (
@@ -85,7 +91,7 @@ export const ParcelCardBento: React.FC<ParcelCardBentoProps> = ({
             </Pressable>
           )}
         </View>
-        <Text style={styles.trackingMono}>{parcel.trackingNumber}</Text>
+        <Text style={[styles.trackingMono, { color: theme.textTertiary }]}>{parcel.trackingNumber}</Text>
       </View>
 
       {/* Progress Bar */}
@@ -95,7 +101,7 @@ export const ParcelCardBento: React.FC<ParcelCardBentoProps> = ({
 
       {/* Footer: Latest Event & Transit Badge */}
       <View style={styles.footerRow}>
-        <Text style={styles.latestEventText} numberOfLines={1}>
+        <Text style={[styles.latestEventText, { color: theme.textSecondary }]} numberOfLines={1}>
           {latestEvent ? latestEvent.description : parcel.statusText}
         </Text>
         <View style={styles.daysBadge}>

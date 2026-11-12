@@ -1,5 +1,8 @@
 import { Platform } from 'react-native';
 import { CanonicalStatus } from '../../domain/models/status';
+import { ColorPalette, GoldenPalettes } from './palettes';
+
+export { ColorPalette, GoldenPalettes };
 
 export const isIOS = Platform.OS === 'ios';
 export const isAndroid = Platform.OS === 'android';
@@ -55,6 +58,7 @@ export const Theme = {
   isAndroid,
   isWeb,
 
+  // Active palette (Acid Cyber default)
   colors: {
     // Neo-Brutalist Canvas & Surfaces (Acid Lime canvas as seen in Ref 4, clean modular cards)
     background: '#D9FF38', // Acid Lime canvas

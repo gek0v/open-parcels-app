@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Theme } from '../../theme/adaptiveTheme';
+import { useTheme } from '../../theme/ThemeContext';
 import { useI18n } from '../../../infrastructure/i18n';
 
 export type FilterTab = 'active' | 'delivered' | 'archived';
@@ -21,15 +22,16 @@ export const SegmentedFilter: React.FC<SegmentedFilterProps> = ({
   counts,
 }) => {
   const { t } = useI18n();
+  const { theme } = useTheme();
 
   const tabs: { key: FilterTab; label: string; count: number; color: string }[] = [
-    { key: 'active', label: t.filter.active, count: counts.active, color: Theme.colors.yellow },
-    { key: 'delivered', label: t.filter.delivered, count: counts.delivered, color: Theme.colors.status.delivered },
-    { key: 'archived', label: t.filter.archived, count: counts.archived, color: Theme.colors.pink },
+    { key: 'active', label: t.filter.active, count: counts.active, color: theme.yellow },
+    { key: 'delivered', label: t.filter.delivered, count: counts.delivered, color: theme.status.delivered },
+    { key: 'archived', label: t.filter.archived, count: counts.archived, color: theme.pink },
   ];
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.surface, borderColor: theme.border }]}>
       {tabs.map((tab) => {
         const isActive = activeTab === tab.key;
         return (
