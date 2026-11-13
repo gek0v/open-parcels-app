@@ -5,6 +5,7 @@ import type { Parcel } from '../src/domain/models/parcel';
 // In-memory mock storage and filesystem
 let inMemoryParcels: Parcel[] = [];
 let mockFiles: Record<string, string> = {};
+(globalThis as any).__backupMockFiles = mockFiles;
 let sharedFiles: string[] = [];
 
 mock.module('../src/infrastructure/storage/ParcelRepository', () => ({
@@ -28,9 +29,12 @@ mock.module('expo-file-system/legacy', () => ({
   documentDirectory: 'file:///data/docs/',
   writeAsStringAsync: async (uri: string, content: string) => {
     mockFiles[uri] = content;
+    if ((globalThis as any).__backupMockFiles) {
+      (globalThis as any).__backupMockFiles[uri] = content;
+    }
   },
   readAsStringAsync: async (uri: string) => {
-    return mockFiles[uri] || '';
+    return mockFiles[uri] || (globalThis as any).__backupMockFiles?.[uri] || '';
   },
   getInfoAsync: async (...args: any[]) => {
     if ((globalThis as any).__mockFsHandlers?.getInfoAsync) {
@@ -404,6 +408,7 @@ describe('BackupService Full Flow', () => {
   beforeEach(() => {
     inMemoryParcels = [];
     mockFiles = {};
+    (globalThis as any).__backupMockFiles = mockFiles;
     sharedFiles = [];
   });
 

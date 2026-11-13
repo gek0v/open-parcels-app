@@ -104,6 +104,18 @@ const fsHandlers = {
     };
     return task;
   },
+  writeAsStringAsync: async (uri: string, content: string) => {
+    mockFiles[uri] = { exists: true, size: content.length };
+    if ((globalThis as any).__backupMockFiles) {
+      (globalThis as any).__backupMockFiles[uri] = content;
+    }
+  },
+  readAsStringAsync: async (uri: string) => {
+    if ((globalThis as any).__backupMockFiles && (globalThis as any).__backupMockFiles[uri] !== undefined) {
+      return (globalThis as any).__backupMockFiles[uri];
+    }
+    return '';
+  },
 };
 
 (globalThis as any).__mockFsHandlers = fsHandlers;
