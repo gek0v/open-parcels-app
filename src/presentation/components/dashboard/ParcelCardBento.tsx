@@ -6,6 +6,7 @@ import { useTheme } from '../../theme/ThemeContext';
 import { StatusBadge } from '../common/StatusBadge';
 import { ProgressBar } from '../common/ProgressBar';
 import { ArrowRight, Clock, Edit2, MapPin, Barcode } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 
 interface ParcelCardBentoProps {
   parcel: Parcel;
@@ -22,9 +23,26 @@ export const ParcelCardBento: React.FC<ParcelCardBentoProps> = ({
   const latestEvent = parcel.events[parcel.events.length - 1];
   const isChained = !!(parcel.additionalCarriers && parcel.additionalCarriers.length > 0);
 
+  const handleCardPress = async () => {
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    onPress();
+  };
+
+  const handleRenamePress = async (e: any) => {
+    e.stopPropagation();
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+    onRename?.();
+  };
+
   return (
     <Pressable
-      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Envío ${parcel.customAlias || parcel.trackingNumber}, estado ${parcel.statusText}`}
+      onPress={handleCardPress}
       style={({ pressed }) => [
         styles.card,
         { backgroundColor: theme.surface, borderColor: theme.border },
@@ -32,20 +50,20 @@ export const ParcelCardBento: React.FC<ParcelCardBentoProps> = ({
       ]}
     >
       {/* Card Header: Window Controls & Route Pill */}
-      <View style={styles.cardTopHeader}>
+      <View style={[styles.cardTopHeader, { borderBottomColor: theme.surfaceSubtle }]}>
         <View style={styles.leftMetaGroup}>
           <View style={styles.dotsRow}>
-            <View style={[styles.dot, { backgroundColor: theme.coral }]} />
-            <View style={[styles.dot, { backgroundColor: theme.yellow }]} />
-            <View style={[styles.dot, { backgroundColor: theme.mint }]} />
+            <View style={[styles.dot, { backgroundColor: theme.coral, borderColor: theme.border }]} />
+            <View style={[styles.dot, { backgroundColor: theme.yellow, borderColor: theme.border }]} />
+            <View style={[styles.dot, { backgroundColor: theme.mint, borderColor: theme.border }]} />
           </View>
-          <View style={styles.serviceTag}>
-            <Barcode size={13} color="#000000" strokeWidth={2.2} />
-            <Text style={styles.serviceTagText}>EXPEDICIÓN</Text>
+          <View style={[styles.serviceTag, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
+            <Barcode size={13} color={theme.textPrimary} strokeWidth={2.2} />
+            <Text style={[styles.serviceTagText, { color: theme.textSecondary }]}>EXPEDICIÓN</Text>
           </View>
         </View>
 
-        <View style={styles.routePill}>
+        <View style={[styles.routePill, { backgroundColor: theme.yellow, borderColor: theme.border }]}>
           <MapPin size={10} color="#000000" strokeWidth={2.5} />
           <Text style={styles.routePillText}>
             {parcel.origin?.code || 'ORIG'} ➔ {parcel.destination?.code || 'DEST'}
@@ -61,7 +79,7 @@ export const ParcelCardBento: React.FC<ParcelCardBentoProps> = ({
           </Text>
           {isChained && parcel.lastMileCarrier && (
             <View style={styles.chainedRow}>
-              <ArrowRight size={11} color="#000000" strokeWidth={2.5} style={styles.chainArrow} />
+              <ArrowRight size={11} color={theme.textPrimary} strokeWidth={2.5} style={styles.chainArrow} />
               <Text style={[styles.lastMileText, { color: theme.textSecondary }]} numberOfLines={1}>
                 {parcel.lastMileCarrier.name}
               </Text>
@@ -80,14 +98,17 @@ export const ParcelCardBento: React.FC<ParcelCardBentoProps> = ({
           </Text>
           {onRename && (
             <Pressable
-              onPress={(e) => {
-                e.stopPropagation();
-                onRename();
-              }}
-              style={({ pressed }) => [styles.renameBtn, pressed && styles.btnPressed]}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Renombrar alias del envío"
+              onPress={handleRenamePress}
+              style={({ pressed }) => [
+                styles.renameBtn,
+                { backgroundColor: theme.yellow, borderColor: theme.border },
+                pressed && styles.btnPressed,
+              ]}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
-              <Edit2 size={12} color="#000000" strokeWidth={2.5} />
+              <Edit2 size={14} color="#000000" strokeWidth={2.5} />
             </Pressable>
           )}
         </View>
@@ -104,9 +125,9 @@ export const ParcelCardBento: React.FC<ParcelCardBentoProps> = ({
         <Text style={[styles.latestEventText, { color: theme.textSecondary }]} numberOfLines={1}>
           {latestEvent ? latestEvent.description : parcel.statusText}
         </Text>
-        <View style={styles.daysBadge}>
-          <Clock size={11} color="#000000" strokeWidth={2.5} style={styles.clockIcon} />
-          <Text style={styles.daysText}>{parcel.daysInTransit}d</Text>
+        <View style={[styles.daysBadge, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <Clock size={11} color={theme.textPrimary} strokeWidth={2.5} style={styles.clockIcon} />
+          <Text style={[styles.daysText, { color: theme.textPrimary }]}>{parcel.daysInTransit}d</Text>
         </View>
       </View>
     </Pressable>
@@ -115,12 +136,10 @@ export const ParcelCardBento: React.FC<ParcelCardBentoProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
     borderRadius: Theme.radius.md,
     padding: 16,
     marginBottom: 14,
     borderWidth: 2.5,
-    borderColor: '#000000',
     shadowColor: '#000000',
     shadowOffset: { width: 4, height: 4 },
     shadowOpacity: 1,
@@ -140,7 +159,6 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     marginBottom: 10,
     borderBottomWidth: 1.5,
-    borderBottomColor: '#E2E8F0',
   },
   leftMetaGroup: {
     flexDirection: 'row',
@@ -156,34 +174,28 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     borderWidth: 1.2,
-    borderColor: '#000000',
   },
   serviceTag: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#F1F5F9',
     paddingHorizontal: 6,
     paddingVertical: 1.5,
     borderRadius: Theme.radius.xs,
     borderWidth: 1,
-    borderColor: '#CBD5E1',
   },
   serviceTagText: {
     fontSize: 9,
     fontWeight: '900',
-    color: '#334155',
     letterSpacing: 0.5,
   },
   routePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFE600',
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: Theme.radius.xs,
     borderWidth: 1.2,
-    borderColor: '#000000',
     gap: 4,
   },
   routePillText: {
@@ -200,19 +212,16 @@ const styles = StyleSheet.create({
   carrierTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFE600',
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: Theme.radius.xs,
     borderWidth: 1.5,
-    borderColor: '#000000',
     flexShrink: 1,
     marginRight: 8,
   },
   carrierName: {
     fontSize: 11,
     fontWeight: '900',
-    color: '#000000',
     textTransform: 'uppercase',
   },
   chainedRow: {
@@ -226,7 +235,6 @@ const styles = StyleSheet.create({
   lastMileText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#000000',
     textTransform: 'uppercase',
   },
   titleSection: {
@@ -241,16 +249,18 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 17,
     fontWeight: '900',
-    color: '#000000',
     letterSpacing: -0.3,
   },
   renameBtn: {
-    padding: 4,
+    minWidth: 36,
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 6,
     borderRadius: Theme.radius.xs,
-    backgroundColor: '#FFE600',
     borderWidth: 1.5,
-    borderColor: '#000000',
     marginLeft: 8,
+    ...Theme.shadows.sm,
   },
   btnPressed: {
     transform: [{ scale: 0.95 }],
@@ -259,7 +269,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: Theme.isIOS ? 'Courier' : 'monospace',
     fontWeight: '700',
-    color: '#64748B',
     marginTop: 2,
   },
   progressContainer: {
@@ -275,18 +284,15 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 11,
     fontWeight: '600',
-    color: '#334155',
     marginRight: 8,
   },
   daysBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 7,
-    paddingVertical: 2,
+    paddingVertical: 3,
     borderRadius: Theme.radius.xs,
-    backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: '#000000',
     shadowColor: '#000000',
     shadowOffset: { width: 1.5, height: 1.5 },
     shadowOpacity: 1,
@@ -300,6 +306,5 @@ const styles = StyleSheet.create({
   daysText: {
     fontSize: 10,
     fontWeight: '900',
-    color: '#000000',
   },
 });

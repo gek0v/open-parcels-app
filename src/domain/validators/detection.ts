@@ -2533,3 +2533,65 @@ export function bestMatch(
   const matches = detectCandidateCarriers(rawNumber, countryHint);
   return matches.length > 0 ? matches[0] : null;
 }
+
+/** Alias matching user / domain naming convention */
+export const detectCarrierCandidates = detectCandidateCarriers;
+
+export interface TrackingValidationResult {
+  isValid: boolean;
+  cleanNumber: string;
+  candidates: DetectedCarrier[];
+  bestCarrier?: DetectedCarrier;
+}
+
+/**
+ * Validates whether an arbitrary input string (e.g. from the clipboard or text input)
+ * is a plausible tracking number and identifies the carrier candidates.
+ */
+export function validateTrackingNumber(
+  rawInput: string,
+  countryHint?: string
+): TrackingValidationResult {
+  if (!rawInput || typeof rawInput !== 'string') {
+    return { isValid: false, cleanNumber: '', candidates: [] };
+  }
+
+  const trimmed = rawInput.trim();
+  // Reject multi-line strings or excessively long text (e.g. copied paragraphs)
+  if (trimmed.includes('\n') || trimmed.includes('\r')) {
+    return { isValid: false, cleanNumber: '', candidates: [] };
+  }
+
+  // Reject URLs or email addresses
+  if (/^(https?:\/\/|mailto:|www\.)/i.test(trimmed) || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+    return { isValid: false, cleanNumber: '', candidates: [] };
+  }
+
+  const clean = cleanTrackingNumber(trimmed);
+  // Tracking numbers are typically 5 to 45 alphanumeric characters (AWB has hyphen)
+  if (clean.length < 5 || clean.length > 45) {
+    return { isValid: false, cleanNumber: clean, candidates: [] };
+  }
+
+  // Fast rejection of purely non-tracking plain text words with no digits unless ISO container
+  const hasDigit = /\d/.test(clean);
+  if (!hasDigit && !/^[A-Z]{3}[UJZ]\d{7}$/.test(clean)) {
+    return { isValid: false, cleanNumber: clean, candidates: [] };
+  }
+
+  const candidates = detectCandidateCarriers(trimmed, countryHint);
+  if (candidates.length === 0) {
+    return { isValid: false, cleanNumber: clean, candidates: [] };
+  }
+
+  // Check top candidate confidence
+  const topCandidate = candidates[0];
+  const isValid = topCandidate.confidence >= 0.70;
+
+  return {
+    isValid,
+    cleanNumber: clean,
+    candidates,
+    bestCarrier: topCandidate,
+  };
+}

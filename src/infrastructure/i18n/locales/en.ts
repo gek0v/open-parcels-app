@@ -45,6 +45,23 @@ export const en: TranslationKey = {
     design: 'LAYOUT:',
   },
 
+  // Sorting
+  sort: {
+    label: 'SORT:',
+    updated: 'RECENT',
+    days: 'DAYS',
+    carrier: 'CARRIER',
+  },
+
+  // Clipboard Detection Banner
+  clipboardBanner: {
+    title: 'CLIPBOARD DETECTED',
+    addBtn: 'ADD',
+    dismissBtn: 'DISMISS',
+    dismissAria: 'Dismiss clipboard tracking number',
+    addAria: 'Add parcel from clipboard',
+  },
+
   // Search
   search: {
     placeholder: 'Search by alias, code or carrier...',

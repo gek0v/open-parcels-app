@@ -6,6 +6,7 @@ import { useTheme } from '../../theme/ThemeContext';
 import { StatusBadge } from '../common/StatusBadge';
 import { ProgressBar } from '../common/ProgressBar';
 import { Tag, Edit2 } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 
 interface ParcelCardIndustrialProps {
   parcel: Parcel;
@@ -21,9 +22,26 @@ export const ParcelCardIndustrial: React.FC<ParcelCardIndustrialProps> = ({
   const { theme } = useTheme();
   const latestEvent = parcel.events[parcel.events.length - 1];
 
+  const handleCardPress = async () => {
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    onPress();
+  };
+
+  const handleRenamePress = async (e: any) => {
+    e.stopPropagation();
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+    onRename?.();
+  };
+
   return (
     <Pressable
-      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Albarán ${parcel.customAlias || parcel.trackingNumber}, transportista ${parcel.carrier.name}`}
+      onPress={handleCardPress}
       style={({ pressed }) => [
         styles.labelContainer,
         { backgroundColor: theme.surface, borderColor: theme.border },
@@ -31,7 +49,7 @@ export const ParcelCardIndustrial: React.FC<ParcelCardIndustrialProps> = ({
       ]}
     >
       {/* Top Hazard / Shipping Stripe */}
-      <View style={styles.hazardStripe}>
+      <View style={[styles.hazardStripe, { backgroundColor: theme.yellow, borderBottomColor: theme.border }]}>
         <Text style={styles.hazardText}>{'/// AIR & GROUND LOGISTICS MATRIX ///'}</Text>
         <Text style={styles.destinationStamp}>
           DEST: {parcel.destination?.code || 'ES'}
@@ -41,9 +59,9 @@ export const ParcelCardIndustrial: React.FC<ParcelCardIndustrialProps> = ({
       <View style={styles.labelInner}>
         {/* Stamp & Carrier Row */}
         <View style={styles.stampRow}>
-          <View style={styles.carrierStampBox}>
-            <Tag size={12} color="#000000" />
-            <Text style={styles.carrierStampText}>{parcel.carrier.name.toUpperCase()}</Text>
+          <View style={[styles.carrierStampBox, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
+            <Tag size={12} color={theme.textPrimary} />
+            <Text style={[styles.carrierStampText, { color: theme.textPrimary }]}>{parcel.carrier.name.toUpperCase()}</Text>
           </View>
 
           <StatusBadge status={parcel.status} size="small" />
@@ -51,30 +69,29 @@ export const ParcelCardIndustrial: React.FC<ParcelCardIndustrialProps> = ({
 
         {/* Big Bold Alias */}
         <View style={styles.aliasRow}>
-          <Text style={styles.alias} numberOfLines={1}>
+          <Text style={[styles.alias, { color: theme.textPrimary }]} numberOfLines={1}>
             {parcel.customAlias || parcel.trackingNumber}
           </Text>
           {onRename && (
             <Pressable
-              onPress={(e) => {
-                e.stopPropagation();
-                onRename();
-              }}
-              style={styles.renameBtn}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Renombrar alias del envío"
+              onPress={handleRenamePress}
+              style={[styles.renameBtn, { backgroundColor: theme.yellow, borderColor: theme.border }]}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
-              <Edit2 size={12} color="#000000" strokeWidth={2.5} />
+              <Edit2 size={13} color="#000000" strokeWidth={2.5} />
             </Pressable>
           )}
         </View>
 
         {/* Industrial Waybill Barcode Block */}
-        <View style={styles.waybillBox}>
+        <View style={[styles.waybillBox, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
           <View style={styles.waybillCol}>
-            <Text style={styles.waybillLabel}>WAYBILL / TRACKING ID</Text>
-            <Text style={styles.waybillCode}>{parcel.trackingNumber}</Text>
+            <Text style={[styles.waybillLabel, { color: theme.textTertiary }]}>WAYBILL / TRACKING ID</Text>
+            <Text style={[styles.waybillCode, { color: theme.textPrimary }]}>{parcel.trackingNumber}</Text>
           </View>
-          <View style={styles.daysCircle}>
+          <View style={[styles.daysCircle, { backgroundColor: theme.yellow, borderColor: theme.border }]}>
             <Text style={styles.daysNumber}>{parcel.daysInTransit}</Text>
             <Text style={styles.daysUnit}>DÍAS</Text>
           </View>
@@ -86,8 +103,8 @@ export const ParcelCardIndustrial: React.FC<ParcelCardIndustrialProps> = ({
         </View>
 
         {/* Footer Milestone */}
-        <View style={styles.footerRow}>
-          <Text style={styles.statusMilestoneText} numberOfLines={1}>
+        <View style={[styles.footerRow, { borderTopColor: theme.surfaceSubtle }]}>
+          <Text style={[styles.statusMilestoneText, { color: theme.textSecondary }]} numberOfLines={1}>
             LOG: {latestEvent ? latestEvent.description : parcel.statusText}
           </Text>
         </View>
@@ -98,11 +115,9 @@ export const ParcelCardIndustrial: React.FC<ParcelCardIndustrialProps> = ({
 
 const styles = StyleSheet.create({
   labelContainer: {
-    backgroundColor: '#FFFFFF',
     borderRadius: Theme.radius.sm,
     marginBottom: 16,
     borderWidth: 2.5,
-    borderColor: '#000000',
     overflow: 'hidden',
     shadowColor: '#000000',
     shadowOffset: { width: 4.5, height: 4.5 },
@@ -120,11 +135,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#FFE600', // Cyber Yellow warning
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderBottomWidth: 2,
-    borderBottomColor: '#000000',
   },
   hazardText: {
     fontSize: 9,
@@ -137,7 +150,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     backgroundColor: '#000000',
     color: '#FFE600',
-    paddingHorizontal: 4,
+    paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: 2,
   },
@@ -154,17 +167,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#F1F5F9',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: Theme.radius.xs,
     borderWidth: 1,
-    borderColor: '#000000',
   },
   carrierStampText: {
     fontSize: 10,
     fontWeight: '900',
-    color: '#000000',
   },
   aliasRow: {
     flexDirection: 'row',
@@ -176,25 +186,24 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 17,
     fontWeight: '900',
-    color: '#000000',
     letterSpacing: -0.3,
   },
   renameBtn: {
-    padding: 4,
+    minWidth: 36,
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 5,
     borderRadius: Theme.radius.xs,
-    backgroundColor: '#FFE600',
     borderWidth: 1.5,
-    borderColor: '#000000',
     marginLeft: 8,
   },
   waybillBox: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#F8FAFC',
     borderRadius: Theme.radius.xs,
     borderWidth: 1.5,
-    borderColor: '#000000',
     padding: 8,
     marginBottom: 8,
   },
@@ -204,23 +213,19 @@ const styles = StyleSheet.create({
   waybillLabel: {
     fontSize: 8,
     fontWeight: '900',
-    color: '#64748B',
     letterSpacing: 0.5,
   },
   waybillCode: {
     fontSize: 12,
     fontFamily: Theme.isIOS ? 'Courier' : 'monospace',
     fontWeight: '900',
-    color: '#000000',
     marginTop: 2,
   },
   daysCircle: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#FFE600',
     borderWidth: 1.5,
-    borderColor: '#000000',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -242,11 +247,9 @@ const styles = StyleSheet.create({
     marginTop: 6,
     paddingTop: 6,
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
   },
   statusMilestoneText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#475569',
   },
 });
