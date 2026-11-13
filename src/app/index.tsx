@@ -3,10 +3,12 @@ import { StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DashboardScreen } from '../presentation/screens/DashboardScreen';
-import { Theme } from '../presentation/theme/adaptiveTheme';
+import { useTheme } from '../presentation/theme/ThemeContext';
 import { Parcel } from '../domain/models/parcel';
 
 export default function IndexScreen() {
+  const { theme } = useTheme();
+
   const handleSelectParcel = (parcel: Parcel) => {
     router.push({
       pathname: '/parcel/[id]',
@@ -14,12 +16,15 @@ export default function IndexScreen() {
     });
   };
 
-  const handleOpenNewParcel = () => {
-    router.push('/new-parcel');
+  const handleOpenNewParcel = (initialData?: { trackingNumber?: string; carrierSlug?: string }) => {
+    router.push({
+      pathname: '/new-parcel',
+      params: initialData,
+    });
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.canvas }]} edges={['top', 'bottom', 'left', 'right']}>
       <DashboardScreen
         onSelectParcel={handleSelectParcel}
         onOpenNewParcel={handleOpenNewParcel}
@@ -31,6 +36,5 @@ export default function IndexScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Theme.colors.background,
   },
 });

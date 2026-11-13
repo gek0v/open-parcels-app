@@ -12,6 +12,8 @@ import {
   Platform,
 } from 'react-native';
 import { Theme } from '../theme/adaptiveTheme';
+import { useTheme } from '../theme/ThemeContext';
+import { useI18n } from '../../infrastructure/i18n';
 import { CameraScannerModal } from '../components/scanner/CameraScannerModal';
 import { CarrierDetectorBar } from '../components/scanner/CarrierDetectorBar';
 import { trackingEngineManager } from '../../infrastructure/engine';
@@ -19,26 +21,42 @@ import { parcelRepository } from '../../infrastructure/storage/ParcelRepository'
 import { DetectedCarrier } from '../../domain/models/carrier';
 import { Parcel } from '../../domain/models/parcel';
 import { X, Camera, Plus, ShieldAlert, Cpu } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 
 interface NewParcelModalProps {
   visible: boolean;
+  initialTrackingNumber?: string;
+  initialCarrierSlug?: string;
   onClose: () => void;
   onParcelCreated: (parcel: Parcel) => void;
 }
 
 export const NewParcelModal: React.FC<NewParcelModalProps> = ({
   visible,
+  initialTrackingNumber,
+  initialCarrierSlug,
   onClose,
   onParcelCreated,
 }) => {
-  const [trackingNumber, setTrackingNumber] = useState('');
+  const { theme } = useTheme();
+  const { t } = useI18n();
+  const [trackingNumber, setTrackingNumber] = useState(initialTrackingNumber || '');
   const [customAlias, setCustomAlias] = useState('');
   const [postalCode, setPostalCode] = useState('');
-  const [selectedCarrierSlug, setSelectedCarrierSlug] = useState<string | undefined>();
+  const [selectedCarrierSlug, setSelectedCarrierSlug] = useState<string | undefined>(initialCarrierSlug);
   const [candidates, setCandidates] = useState<DetectedCarrier[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [cameraVisible, setCameraVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialTrackingNumber) {
+      setTrackingNumber(initialTrackingNumber);
+    }
+    if (initialCarrierSlug) {
+      setSelectedCarrierSlug(initialCarrierSlug);
+    }
+  }, [initialTrackingNumber, initialCarrierSlug]);
 
   useEffect(() => {
     let active = true;
@@ -59,6 +77,7 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
       setCandidates(results);
       setSelectedCarrierSlug((previous) => {
         if (results.length === 0) return undefined;
+        // Keep initial or previously selected carrier if still in candidate list
         const stillAvailable = results.some((r) => r.carrier.slug === previous);
         if (stillAvailable) return previous;
         const liveCandidate = results.find((r) => r.carrier.hasLiveTracking);
@@ -81,18 +100,22 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
   const handleTrackAndSave = async () => {
     const cleanNumber = trackingNumber.trim();
     if (!cleanNumber) {
-      setErrorMessage('Introduce un número de seguimiento válido.');
+      setErrorMessage(t.newParcelModal.trackingPlaceholder || 'Introduce un número de seguimiento válido.');
       return;
     }
 
     if (requiresPostalCode && !postalCode.trim()) {
       const carrierName = currentSelectedCandidate?.carrier.name || 'este transportista';
-      setErrorMessage('Este transportista (' + carrierName + ') requiere el código postal de destino.');
+      setErrorMessage(`${t.newParcelModal.postalCodeHint || 'Este transportista exige código postal.'} (${carrierName})`);
       return;
     }
 
     setIsLoading(true);
     setErrorMessage(null);
+
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
 
     try {
       const parcel = await trackingEngineManager.current.track({
@@ -107,10 +130,18 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
       }
 
       await parcelRepository.save(parcel);
+
+      try {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+
       onParcelCreated(parcel);
       resetForm();
       onClose();
     } catch (err: any) {
+      try {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      } catch {}
       setErrorMessage(err.message || 'Error al rastrear el envío.');
     } finally {
       setIsLoading(false);
@@ -126,23 +157,33 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
     setErrorMessage(null);
   };
 
+  const handleClose = async () => {
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    resetForm();
+    onClose();
+  };
+
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.keyboardContainer}
+        style={[styles.keyboardContainer, { backgroundColor: Theme.isWeb ? theme.surfaceSubtle : theme.canvas }]}
       >
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: theme.canvas, borderColor: theme.border }]}>
           {/* Header */}
-          <View style={styles.header}>
+          <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
             <View style={styles.headerCopy}>
               <View style={styles.windowDots}>
-                <View style={[styles.dot, { backgroundColor: Theme.colors.coral }]} />
-                <View style={[styles.dot, { backgroundColor: Theme.colors.yellow }]} />
-                <View style={[styles.dot, { backgroundColor: Theme.colors.mint }]} />
-                <Text style={styles.headerTitle}>NUEVO ENVÍO</Text>
+                <View style={[styles.dot, { backgroundColor: theme.coral, borderColor: theme.border }]} />
+                <View style={[styles.dot, { backgroundColor: theme.yellow, borderColor: theme.border }]} />
+                <View style={[styles.dot, { backgroundColor: theme.mint, borderColor: theme.border }]} />
+                <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
+                  {t.newParcelModal.title}
+                </Text>
               </View>
-              <View style={styles.engineBadge}>
+              <View style={[styles.engineBadge, { backgroundColor: theme.yellow, borderColor: theme.border }]}>
                 <Cpu size={12} color="#000000" strokeWidth={2.5} />
                 <Text style={styles.engineBadgeText} numberOfLines={1}>
                   {trackingEngineManager.current.engineName.toUpperCase()}
@@ -151,14 +192,16 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
             </View>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Cerrar formulario de nuevo envío"
-              onPress={() => {
-                resetForm();
-                onClose();
-              }}
-              style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}
+              accessibilityLabel={t.newParcelModal.cancelBtn || 'Cerrar formulario de nuevo envío'}
+              onPress={handleClose}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={({ pressed }) => [
+                styles.closeButton,
+                { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+                pressed && styles.pressed,
+              ]}
             >
-              <X size={18} color="#000000" strokeWidth={3} />
+              <X size={20} color={theme.textPrimary} strokeWidth={3} />
             </Pressable>
           </View>
 
@@ -170,13 +213,15 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
           >
             {/* Tracking Number Input & Scanner Trigger */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>NÚMERO DE SEGUIMIENTO *</Text>
-              <View style={styles.inputWithActions}>
+              <Text style={[styles.fieldLabel, { color: theme.textPrimary }]}>
+                {t.newParcelModal.trackingNumberLabel} *
+              </Text>
+              <View style={[styles.inputWithActions, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                 <TextInput
-                  accessibilityLabel="Número de seguimiento"
-                  style={styles.mainInput}
-                  placeholder="Ej: LP00561234567890, 75616714..."
-                  placeholderTextColor="#64748B"
+                  accessibilityLabel={t.newParcelModal.trackingNumberLabel}
+                  style={[styles.mainInput, { color: theme.textPrimary }]}
+                  placeholder={t.newParcelModal.trackingPlaceholder || 'Ej: LP00561234567890, 75616714...'}
+                  placeholderTextColor={theme.textTertiary}
                   value={trackingNumber}
                   onChangeText={(text) => {
                     setTrackingNumber(text);
@@ -188,16 +233,25 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
                 />
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Escanear código de barras"
-                  onPress={() => setCameraVisible(true)}
-                  style={({ pressed }) => [styles.scannerIconButton, pressed && styles.smallPressed]}
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  accessibilityLabel={t.newParcelModal.cameraScanBtn || 'Escanear código de barras'}
+                  onPress={async () => {
+                    try {
+                      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    } catch {}
+                    setCameraVisible(true);
+                  }}
+                  style={({ pressed }) => [
+                    styles.scannerIconButton,
+                    { backgroundColor: theme.yellow, borderColor: theme.border },
+                    pressed && styles.smallPressed,
+                  ]}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <Camera size={20} color="#000000" strokeWidth={2.5} />
+                  <Camera size={22} color="#000000" strokeWidth={2.5} />
                 </Pressable>
               </View>
-              <Text style={styles.helperText}>
-                Detectamos el transportista automáticamente al escribir el código.
+              <Text style={[styles.helperText, { color: theme.textSecondary }]}>
+                {t.newParcelModal.subtitle || 'Detectamos el transportista automáticamente al escribir el código.'}
               </Text>
             </View>
 
@@ -208,20 +262,20 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
               onSelectCarrier={(slug) => setSelectedCarrierSlug(slug)}
             />
 
-            {/* Conditional Postal Code Input (for InPost / CTT) */}
+            {/* Conditional Postal Code Input (for InPost / CTT / SEUR / GLS) */}
             {requiresPostalCode && (
-              <View style={[styles.fieldGroup, styles.conditionalBox]}>
+              <View style={[styles.fieldGroup, styles.conditionalBox, { backgroundColor: theme.yellow, borderColor: theme.border }]}>
                 <View style={styles.conditionalHeader}>
                   <ShieldAlert size={16} color="#000000" strokeWidth={3} />
                   <Text style={styles.conditionalTitle} numberOfLines={2}>
-                    CÓDIGO POSTAL OBLIGATORIO ({currentSelectedCandidate?.carrier.name.toUpperCase()})
+                    {t.newParcelModal.postalCodeLabel} ({currentSelectedCandidate?.carrier.name.toUpperCase()})
                   </Text>
                 </View>
                 <TextInput
-                  accessibilityLabel="Código postal de destino"
-                  style={styles.standardInput}
-                  placeholder="Ej: 47140, 28001..."
-                  placeholderTextColor="#64748B"
+                  accessibilityLabel={t.newParcelModal.postalCodeLabel}
+                  style={[styles.standardInput, { backgroundColor: theme.surface, borderColor: theme.border, color: theme.textPrimary }]}
+                  placeholder={t.newParcelModal.postalCodePlaceholder || 'Ej: 47140, 28001...'}
+                  placeholderTextColor={theme.textTertiary}
                   value={postalCode}
                   onChangeText={setPostalCode}
                   keyboardType="numeric"
@@ -232,12 +286,14 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
 
             {/* Custom Alias Input */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>ALIAS PERSONALIZADO (OPCIONAL)</Text>
+              <Text style={[styles.fieldLabel, { color: theme.textPrimary }]}>
+                {t.newParcelModal.aliasLabel}
+              </Text>
               <TextInput
-                accessibilityLabel="Alias personalizado"
-                style={styles.standardInput}
-                placeholder="Ej: Zapatillas Nike, Teclado AliExpress..."
-                placeholderTextColor="#64748B"
+                accessibilityLabel={t.newParcelModal.aliasLabel}
+                style={[styles.standardInput, { backgroundColor: theme.surface, borderColor: theme.border, color: theme.textPrimary }]}
+                placeholder={t.newParcelModal.aliasPlaceholder || 'Ej: Zapatillas Nike, Teclado AliExpress...'}
+                placeholderTextColor={theme.textTertiary}
                 value={customAlias}
                 onChangeText={setCustomAlias}
               />
@@ -245,7 +301,7 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
 
             {/* Error Message if any */}
             {errorMessage && (
-              <View style={styles.errorContainer}>
+              <View style={[styles.errorContainer, { backgroundColor: theme.coral, borderColor: theme.border }]}>
                 <Text style={styles.errorText}>{errorMessage}</Text>
               </View>
             )}
@@ -258,16 +314,20 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
               disabled={!canSubmit}
               style={({ pressed }) => [
                 styles.submitButton,
+                { backgroundColor: theme.blue, borderColor: theme.border },
                 !canSubmit && styles.submitButtonDisabled,
                 pressed && canSubmit && styles.pressed,
               ]}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             >
               {isLoading ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
                 <>
                   <Plus size={20} color="#FFFFFF" strokeWidth={3} style={styles.submitIcon} />
-                  <Text style={styles.submitButtonText}>RASTREAR Y GUARDAR</Text>
+                  <Text style={styles.submitButtonText}>
+                    {t.newParcelModal.startTrackingBtn || 'RASTREAR Y GUARDAR'}
+                  </Text>
                 </>
               )}
             </Pressable>
@@ -288,19 +348,16 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
 const styles = StyleSheet.create({
   keyboardContainer: {
     flex: 1,
-    backgroundColor: Theme.isWeb ? Theme.colors.surfaceSubtle : Theme.colors.background,
   },
   container: {
     flex: 1,
     width: '100%',
     maxWidth: 680,
     alignSelf: 'center',
-    backgroundColor: Theme.colors.background,
     ...(Theme.isWeb
       ? {
           borderLeftWidth: 2.5,
           borderRightWidth: 2.5,
-          borderColor: '#000000',
         }
       : {}),
   },
@@ -312,8 +369,6 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 16,
     borderBottomWidth: 3,
-    borderBottomColor: '#000000',
-    backgroundColor: '#FFFFFF',
   },
   headerCopy: {
     flex: 1,
@@ -329,12 +384,10 @@ const styles = StyleSheet.create({
     height: 10,
     borderRadius: 5,
     borderWidth: 1.5,
-    borderColor: '#000000',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#000000',
     marginLeft: 6,
     letterSpacing: -0.3,
   },
@@ -342,12 +395,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 6,
-    backgroundColor: Theme.colors.yellow,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: Theme.radius.xs,
     borderWidth: 1.5,
-    borderColor: '#000000',
     alignSelf: 'flex-start',
     ...Theme.shadows.sm,
   },
@@ -360,14 +411,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   closeButton: {
-    width: 38,
-    height: 38,
+    minWidth: 48,
+    minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: Theme.radius.sm,
-    backgroundColor: '#FFFFFF',
     borderWidth: 2,
-    borderColor: '#000000',
     marginLeft: 12,
     ...Theme.shadows.sm,
   },
@@ -384,18 +433,17 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: 10,
     fontWeight: '900',
-    color: '#000000',
     marginBottom: 7,
     letterSpacing: 0.6,
   },
   inputWithActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
     borderRadius: Theme.radius.sm,
     borderWidth: 2.5,
-    borderColor: '#000000',
-    paddingHorizontal: 12,
+    paddingLeft: 12,
+    paddingRight: 6,
+    height: 56,
     ...Theme.shadows.md,
   },
   mainInput: {
@@ -404,45 +452,36 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: Theme.isIOS ? 'Courier' : 'monospace',
     fontWeight: '700',
-    color: '#000000',
     paddingVertical: 0,
   },
   helperText: {
     marginTop: 7,
     fontSize: 10,
     fontWeight: '700',
-    color: Theme.colors.textTertiary,
   },
   scannerIconButton: {
-    width: 36,
-    height: 36,
+    minWidth: 48,
+    minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Theme.colors.yellow,
     borderRadius: Theme.radius.xs,
     borderWidth: 2,
-    borderColor: '#000000',
-    marginLeft: 8,
+    marginLeft: 6,
     ...Theme.shadows.sm,
   },
   standardInput: {
-    backgroundColor: '#FFFFFF',
-    height: 50,
+    height: 52,
     borderRadius: Theme.radius.sm,
     borderWidth: 2.5,
-    borderColor: '#000000',
     paddingHorizontal: 14,
     fontSize: 14,
     fontWeight: '700',
-    color: '#000000',
     ...Theme.shadows.sm,
   },
   conditionalBox: {
-    backgroundColor: Theme.colors.yellow,
     padding: 14,
     borderRadius: Theme.radius.sm,
     borderWidth: 2.5,
-    borderColor: '#000000',
     ...Theme.shadows.md,
   },
   conditionalHeader: {
@@ -459,12 +498,10 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   errorContainer: {
-    backgroundColor: Theme.colors.coral,
     padding: 12,
     borderRadius: Theme.radius.sm,
     marginBottom: 16,
     borderWidth: 2,
-    borderColor: '#000000',
     ...Theme.shadows.sm,
   },
   errorText: {
@@ -474,7 +511,6 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   submitButton: {
-    backgroundColor: Theme.colors.blue,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -482,7 +518,6 @@ const styles = StyleSheet.create({
     borderRadius: Theme.radius.sm,
     marginTop: 8,
     borderWidth: 2.5,
-    borderColor: '#000000',
     ...Theme.shadows.md,
   },
   submitButtonDisabled: {

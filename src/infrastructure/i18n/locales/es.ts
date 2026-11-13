@@ -43,6 +43,23 @@ export const es = {
     design: 'DISEÑO:',
   },
 
+  // Sorting
+  sort: {
+    label: 'ORDEN:',
+    updated: 'RECIENTES',
+    days: 'DÍAS',
+    carrier: 'TRANSPORTISTA',
+  },
+
+  // Clipboard Detection Banner
+  clipboardBanner: {
+    title: 'PORTAPAPELES DETECTADO',
+    addBtn: 'AÑADIR',
+    dismissBtn: 'DESCARTAR',
+    dismissAria: 'Descartar número del portapapeles',
+    addAria: 'Añadir paquete desde el portapapeles',
+  },
+
   // Search
   search: {
     placeholder: 'Buscar por alias, código o transportista...',

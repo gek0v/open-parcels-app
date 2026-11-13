@@ -6,6 +6,7 @@ import { useTheme } from '../../theme/ThemeContext';
 import { StatusBadge } from '../common/StatusBadge';
 import { ProgressBar } from '../common/ProgressBar';
 import { ArrowUpRight, Clock, Edit2 } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 
 interface ParcelCardRetroOSProps {
   parcel: Parcel;
@@ -26,14 +27,38 @@ export const ParcelCardRetroOS: React.FC<ParcelCardRetroOSProps> = ({
     return theme.status[parcel.status] || theme.primary;
   };
 
+  const handleCardPress = async () => {
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    onPress();
+  };
+
+  const handleRenamePress = async (e: any) => {
+    e.stopPropagation();
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+    onRename?.();
+  };
+
   return (
-    <View style={[styles.windowCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Ventana Retro ${parcel.customAlias || parcel.trackingNumber}, transportista ${parcel.carrier.name}`}
+      onPress={handleCardPress}
+      style={({ pressed }) => [
+        styles.windowCard,
+        { backgroundColor: theme.surface, borderColor: theme.border },
+        pressed && styles.cardPressed,
+      ]}
+    >
       {/* OS Window Colored Title Bar */}
-      <View style={[styles.windowTitleBar, { backgroundColor: getHeaderColor(), borderColor: theme.border }]}>
+      <View style={[styles.windowTitleBar, { backgroundColor: getHeaderColor(), borderBottomColor: theme.border }]}>
         <View style={styles.windowControls}>
-          <View style={[styles.dot, { backgroundColor: theme.coral }]} />
-          <View style={[styles.dot, { backgroundColor: theme.yellow }]} />
-          <View style={[styles.dot, { backgroundColor: theme.mint }]} />
+          <View style={[styles.dot, { backgroundColor: theme.coral, borderColor: theme.border }]} />
+          <View style={[styles.dot, { backgroundColor: theme.yellow, borderColor: theme.border }]} />
+          <View style={[styles.dot, { backgroundColor: theme.mint, borderColor: theme.border }]} />
         </View>
         <Text style={styles.windowTitleText} numberOfLines={1}>
           {parcel.carrier.name.toUpperCase()}{' // TRACK'}
@@ -42,37 +67,33 @@ export const ParcelCardRetroOS: React.FC<ParcelCardRetroOSProps> = ({
       </View>
 
       {/* Card Body */}
-      <Pressable
-        onPress={onPress}
-        style={({ pressed }) => [styles.cardBody, pressed && styles.bodyPressed]}
-      >
+      <View style={[styles.cardBody, { backgroundColor: theme.surface }]}>
         <View style={styles.contentRow}>
           <View style={styles.infoCol}>
             <View style={styles.aliasRow}>
-              <Text style={styles.alias} numberOfLines={1}>
+              <Text style={[styles.alias, { color: theme.textPrimary }]} numberOfLines={1}>
                 {parcel.customAlias || parcel.trackingNumber}
               </Text>
               {onRename && (
                 <Pressable
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    onRename();
-                  }}
-                  style={styles.renameIconBtn}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Renombrar alias del envío"
+                  onPress={handleRenamePress}
+                  style={[styles.renameIconBtn, { backgroundColor: theme.yellow, borderColor: theme.border }]}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 >
-                  <Edit2 size={12} color="#000000" strokeWidth={2.5} />
+                  <Edit2 size={13} color="#000000" strokeWidth={2.5} />
                 </Pressable>
               )}
             </View>
 
-            <View style={styles.trackingPill}>
-              <Text style={styles.trackingMono}>{parcel.trackingNumber}</Text>
+            <View style={[styles.trackingPill, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
+              <Text style={[styles.trackingMono, { color: theme.textSecondary }]}>{parcel.trackingNumber}</Text>
             </View>
           </View>
 
           {/* Action Arrow Icon Button */}
-          <View style={styles.actionArrowBox}>
+          <View style={[styles.actionArrowBox, { backgroundColor: theme.yellow, borderColor: theme.border }]}>
             <ArrowUpRight size={20} color="#000000" strokeWidth={3} />
           </View>
         </View>
@@ -88,27 +109,25 @@ export const ParcelCardRetroOS: React.FC<ParcelCardRetroOSProps> = ({
         </View>
 
         {/* Latest Log Info */}
-        <View style={styles.footerRow}>
-          <Text style={styles.latestLogText} numberOfLines={1}>
+        <View style={[styles.footerRow, { borderTopColor: theme.surfaceSubtle }]}>
+          <Text style={[styles.latestLogText, { color: theme.textSecondary }]} numberOfLines={1}>
             ► {latestEvent ? latestEvent.description : parcel.statusText}
           </Text>
-          <View style={styles.transitBox}>
-            <Clock size={10} color="#000000" />
-            <Text style={styles.transitDaysText}>{parcel.daysInTransit}D</Text>
+          <View style={[styles.transitBox, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
+            <Clock size={10} color={theme.textPrimary} />
+            <Text style={[styles.transitDaysText, { color: theme.textPrimary }]}>{parcel.daysInTransit}D</Text>
           </View>
         </View>
-      </Pressable>
-    </View>
+      </View>
+    </Pressable>
   );
 };
 
 const styles = StyleSheet.create({
   windowCard: {
-    backgroundColor: '#FFFFFF',
     borderRadius: Theme.radius.md,
     marginBottom: 16,
     borderWidth: 2.5,
-    borderColor: '#000000',
     overflow: 'hidden',
     shadowColor: '#000000',
     shadowOffset: { width: 4.5, height: 4.5 },
@@ -117,6 +136,11 @@ const styles = StyleSheet.create({
     elevation: 6,
     ...(Theme.isWeb ? ({ boxShadow: '4.5px 4.5px 0px #000000' } as any) : {}),
   },
+  cardPressed: {
+    transform: [{ translateX: 2 }, { translateY: 2 }],
+    shadowOffset: { width: 2, height: 2 },
+    ...(Theme.isWeb ? ({ boxShadow: '2px 2px 0px #000000' } as any) : {}),
+  },
   windowTitleBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -124,7 +148,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderBottomWidth: 2,
-    borderBottomColor: '#000000',
   },
   windowControls: {
     flexDirection: 'row',
@@ -135,7 +158,6 @@ const styles = StyleSheet.create({
     height: 9,
     borderRadius: 4.5,
     borderWidth: 1.2,
-    borderColor: '#000000',
   },
   windowTitleText: {
     flex: 1,
@@ -147,10 +169,6 @@ const styles = StyleSheet.create({
   },
   cardBody: {
     padding: 14,
-    backgroundColor: '#FFFFFF',
-  },
-  bodyPressed: {
-    backgroundColor: '#F8FAFC',
   },
   contentRow: {
     flexDirection: 'row',
@@ -169,42 +187,38 @@ const styles = StyleSheet.create({
   alias: {
     fontSize: 17,
     fontWeight: '900',
-    color: '#000000',
     letterSpacing: -0.3,
   },
   renameIconBtn: {
-    padding: 4,
+    minWidth: 36,
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 5,
     borderRadius: Theme.radius.xs,
-    backgroundColor: '#FFE600',
     borderWidth: 1.5,
-    borderColor: '#000000',
     marginLeft: 8,
   },
   trackingPill: {
     alignSelf: 'flex-start',
-    backgroundColor: '#F1F5F9',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: Theme.radius.xs,
     borderWidth: 1,
-    borderColor: '#CBD5E1',
     marginTop: 4,
   },
   trackingMono: {
     fontSize: 11,
     fontFamily: Theme.isIOS ? 'Courier' : 'monospace',
     fontWeight: '700',
-    color: '#1E293B',
   },
   actionArrowBox: {
     width: 36,
     height: 36,
     borderRadius: Theme.radius.sm,
-    backgroundColor: '#FFE600', // Cyber Yellow
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#000000',
     shadowColor: '#000000',
     shadowOffset: { width: 2, height: 2 },
     shadowOpacity: 1,
@@ -238,29 +252,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingTop: 6,
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
   },
   latestLogText: {
     flex: 1,
     fontSize: 11,
     fontWeight: '600',
-    color: '#475569',
     marginRight: 8,
   },
   transitBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: '#F1F5F9',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: Theme.radius.xs,
     borderWidth: 1,
-    borderColor: '#000000',
   },
   transitDaysText: {
     fontSize: 10,
     fontWeight: '900',
-    color: '#000000',
   },
 });
