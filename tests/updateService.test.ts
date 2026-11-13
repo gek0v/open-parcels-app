@@ -37,9 +37,7 @@ mock.module('@react-native-async-storage/async-storage', () => ({
   },
 }));
 
-mock.module('expo-file-system/legacy', () => ({
-  documentDirectory: 'file:///data/user/0/com.openparcels.app/files/',
-  cacheDirectory: 'file:///data/user/0/com.openparcels.app/cache/',
+const fsHandlers = {
   getInfoAsync: async (uri: string) => {
     const file = mockFiles[uri];
     if (!file || !file.exists) {
@@ -106,6 +104,26 @@ mock.module('expo-file-system/legacy', () => ({
     };
     return task;
   },
+  writeAsStringAsync: async (uri: string, content: string) => {
+    mockFiles[uri] = { exists: true, size: content.length };
+    if ((globalThis as any).__backupMockFiles) {
+      (globalThis as any).__backupMockFiles[uri] = content;
+    }
+  },
+  readAsStringAsync: async (uri: string) => {
+    if ((globalThis as any).__backupMockFiles && (globalThis as any).__backupMockFiles[uri] !== undefined) {
+      return (globalThis as any).__backupMockFiles[uri];
+    }
+    return '';
+  },
+};
+
+(globalThis as any).__mockFsHandlers = fsHandlers;
+
+mock.module('expo-file-system/legacy', () => ({
+  documentDirectory: 'file:///data/user/0/com.openparcels.app/files/',
+  cacheDirectory: 'file:///data/user/0/com.openparcels.app/cache/',
+  ...fsHandlers,
 }));
 
 mock.module('expo-intent-launcher', () => ({
@@ -138,6 +156,9 @@ mock.module('react-native', () => ({
     openURL: async (url: string) => {
       openURLCalls.push(url);
     },
+  },
+  Share: {
+    share: async () => ({ action: 'sharedAction' }),
   },
   TurboModuleRegistry: {
     get: () => null,

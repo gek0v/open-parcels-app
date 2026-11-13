@@ -5,19 +5,21 @@ import { Theme } from '../../theme/adaptiveTheme';
 import { useTheme } from '../../theme/ThemeContext';
 import { StatusBadge } from '../common/StatusBadge';
 import { ProgressBar } from '../common/ProgressBar';
-import { ArrowUpRight, Clock, Edit2 } from 'lucide-react-native';
+import { ArrowUpRight, Clock, Edit2, Share2 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 
 interface ParcelCardRetroOSProps {
   parcel: Parcel;
   onPress: () => void;
   onRename?: () => void;
+  onShare?: () => void;
 }
 
 export const ParcelCardRetroOS: React.FC<ParcelCardRetroOSProps> = ({
   parcel,
   onPress,
   onRename,
+  onShare,
 }) => {
   const { theme } = useTheme();
   const latestEvent = parcel.events[parcel.events.length - 1];
@@ -40,6 +42,14 @@ export const ParcelCardRetroOS: React.FC<ParcelCardRetroOSProps> = ({
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch {}
     onRename?.();
+  };
+
+  const handleSharePress = async (e: any) => {
+    e.stopPropagation();
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    onShare?.();
   };
 
   return (
@@ -74,17 +84,30 @@ export const ParcelCardRetroOS: React.FC<ParcelCardRetroOSProps> = ({
               <Text style={[styles.alias, { color: theme.textPrimary }]} numberOfLines={1}>
                 {parcel.customAlias || parcel.trackingNumber}
               </Text>
-              {onRename && (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Renombrar alias del envío"
-                  onPress={handleRenamePress}
-                  style={[styles.renameIconBtn, { backgroundColor: theme.yellow, borderColor: theme.border }]}
-                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                >
-                  <Edit2 size={13} color="#000000" strokeWidth={2.5} />
-                </Pressable>
-              )}
+              <View style={styles.actionButtonsRow}>
+                {onShare && (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Compartir datos del envío"
+                    onPress={handleSharePress}
+                    style={[styles.renameIconBtn, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}
+                    hitSlop={{ top: 12, bottom: 12, left: 6, right: 6 }}
+                  >
+                    <Share2 size={13} color={theme.textPrimary} strokeWidth={2.5} />
+                  </Pressable>
+                )}
+                {onRename && (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Renombrar alias del envío"
+                    onPress={handleRenamePress}
+                    style={[styles.renameIconBtn, { backgroundColor: theme.yellow, borderColor: theme.border }]}
+                    hitSlop={{ top: 12, bottom: 12, left: 6, right: 6 }}
+                  >
+                    <Edit2 size={13} color="#000000" strokeWidth={2.5} />
+                  </Pressable>
+                )}
+              </View>
             </View>
 
             <View style={[styles.trackingPill, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
@@ -188,6 +211,11 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '900',
     letterSpacing: -0.3,
+  },
+  actionButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   renameIconBtn: {
     minWidth: 36,
