@@ -3,7 +3,7 @@ import { en } from './locales/en';
 import type { TranslationKey } from './locales/es';
 
 export type Language = 'es' | 'en';
-export const LANGUAGE_KEY = '@open_parcels:language';
+export { LANGUAGE_KEY } from './constants';
 
 export const translations: Record<Language, TranslationKey> = {
   es,

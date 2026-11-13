@@ -11,6 +11,8 @@ import {
 import { TrackingEngineError } from './errors';
 import { getLocalizedStatusText } from './mapper';
 import { fetchInPostLive } from './inpostLive';
+import { fetchCorreosSpainLive, fetchCorreosExpressLive } from './correosLive';
+import { fetchGLSSpainLive, fetchSEURLive } from './spainCouriersLive';
 
 export class LocalTrackingEngine implements ITrackingEngine {
   readonly engineName = 'Open Parcels Embedded (Local-First)';
@@ -68,7 +70,7 @@ export class LocalTrackingEngine implements ITrackingEngine {
     const slug = selectedCarrier.slug;
     const postalCode = params.postalCode?.trim() || '';
 
-    // Real live tracking for InPost / Mondial Relay (matches Go CLI behavior)
+    // Real live tracking for InPost / Mondial Relay
     if ((slug === 'inpost' || slug === 'inpost-es') && params.allowSimulated !== true) {
       try {
         return await fetchInPostLive(
@@ -79,13 +81,73 @@ export class LocalTrackingEngine implements ITrackingEngine {
           params.lang
         );
       } catch (err) {
-        if (err instanceof TrackingEngineError && err.code === 'SHIPMENT_NOT_FOUND') {
+        if (err instanceof TrackingEngineError && err.code === 'POSTAL_CODE_REQUIRED') {
           throw err;
         }
         if (params.allowSimulated === false) {
           throw err;
         }
         console.warn('InPost live fetch failed, falling back to local backup:', err);
+      }
+    }
+
+    // Real live tracking for Correos España
+    if (slug === 'correos-spain' && params.allowSimulated !== true) {
+      try {
+        return await fetchCorreosSpainLive(rawNumber, selectedCarrier, params.lang);
+      } catch (err) {
+        if (err instanceof TrackingEngineError && err.code === 'POSTAL_CODE_REQUIRED') {
+          throw err;
+        }
+        if (params.allowSimulated === false) {
+          throw err;
+        }
+        console.warn('Correos España live fetch failed, falling back to local backup:', err);
+      }
+    }
+
+    // Real live tracking for Correos Express
+    if (slug === 'correosexpress' && params.allowSimulated !== true) {
+      try {
+        return await fetchCorreosExpressLive(rawNumber, selectedCarrier, params.lang);
+      } catch (err) {
+        if (err instanceof TrackingEngineError && err.code === 'POSTAL_CODE_REQUIRED') {
+          throw err;
+        }
+        if (params.allowSimulated === false) {
+          throw err;
+        }
+        console.warn('Correos Express live fetch failed, falling back to local backup:', err);
+      }
+    }
+
+    // Real live tracking for GLS Spain
+    if (slug === 'asm-gls-spain' && params.allowSimulated !== true) {
+      try {
+        return await fetchGLSSpainLive(rawNumber, postalCode, selectedCarrier, params.lang);
+      } catch (err) {
+        if (err instanceof TrackingEngineError && err.code === 'POSTAL_CODE_REQUIRED') {
+          throw err;
+        }
+        if (params.allowSimulated === false) {
+          throw err;
+        }
+        console.warn('GLS Spain live fetch failed, falling back to local backup:', err);
+      }
+    }
+
+    // Real live tracking for SEUR
+    if (slug === 'seur' && params.allowSimulated !== true) {
+      try {
+        return await fetchSEURLive(rawNumber, postalCode, selectedCarrier, params.lang);
+      } catch (err) {
+        if (err instanceof TrackingEngineError && err.code === 'POSTAL_CODE_REQUIRED') {
+          throw err;
+        }
+        if (params.allowSimulated === false) {
+          throw err;
+        }
+        console.warn('SEUR live fetch failed, falling back to local backup:', err);
       }
     }
 

@@ -5,14 +5,14 @@ import { Platform } from 'react-native';
 import { Parcel } from '../../domain/models/parcel';
 import { parcelRepository } from '../storage/ParcelRepository';
 import { trackingEngineManager, normalizeCanonicalStatus } from '../engine';
-import { LANGUAGE_KEY } from '../i18n';
+import { LANGUAGE_KEY } from '../i18n/constants';
 import { notificationService } from './NotificationService';
 
 export const BACKGROUND_SYNC_TASK = 'OPEN_PARCELS_BACKGROUND_SYNC';
 
 export async function executeBackgroundSync(): Promise<BackgroundFetch.BackgroundFetchResult> {
   try {
-    // Ensure engine mode and REST URL are hydrated in headless background runtime
+    // On-device local engine initialization
     await trackingEngineManager.hydrate();
 
     const storedLang = await AsyncStorage.getItem(LANGUAGE_KEY).catch(() => null);
