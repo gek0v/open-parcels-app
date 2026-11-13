@@ -1,6 +1,20 @@
 import { afterEach, describe, expect, it, mock } from 'bun:test';
-import { RestTrackingEngine } from '../src/infrastructure/engine/RestTrackingEngine';
+import { LocalTrackingEngine } from '../src/infrastructure/engine/LocalTrackingEngine';
 import { TrackingEngineError, isPostalCodeRequiredError } from '../src/infrastructure/engine/errors';
+import { findCarrierBySlug } from '../src/domain/validators/detection';
+import {
+  parseCorreosSpainPayload,
+  parseCorreosExpressPayload,
+  fetchCorreosSpainLive,
+  fetchCorreosExpressLive,
+} from '../src/infrastructure/engine/correosLive';
+import {
+  parseGLSSpainPayload,
+  parseSEURPayload,
+  fetchGLSSpainLive,
+  fetchSEURLive,
+} from '../src/infrastructure/engine/spainCouriersLive';
+import { parseInPostHtmlToParcel } from '../src/infrastructure/engine/inpostLive';
 
 const originalFetch = globalThis.fetch;
 
@@ -8,295 +22,7 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
 });
 
-describe('RestTrackingEngine Go Engine Alignment', () => {
-  it('sends aligned /api/v1/track request payload and maps full TrackResponsePayload', async () => {
-    let capturedUrl = '';
-    let capturedBody: Record<string, any> = {};
-
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-      capturedUrl = String(input);
-      capturedBody = JSON.parse(String(init?.body || '{}'));
-      return new Response(
-        JSON.stringify({
-          tracking_number: 'LP00561234567890',
-          carrier: {
-            slug: 'cainiao',
-            name: 'Cainiao Global',
-            country: 'CN',
-            country_name: 'China',
-            type: 'cross_border',
-            website: 'https://global.cainiao.com',
-            tracking_url: 'https://global.cainiao.com/detail.htm?mailNoList=%s',
-          },
-          additional_carriers: [
-            {
-              slug: 'correosexpress',
-              name: 'Correos Express',
-              country: 'ES',
-              country_name: 'Spain',
-              type: 'express',
-            },
-          ],
-          last_mile_tracking_number: '6900561234567890',
-          last_mile_carrier: {
-            slug: 'correosexpress',
-            name: 'Correos Express',
-            country: 'ES',
-          },
-          status: 'out_for_delivery',
-          status_text: 'En reparto',
-          progress: 85,
-          origin: { code: 'CN', name: 'China' },
-          destination: { code: 'ES', name: 'Spain' },
-          estimated_delivery: '2026-11-12T18:00:00Z',
-          delivered_at: null,
-          days_in_transit: 6,
-          weight: '1.45 kg',
-          service_type: 'Cainiao Standard for Special Goods',
-          flight_legs: [
-            {
-              flight_number: 'CA907',
-              origin: 'HKG',
-              destination: 'MAD',
-              status: 'arrived',
-              actual_arrival: '2026-11-10T09:15:00Z',
-            },
-          ],
-          from_cache: true,
-          is_live_data: true,
-          updated_at: '2026-11-11T10:00:00Z',
-          events: [
-            {
-              date: '2026-11-11T09:00:00Z',
-              raw_date: '2026-11-11 09:00:00',
-              status: 'out_for_delivery',
-              stage: 'last_mile',
-              description: 'En reparto',
-              location: 'Madrid, ES',
-              carrier_slug: 'correosexpress',
-              carrier_name: 'Correos Express',
-              carrier_index: 1,
-            },
-            {
-              date: '2026-11-10T18:00:00Z',
-              status: 'in_transit',
-              stage: 'handover',
-              description: 'Handed over to local carrier',
-              location: 'Coslada, Madrid',
-              carrier_slug: 'cainiao',
-              carrier_name: 'Cainiao Global',
-              carrier_index: 0,
-            },
-          ],
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      );
-    }) as unknown as typeof fetch;
-
-    const engine = new RestTrackingEngine('http://localhost:8080');
-    const parcel = await engine.track({
-      trackingNumber: 'LP00561234567890',
-      carrierHint: 'cainiao',
-      destinationCountry: 'ES',
-      postalCode: '28001',
-      lang: 'es',
-      allowSimulated: false,
-      forceRefresh: true,
-      email: 'user@example.com',
-      phone: '+34600000000',
-      additionalFields: { nif: '12345678A' },
-    });
-
-    expect(capturedUrl).toBe('http://localhost:8080/api/v1/track');
-    expect(capturedBody.tracking_number).toBe('LP00561234567890');
-    expect(capturedBody.language).toBe('es');
-    expect(capturedBody.postal_code).toBe('28001');
-    expect(capturedBody.destination_country).toBe('ES');
-    expect(capturedBody.allow_simulated).toBe(false);
-    expect(capturedBody.force_refresh).toBe(true);
-    expect(capturedBody.email).toBe('user@example.com');
-    expect(capturedBody.phone).toBe('+34600000000');
-    expect(capturedBody.additional_fields).toEqual({ nif: '12345678A' });
-
-    expect(parcel.lastMileTrackingNumber).toBe('6900561234567890');
-    expect(parcel.lastMileCarrier?.slug).toBe('correosexpress');
-    expect(parcel.estimatedDelivery).toBe('2026-11-12T18:00:00Z');
-    expect(parcel.weight).toBe('1.45 kg');
-    expect(parcel.serviceType).toBe('Cainiao Standard for Special Goods');
-    expect(parcel.fromCache).toBe(true);
-    expect(parcel.isLiveData).toBe(true);
-    expect(parcel.flightLegs?.[0].flightNumber).toBe('CA907');
-    expect(parcel.events[0].stage).toBe('last_mile');
-    expect(parcel.events[0].rawDate).toBe('2026-11-11 09:00:00');
-    expect(parcel.events[0].carrierIndex).toBe(1);
-    expect(parcel.events[1].stage).toBe('handover');
-  });
-
-  it('maps Go /api/v1/detect matched_pattern and carrier metadata', async () => {
-    globalThis.fetch = (async () =>
-      new Response(
-        JSON.stringify({
-          tracking_number: '36150127630406',
-          candidates: [
-            {
-              carrier: {
-                slug: 'seur',
-                name: 'SEUR',
-                country: 'ES',
-                country_name: 'Spain',
-                type: 'express',
-              },
-              confidence: 1.0,
-              matched_pattern: 'SEUR Spain parcel number',
-              reason: 'Matched pattern: SEUR Spain parcel number',
-            },
-          ],
-        }),
-        { status: 200 }
-      )) as unknown as typeof fetch;
-
-    const engine = new RestTrackingEngine('http://localhost:8080');
-    const results = await engine.detect('36150127630406', 'ES');
-
-    expect(results.length).toBe(1);
-    expect(results[0].carrier.slug).toBe('seur');
-    expect(results[0].carrier.requiresPostalCode).toBe(true);
-    expect(results[0].matchedRule).toBe('SEUR Spain parcel number');
-    expect(results[0].reason).toBe('Matched pattern: SEUR Spain parcel number');
-  });
-
-  it('parses all typed domain error codes from Go REST API', async () => {
-    const cases: { status: number; apiCode: string; expectedCode: string }[] = [
-      { status: 422, apiCode: 'POSTAL_CODE_REQUIRED', expectedCode: 'POSTAL_CODE_REQUIRED' },
-      { status: 422, apiCode: 'MISSING_POSTAL_CODE', expectedCode: 'MISSING_POSTAL_CODE' },
-      { status: 404, apiCode: 'SHIPMENT_NOT_FOUND', expectedCode: 'SHIPMENT_NOT_FOUND' },
-      { status: 501, apiCode: 'CARRIER_NOT_IMPLEMENTED', expectedCode: 'CARRIER_NOT_IMPLEMENTED' },
-      { status: 429, apiCode: 'CARRIER_RATE_LIMITED', expectedCode: 'CARRIER_RATE_LIMITED' },
-      { status: 502, apiCode: 'CARRIER_UNAVAILABLE', expectedCode: 'CARRIER_TEMPORARILY_UNAVAILABLE' },
-      {
-        status: 502,
-        apiCode: 'CARRIER_TEMPORARILY_UNAVAILABLE',
-        expectedCode: 'CARRIER_TEMPORARILY_UNAVAILABLE',
-      },
-    ];
-
-    const engine = new RestTrackingEngine('http://localhost:8080');
-
-    for (const c of cases) {
-      globalThis.fetch = (async () =>
-        new Response(
-          JSON.stringify({
-            error: {
-              code: c.apiCode,
-              message: `Error: ${c.apiCode}`,
-            },
-          }),
-          { status: c.status }
-        )) as unknown as typeof fetch;
-
-      let caught: unknown;
-      try {
-        await engine.track({ trackingNumber: 'TEST1234' });
-      } catch (err) {
-        caught = err;
-      }
-
-      expect(caught).toBeInstanceOf(TrackingEngineError);
-      expect((caught as TrackingEngineError).code).toBe(c.expectedCode as any);
-      expect((caught as TrackingEngineError).message).toBe(`Error: ${c.apiCode}`);
-
-      if (c.apiCode === 'POSTAL_CODE_REQUIRED' || c.apiCode === 'MISSING_POSTAL_CODE') {
-        expect(isPostalCodeRequiredError(caught)).toBe(true);
-      }
-    }
-  });
-
-  it('supports ParcelsApp v4 async polling (/trackings?async=true + GET /trackings/{id})', async () => {
-    let callCount = 0;
-    globalThis.fetch = (async (input: RequestInfo | URL) => {
-      callCount++;
-      const url = String(input);
-      if (url.endsWith('/trackings?async=true')) {
-        return new Response(
-          JSON.stringify({
-            request_id: 'req_async_123',
-            status: 'processing',
-            done: false,
-            expires_at: '2026-11-11T12:00:00Z',
-            results: [],
-          }),
-          { status: 200 }
-        );
-      }
-
-      if (url.endsWith('/trackings/req_async_123') && callCount === 2) {
-        return new Response(
-          JSON.stringify({
-            request_id: 'req_async_123',
-            status: 'processing',
-            done: false,
-            expires_at: '2026-11-11T12:00:00Z',
-            results: [],
-          }),
-          { status: 200 }
-        );
-      }
-
-      return new Response(
-        JSON.stringify({
-          request_id: 'req_async_123',
-          status: 'completed',
-          done: true,
-          expires_at: '2026-11-11T12:00:00Z',
-          results: [
-            {
-              tracking_number: 'LP00561234567890',
-              state: 'completed',
-              from_cache: true,
-              shipment: {
-                trackingId: 'LP00561234567890',
-                status: 'delivered',
-                origin: 'China',
-                originCode: 'CN',
-                destination: 'Spain',
-                destinationCode: 'ES',
-                daysInTransit: 5,
-                detectedCarrier: { slug: 'cainiao', name: 'Cainiao Global' },
-                services: [
-                  { slug: 'cainiao', name: 'Cainiao Global' },
-                  { slug: 'correosexpress', name: 'Correos Express' },
-                ],
-                states: [
-                  {
-                    state: 'Entregado al destinatario',
-                    location: 'Madrid, ES',
-                    date: '2026-11-11T09:00:00Z',
-                    carrier: 1,
-                  },
-                ],
-              },
-            },
-          ],
-        }),
-        { status: 200 }
-      );
-    }) as unknown as typeof fetch;
-
-    const engine = new RestTrackingEngine('http://localhost:8080');
-    const parcel = await engine.trackAsync(
-      { trackingNumber: 'LP00561234567890', lang: 'es' },
-      { pollIntervalMs: 10, timeoutMs: 2000 }
-    );
-
-    expect(callCount).toBe(3);
-    expect(parcel.trackingNumber).toBe('LP00561234567890');
-    expect(parcel.status).toBe('delivered');
-    expect(parcel.fromCache).toBe(true);
-    expect(parcel.lastMileCarrier?.slug).toBe('correosexpress');
-    expect(parcel.events[0].carrierSlug).toBe('correosexpress');
-    expect(parcel.events[0].status).toBe('delivered');
-  });
-
+describe('NativeGoTrackingEngine On-Device Execution', () => {
   it('handles NativeGoTrackingEngine fallback and Go JSON payload mapping', async () => {
     let available = false;
     mock.module('react-native', () => ({
@@ -354,15 +80,13 @@ describe('RestTrackingEngine Go Engine Alignment', () => {
     expect(tracked.carrier.requiresPostalCode).toBe(true);
   });
 });
+
 describe('InPost Live Parser & Local Engine Integration', () => {
   const sampleInPostHtml = `<!DOCTYPE html><html><body>
 <astro-island uid="test-inpost" props="{&quot;locale&quot;:[0,&quot;es&quot;],&quot;country&quot;:[0,&quot;ES&quot;],&quot;zipCode&quot;:[0,&quot;47140&quot;],&quot;trackingDetails&quot;:[0,{&quot;packageId&quot;:[0,&quot;75616714&quot;],&quot;milestones&quot;:[1,[[0,{&quot;type&quot;:[0,&quot;IN_TRANSIT&quot;],&quot;name&quot;:[0,&quot;En camino&quot;],&quot;date&quot;:[0,&quot;2026-11-11T12:53:58.564Z&quot;],&quot;events&quot;:[1,[[0,{&quot;code&quot;:[0,&quot;MMD.1001&quot;],&quot;name&quot;:[0,&quot;Recibido en el centro logístico&quot;],&quot;date&quot;:[0,&quot;2026-11-11T12:53:58.564Z&quot;],&quot;description&quot;:[0,&quot;Tu paquete ha sido recibido en uno de nuestros centros logísticos.&quot;]}],[0,{&quot;code&quot;:[0,&quot;FMD.1002&quot;],&quot;name&quot;:[0,&quot;Recogido por el mensajero&quot;],&quot;date&quot;:[0,&quot;2026-11-11T10:56:51.253Z&quot;],&quot;description&quot;:[0,&quot;Tu paquete ha iniciado el tránsito y se dirige a uno de nuestros centros logísticos.&quot;]}]]]}],[0,{&quot;type&quot;:[0,&quot;AT_THE_ORIGIN&quot;],&quot;name&quot;:[0,&quot;En preparación&quot;],&quot;date&quot;:[0,&quot;2026-11-10T19:01:43.002Z&quot;],&quot;events&quot;:[1,[[0,{&quot;code&quot;:[0,&quot;FMD.1001&quot;],&quot;name&quot;:[0,&quot;Listo para ser recogido por el mensajero&quot;],&quot;date&quot;:[0,&quot;2026-11-10T19:01:43.002Z&quot;],&quot;description&quot;:[0,&quot;Tu paquete está preparado y será recogido por nuestros mensajeros pronto.&quot;]}],[0,{&quot;code&quot;:[0,&quot;CRE.1001&quot;],&quot;name&quot;:[0,&quot;En preparación&quot;],&quot;date&quot;:[0,&quot;2026-11-06T18:52:46Z&quot;],&quot;description&quot;:[0,&quot;El envío ha sido registrado informáticamente y estamos a la espera de recibir el paquete.&quot;]}]]]}]]]}],&quot;trackingDetailsStatus&quot;:[0,200]}" client="load"></astro-island>
 </body></html>`;
 
-  it('correctly extracts Astro props and normalizes InPost live events without false delivered status', async () => {
-    const { parseInPostHtmlToParcel } = await import('../src/infrastructure/engine/inpostLive');
-    const { findCarrierBySlug } = await import('../src/domain/validators/detection');
-
+  it('correctly extracts Astro props and normalizes InPost live events without false delivered status', () => {
     const parcel = parseInPostHtmlToParcel(
       sampleInPostHtml,
       '75616714',
@@ -391,9 +115,7 @@ describe('InPost Live Parser & Local Engine Integration', () => {
       new Response(sampleInPostHtml, { status: 200, headers: { 'Content-Type': 'text/html' } })
     ) as unknown as typeof fetch;
 
-    const { LocalTrackingEngine } = await import('../src/infrastructure/engine/LocalTrackingEngine');
     const engine = new LocalTrackingEngine();
-
     const parcel = await engine.track({
       trackingNumber: '75616714',
       carrierHint: 'inpost',
@@ -406,5 +128,288 @@ describe('InPost Live Parser & Local Engine Integration', () => {
     expect(parcel.events[0].description).toBe(
       'Tu paquete ha sido recibido en uno de nuestros centros logísticos.'
     );
+  });
+});
+
+describe('Correos España & Correos Express Live Adapters', () => {
+  it('parses Correos España live API response accurately with normalized status and milestones', () => {
+    const payload = {
+      shipment: {
+        shipmentCode: 'PQ4F6P0703418520134120K',
+        status: 'EN_REPARTO',
+        statusDescription: 'En reparto',
+        deliveryDate: null,
+        origin: {
+          country: 'ES',
+          countryName: 'España',
+          postalCode: '28001',
+          office: 'Madrid Sucursal 1',
+        },
+        destination: {
+          country: 'ES',
+          countryName: 'España',
+          postalCode: '41001',
+          office: 'Sevilla CTA',
+        },
+        events: [
+          {
+            eventDate: '13/11/2026 08:30:00',
+            status: 'EN_REPARTO',
+            description: 'El envío está en reparto para entrega hoy',
+            location: 'Sevilla',
+            office: 'Unidad de Reparto 4',
+          },
+          {
+            eventDate: '12/11/2026 19:45:00',
+            status: 'TRANSITO',
+            description: 'En tránsito hacia centro de distribución',
+            location: 'Madrid CTA',
+            office: 'CTA Coslada',
+          },
+          {
+            eventDate: '11/11/2026 14:10:00',
+            status: 'PRE_REGISTRADO',
+            description: 'Pre-registrado telemáticamente por el remitente',
+            location: 'Madrid',
+          },
+        ],
+      },
+    };
+
+    const carrier = findCarrierBySlug('correos-spain');
+    const parcel = parseCorreosSpainPayload(payload, 'PQ4F6P0703418520134120K', carrier, 'es');
+
+    expect(parcel.trackingNumber).toBe('PQ4F6P0703418520134120K');
+    expect(parcel.status).toBe('out_for_delivery');
+    expect(parcel.isLiveData).toBe(true);
+    expect(parcel.events).toHaveLength(3);
+    expect(parcel.events[0].status).toBe('out_for_delivery');
+    expect(parcel.events[0].stage).toBe('last_mile');
+    expect(parcel.events[0].location).toContain('España');
+    expect(parcel.events[1].status).toBe('in_transit');
+    expect(parcel.events[2].status).toBe('info_received');
+  });
+
+  it('anti-false-delivery: Correos España "AVISO PARA RECOGIDA / AUSENTE" does not mark delivered', () => {
+    const payload = {
+      shipment: {
+        shipmentCode: 'PQ4F6P0703418520134120K',
+        status: 'AVISO_LLEGADA',
+        statusDescription: 'Destinatario ausente, aviso para recogida en oficina',
+        events: [
+          {
+            eventDate: '13/11/2026 11:00:00',
+            status: 'AVISO_LLEGADA',
+            description: 'Intento fallido de entrega: destinatario ausente. Dejado aviso.',
+            location: 'Oficina Central',
+          },
+        ],
+      },
+    };
+
+    const carrier = findCarrierBySlug('correos-spain');
+    const parcel = parseCorreosSpainPayload(payload, 'PQ4F6P0703418520134120K', carrier, 'es');
+
+    expect(parcel.status).not.toBe('delivered');
+    expect(parcel.isLiveData).toBe(true);
+  });
+
+  it('parses Correos Express live API payload accurately', () => {
+    const payload = {
+      codigoError: '0',
+      mensajeError: '',
+      codEnvio: '690012345678901234',
+      referencia: 'PEDIDO-9988',
+      estado: 'REPARTO',
+      descEstado: 'En reparto',
+      posicion: [
+        {
+          fecha: '13/11/2026',
+          hora: '09:15:00',
+          desc: 'EN REPARTO',
+          descrip: 'El paquete se encuentra en reparto con el mensajero.',
+          codOfi: '2801',
+          nomOfi: 'Madrid Delegación Central',
+          tipo: 'R',
+        },
+        {
+          fecha: '12/11/2026',
+          hora: '21:00:00',
+          desc: 'EN TRANSITO',
+          descrip: 'Llegada a nave de clasificación.',
+          codOfi: '2800',
+          nomOfi: 'Hub Coslada',
+          tipo: 'T',
+        },
+      ],
+    };
+
+    const carrier = findCarrierBySlug('correosexpress');
+    const parcel = parseCorreosExpressPayload(payload, '690012345678901234', carrier, 'es');
+
+    expect(parcel.trackingNumber).toBe('690012345678901234');
+    expect(parcel.status).toBe('out_for_delivery');
+    expect(parcel.isLiveData).toBe(true);
+    expect(parcel.events).toHaveLength(2);
+    expect(parcel.events[0].status).toBe('out_for_delivery');
+    expect(parcel.events[0].eventCode).toBe('R');
+    expect(parcel.events[1].status).toBe('in_transit');
+  });
+
+  it('LocalTrackingEngine dispatches Correos España live query when online', async () => {
+    let capturedUrl = '';
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      capturedUrl = String(input);
+      return new Response(
+        JSON.stringify({
+          shipment: {
+            shipmentCode: 'PQ4F6P0703418520134120K',
+            status: 'ENTREGADO',
+            statusDescription: 'Entregado al destinatario',
+            deliveryDate: '2026-11-13T12:00:00Z',
+            events: [
+              {
+                eventDate: '2026-11-13T12:00:00Z',
+                status: 'ENTREGADO',
+                description: 'Entregado',
+                location: 'Madrid',
+              },
+            ],
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    }) as unknown as typeof fetch;
+
+    const engine = new LocalTrackingEngine();
+    const parcel = await engine.track({
+      trackingNumber: 'PQ4F6P0703418520134120K',
+      carrierHint: 'correos-spain',
+    });
+
+    expect(capturedUrl).toContain('api1.correos.es');
+    expect(parcel.status).toBe('delivered');
+    expect(parcel.isLiveData).toBe(true);
+  });
+});
+
+describe('GLS Spain & SEUR Live Adapters (with requiresPostalCode)', () => {
+  it('parses GLS Spain live payload and handles postal code validation', () => {
+    const payload = {
+      trackingNumber: '6123456789',
+      status: 'IN_TRANSIT',
+      statusDescription: 'En tránsito',
+      origin: { city: 'Barcelona', country: 'ES', postalCode: '08001' },
+      destination: { city: 'Madrid', country: 'ES', postalCode: '28001' },
+      history: [
+        {
+          date: '2026-11-13T08:00:00Z',
+          status: 'IN_TRANSIT',
+          description: 'Salida de plataforma logística',
+          location: 'Hub Central',
+        },
+        {
+          date: '2026-11-12T16:00:00Z',
+          status: 'REGISTERED',
+          description: 'Datos registrados en GLS Spain',
+          location: 'Barcelona',
+        },
+      ],
+    };
+
+    const carrier = findCarrierBySlug('asm-gls-spain');
+    const parcel = parseGLSSpainPayload(payload, '6123456789', '28001', carrier, 'es');
+
+    expect(parcel.trackingNumber).toBe('6123456789');
+    expect(parcel.status).toBe('in_transit');
+    expect(parcel.postalCode).toBe('28001');
+    expect(parcel.isLiveData).toBe(true);
+    expect(parcel.events).toHaveLength(2);
+    expect(parcel.events[0].status).toBe('in_transit');
+    expect(parcel.events[1].status).toBe('info_received');
+  });
+
+  it('parses SEUR live payload and maps events and delivery info', () => {
+    const payload = {
+      codigoSeguimiento: '36150127630406',
+      estado: 'REPARTO',
+      descripcionEstado: 'Envío en reparto',
+      codigoPostalDestino: '28001',
+      origen: 'Madrid',
+      destino: 'Madrid',
+      eventos: [
+        {
+          fecha: '13/11/2026 08:30:00',
+          estado: 'REPARTO',
+          descripcion: 'El envío está en reparto hacia su domicilio',
+          centro: 'Madrid Centro',
+        },
+        {
+          fecha: '12/11/2026 22:00:00',
+          estado: 'TRANSITO',
+          descripcion: 'En nave de distribución SEUR',
+          centro: 'Madrid Nave 3',
+        },
+      ],
+    };
+
+    const carrier = findCarrierBySlug('seur');
+    const parcel = parseSEURPayload(payload, '36150127630406', '28001', carrier, 'es');
+
+    expect(parcel.trackingNumber).toBe('36150127630406');
+    expect(parcel.status).toBe('out_for_delivery');
+    expect(parcel.isLiveData).toBe(true);
+    expect(parcel.events).toHaveLength(2);
+    expect(parcel.events[0].status).toBe('out_for_delivery');
+    expect(parcel.events[1].status).toBe('in_transit');
+  });
+
+  it('LocalTrackingEngine enforces postalCode for SEUR and GLS Spain and calls live API', async () => {
+    let capturedUrl = '';
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      capturedUrl = String(input);
+      return new Response(
+        JSON.stringify({
+          codigoSeguimiento: '36150127630406',
+          estado: 'REPARTO',
+          descripcionEstado: 'En reparto',
+          codigoPostalDestino: '28001',
+          eventos: [
+            {
+              fecha: '13/11/2026 08:00:00',
+              estado: 'REPARTO',
+              descripcion: 'En reparto',
+              centro: 'SEUR Madrid',
+            },
+          ],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    }) as unknown as typeof fetch;
+
+    const engine = new LocalTrackingEngine();
+
+    // 1. Calling without postal code throws typed error
+    let postalErr: unknown;
+    try {
+      await engine.track({
+        trackingNumber: '36150127630406',
+        carrierHint: 'seur',
+      });
+    } catch (err) {
+      postalErr = err;
+    }
+    expect(isPostalCodeRequiredError(postalErr)).toBe(true);
+
+    // 2. Calling with postal code executes live SEUR query
+    const parcel = await engine.track({
+      trackingNumber: '36150127630406',
+      carrierHint: 'seur',
+      postalCode: '28001',
+    });
+
+    expect(capturedUrl).toContain('seur.com/livetracking');
+    expect(parcel.status).toBe('out_for_delivery');
+    expect(parcel.isLiveData).toBe(true);
   });
 });

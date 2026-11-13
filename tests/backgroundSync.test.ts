@@ -19,8 +19,6 @@ mock.module('@react-native-async-storage/async-storage', () => ({
   },
 }));
 
-
-
 mock.module('react-native', () => ({
   Platform: {
     OS: 'android',
@@ -65,11 +63,7 @@ mock.module('expo-sqlite', () => ({
 }));
 
 const BackgroundFetch = await import('expo-background-fetch');
-const {
-  ENGINE_LOCAL_FIRST_KEY,
-  REST_BASE_URL_KEY,
-  trackingEngineManager,
-} = await import('../src/infrastructure/engine');
+const { trackingEngineManager } = await import('../src/infrastructure/engine');
 const { parseInPostHtmlToParcel } = await import('../src/infrastructure/engine/inpostLive');
 const { parcelRepository } = await import('../src/infrastructure/storage/ParcelRepository');
 const { notificationService } = await import('../src/infrastructure/services/NotificationService');
@@ -83,13 +77,13 @@ const originalFetch = globalThis.fetch;
 function makeParcel(overrides: Partial<Parcel> = {}): Parcel {
   return {
     id: 'parcel-1',
-    trackingNumber: 'LP00561234567890',
+    trackingNumber: 'PQ4F6P0703418520134120K',
     customAlias: 'Teclado Mecánico',
-    carrier: findCarrierBySlug('cainiao'),
+    carrier: findCarrierBySlug('correos-spain'),
     status: 'in_transit',
     statusText: 'En tránsito',
     progress: 45,
-    origin: { code: 'CN', name: 'China' },
+    origin: { code: 'ES', name: 'España' },
     destination: { code: 'ES', name: 'España' },
     postalCode: '28001',
     daysInTransit: 4,
@@ -100,9 +94,9 @@ function makeParcel(overrides: Partial<Parcel> = {}): Parcel {
         date: '2026-11-10T10:00:00Z',
         status: 'in_transit',
         stage: 'transit',
-        description: 'En tránsito internacional',
-        carrierSlug: 'cainiao',
-        carrierName: 'Cainiao Global',
+        description: 'En tránsito hacia el centro de distribución',
+        carrierSlug: 'correos-spain',
+        carrierName: 'Correos España',
       },
     ],
     createdAt: '2026-11-08T08:00:00Z',
@@ -122,8 +116,7 @@ beforeEach(async () => {
   scheduledNotifications = [];
   storedParcels = [];
   notificationService.clearDeduplicationCache();
-  await trackingEngineManager.setLocalFirst(true);
-  await trackingEngineManager.setRestBaseUrl('http://localhost:8080');
+  await trackingEngineManager.hydrate();
 
   getAllSpy = spyOn(parcelRepository, 'getAll').mockImplementation(async () => storedParcels);
   saveSpy = spyOn(parcelRepository, 'save').mockImplementation(async (p: Parcel) => {
@@ -142,7 +135,7 @@ afterEach(() => {
   saveSpy?.mockRestore();
 });
 
-describe('BackgroundSyncService & Anti-False-Notification Guards', () => {
+describe('BackgroundSyncService & Anti-False-Notification Guards (100% Local-First)', () => {
   it('registers the background sync task with TaskManager', () => {
     expect(typeof definedTasks[BACKGROUND_SYNC_TASK]).toBe('function');
   });
@@ -164,64 +157,10 @@ describe('BackgroundSyncService & Anti-False-Notification Guards', () => {
     expect(storedParcels[0].status).toBe('in_transit');
   });
 
-  it('NEVER notifies or overwrites when an engine returns isLiveData: false (simulated response)', async () => {
-    const originalParcel = makeParcel({
-      trackingNumber: 'LP00561234567890',
-      carrier: findCarrierBySlug('cainiao'),
-      status: 'in_transit',
-      isLiveData: true,
-    });
-    storedParcels = [originalParcel];
-
-    // Switch to REST mode and have server return a simulated payload (is_live_data: false)
-    mockStorage[ENGINE_LOCAL_FIRST_KEY] = 'false';
-    mockStorage[REST_BASE_URL_KEY] = 'http://192.168.1.50:8080';
-
-    globalThis.fetch = (async () =>
-      new Response(
-        JSON.stringify({
-          tracking_number: 'LP00561234567890',
-          carrier: { slug: 'cainiao', name: 'Cainiao Global' },
-          status: 'out_for_delivery',
-          status_text: 'En reparto',
-          progress: 85,
-          days_in_transit: 5,
-          is_live_data: false,
-          updated_at: '2026-11-12T10:00:00Z',
-          events: [
-            {
-              date: '2026-11-12T09:00:00Z',
-              status: 'out_for_delivery',
-              stage: 'last_mile',
-              description: 'Simulated out for delivery',
-              carrier_slug: 'cainiao',
-              carrier_name: 'Cainiao Global',
-            },
-            {
-              date: '2026-11-11T09:00:00Z',
-              status: 'in_transit',
-              stage: 'transit',
-              description: 'Simulated transit',
-              carrier_slug: 'cainiao',
-              carrier_name: 'Cainiao Global',
-            },
-          ],
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )) as unknown as typeof fetch;
-
-    const result = await executeBackgroundSync();
-
-    expect(result).toBe(BackgroundFetch.BackgroundFetchResult.NoData);
-    expect(saveSpy).not.toHaveBeenCalled();
-    expect(scheduledNotifications).toHaveLength(0);
-    expect(storedParcels[0].status).toBe('in_transit');
-  });
-
   it('does NOT send a notification when returned live status equals current status', async () => {
     const originalParcel = makeParcel({
-      trackingNumber: 'LP00561234567890',
-      carrier: findCarrierBySlug('cainiao'),
+      trackingNumber: 'PQ4F6P0703418520134120K',
+      carrier: findCarrierBySlug('correos-spain'),
       status: 'in_transit',
       events: [
         {
@@ -229,39 +168,32 @@ describe('BackgroundSyncService & Anti-False-Notification Guards', () => {
           date: '2026-11-10T10:00:00Z',
           status: 'in_transit',
           stage: 'transit',
-          description: 'En tránsito internacional',
-          carrierSlug: 'cainiao',
-          carrierName: 'Cainiao Global',
+          description: 'En tránsito',
+          carrierSlug: 'correos-spain',
+          carrierName: 'Correos España',
         },
       ],
     });
     storedParcels = [originalParcel];
 
-    mockStorage[ENGINE_LOCAL_FIRST_KEY] = 'false';
-    mockStorage[REST_BASE_URL_KEY] = 'http://192.168.1.50:8080';
-
-    // Case 1: Identical status and identical event count -> NoData, no save, no notification
+    // Case 1: Identical status and events -> NoData, no save, no notification
     globalThis.fetch = (async () =>
       new Response(
         JSON.stringify({
-          tracking_number: 'LP00561234567890',
-          carrier: { slug: 'cainiao', name: 'Cainiao Global' },
-          status: 'in_transit',
-          status_text: 'En tránsito',
-          progress: 45,
-          days_in_transit: 5,
-          is_live_data: true,
-          updated_at: '2026-11-12T10:00:00Z',
-          events: [
-            {
-              date: '2026-11-10T10:00:00Z',
-              status: 'in_transit',
-              stage: 'transit',
-              description: 'En tránsito internacional',
-              carrier_slug: 'cainiao',
-              carrier_name: 'Cainiao Global',
-            },
-          ],
+          shipment: {
+            shipmentCode: 'PQ4F6P0703418520134120K',
+            status: 'TRANSITO',
+            statusDescription: 'En tránsito',
+            deliveryDate: null,
+            events: [
+              {
+                eventDate: '2026-11-10T10:00:00Z',
+                status: 'TRANSITO',
+                description: 'En tránsito',
+                location: 'Madrid',
+              },
+            ],
+          },
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       )) as unknown as typeof fetch;
@@ -275,32 +207,26 @@ describe('BackgroundSyncService & Anti-False-Notification Guards', () => {
     globalThis.fetch = (async () =>
       new Response(
         JSON.stringify({
-          tracking_number: 'LP00561234567890',
-          carrier: { slug: 'cainiao', name: 'Cainiao Global' },
-          status: 'in_transit',
-          status_text: 'En tránsito',
-          progress: 55,
-          days_in_transit: 5,
-          is_live_data: true,
-          updated_at: '2026-11-12T11:00:00Z',
-          events: [
-            {
-              date: '2026-11-12T10:00:00Z',
-              status: 'in_transit',
-              stage: 'customs',
-              description: 'Despacho de aduana completado',
-              carrier_slug: 'cainiao',
-              carrier_name: 'Cainiao Global',
-            },
-            {
-              date: '2026-11-10T10:00:00Z',
-              status: 'in_transit',
-              stage: 'transit',
-              description: 'En tránsito internacional',
-              carrier_slug: 'cainiao',
-              carrier_name: 'Cainiao Global',
-            },
-          ],
+          shipment: {
+            shipmentCode: 'PQ4F6P0703418520134120K',
+            status: 'TRANSITO',
+            statusDescription: 'En tránsito',
+            deliveryDate: null,
+            events: [
+              {
+                eventDate: '2026-11-12T10:00:00Z',
+                status: 'CLASIFICADO',
+                description: 'Clasificado en centro logístico destino',
+                location: 'Sevilla CTA',
+              },
+              {
+                eventDate: '2026-11-10T10:00:00Z',
+                status: 'TRANSITO',
+                description: 'En tránsito',
+                location: 'Madrid',
+              },
+            ],
+          },
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       )) as unknown as typeof fetch;
@@ -312,72 +238,10 @@ describe('BackgroundSyncService & Anti-False-Notification Guards', () => {
     expect(storedParcels[0].events).toHaveLength(2);
   });
 
-  it('hydrates persisted REST mode & URL in background and sends allowSimulated: false', async () => {
-    // Reset in-memory engine manager to defaults (Local = true, localhost:8080)
-    // while AsyncStorage holds user-configured REST mode + custom server URL
-    trackingEngineManager.rest.setBaseUrl('http://localhost:8080');
-    (trackingEngineManager as any).useLocalFirst = true;
-    mockStorage[ENGINE_LOCAL_FIRST_KEY] = 'false';
-    mockStorage[REST_BASE_URL_KEY] = 'https://tracking.mi-servidor.local:8443';
-
-    storedParcels = [
-      makeParcel({
-        trackingNumber: '1Z12345E0205271686',
-        carrier: findCarrierBySlug('ups'),
-        status: 'info_received',
-        postalCode: undefined,
-        destination: { code: 'ES', name: 'España' },
-      }),
-    ];
-
-    let capturedUrl = '';
-    let capturedBody: Record<string, any> = {};
-
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-      capturedUrl = String(input);
-      capturedBody = JSON.parse(String(init?.body || '{}'));
-      return new Response(
-        JSON.stringify({
-          tracking_number: '1Z12345E0205271686',
-          carrier: { slug: 'ups', name: 'UPS' },
-          status: 'info_received',
-          status_text: 'Información recibida',
-          progress: 15,
-          days_in_transit: 1,
-          is_live_data: true,
-          updated_at: '2026-11-12T10:00:00Z',
-          events: [
-            {
-              date: '2026-11-10T10:00:00Z',
-              status: 'info_received',
-              stage: 'created',
-              description: 'Etiqueta creada',
-              carrier_slug: 'ups',
-              carrier_name: 'UPS',
-            },
-          ],
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      );
-    }) as unknown as typeof fetch;
-
-    await executeBackgroundSync();
-
-    expect(trackingEngineManager.isLocalFirst()).toBe(false);
-    expect(trackingEngineManager.rest.getBaseUrl()).toBe('https://tracking.mi-servidor.local:8443');
-    expect(capturedUrl).toBe('https://tracking.mi-servidor.local:8443/api/v1/track');
-    expect(capturedBody.allow_simulated).toBe(false);
-    expect(capturedBody.destination_country).toBe('ES');
-    expect(capturedBody.carrier_hint).toBe('ups');
-  });
-
   it('updates parcel, preserves metadata, and emits exactly ONE coherent notification on verified live status change', async () => {
-    mockStorage[ENGINE_LOCAL_FIRST_KEY] = 'false';
-    mockStorage[REST_BASE_URL_KEY] = 'http://192.168.1.50:8080';
-
     const originalParcel = makeParcel({
       id: 'parcel-live-1',
-      trackingNumber: 'LP00561234567890',
+      trackingNumber: 'PQ4F6P0703418520134120K',
       customAlias: 'Monitor 4K',
       notes: 'Llamar al timbre 2B',
       postalCode: '28001',
@@ -390,32 +254,26 @@ describe('BackgroundSyncService & Anti-False-Notification Guards', () => {
     globalThis.fetch = (async () =>
       new Response(
         JSON.stringify({
-          tracking_number: 'LP00561234567890',
-          carrier: { slug: 'cainiao', name: 'Cainiao Global' },
-          status: 'out_for_delivery',
-          status_text: 'En reparto',
-          progress: 85,
-          days_in_transit: 6,
-          is_live_data: true,
-          updated_at: '2026-11-12T08:30:00Z',
-          events: [
-            {
-              date: '2026-11-12T08:15:00Z',
-              status: 'out_for_delivery',
-              stage: 'last_mile',
-              description: 'En reparto para entrega hoy',
-              carrier_slug: 'correosexpress',
-              carrier_name: 'Correos Express',
-            },
-            {
-              date: '2026-11-10T10:00:00Z',
-              status: 'in_transit',
-              stage: 'transit',
-              description: 'En tránsito internacional',
-              carrier_slug: 'cainiao',
-              carrier_name: 'Cainiao Global',
-            },
-          ],
+          shipment: {
+            shipmentCode: 'PQ4F6P0703418520134120K',
+            status: 'EN_REPARTO',
+            statusDescription: 'En reparto',
+            deliveryDate: null,
+            events: [
+              {
+                eventDate: '2026-11-13T08:15:00Z',
+                status: 'EN_REPARTO',
+                description: 'En reparto para entrega hoy',
+                location: 'Madrid',
+              },
+              {
+                eventDate: '2026-11-10T10:00:00Z',
+                status: 'TRANSITO',
+                description: 'En tránsito',
+                location: 'Madrid',
+              },
+            ],
+          },
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       )) as unknown as typeof fetch;
@@ -443,7 +301,7 @@ describe('BackgroundSyncService & Anti-False-Notification Guards', () => {
     expect(notif.content.data.oldStatus).toBe('in_transit');
     expect(notif.content.data.newStatus).toBe('out_for_delivery');
 
-    // Deduplication: even if sendParcelStatusNotification is invoked again for the same status, it does not duplicate
+    // Deduplication test
     const duplicateSent = await notificationService.sendParcelStatusNotification(
       saved,
       'in_transit',
@@ -454,23 +312,17 @@ describe('BackgroundSyncService & Anti-False-Notification Guards', () => {
   });
 
   it('ignores transient pending or empty responses so they do not regress status or notify', async () => {
-    mockStorage[ENGINE_LOCAL_FIRST_KEY] = 'false';
-    mockStorage[REST_BASE_URL_KEY] = 'http://192.168.1.50:8080';
-
     storedParcels = [makeParcel({ status: 'in_transit' })];
 
     globalThis.fetch = (async () =>
       new Response(
         JSON.stringify({
-          tracking_number: 'LP00561234567890',
-          carrier: { slug: 'cainiao', name: 'Cainiao Global' },
-          status: 'pending',
-          status_text: 'Pendiente',
-          progress: 5,
-          days_in_transit: 0,
-          is_live_data: true,
-          updated_at: '2026-11-12T08:30:00Z',
-          events: [],
+          shipment: {
+            shipmentCode: 'PQ4F6P0703418520134120K',
+            status: '',
+            statusDescription: '',
+            events: [],
+          },
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       )) as unknown as typeof fetch;
