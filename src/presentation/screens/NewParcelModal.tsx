@@ -49,14 +49,18 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
   const [cameraVisible, setCameraVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (initialTrackingNumber) {
-      setTrackingNumber(initialTrackingNumber);
-    }
-    if (initialCarrierSlug) {
-      setSelectedCarrierSlug(initialCarrierSlug);
-    }
-  }, [initialTrackingNumber, initialCarrierSlug]);
+  const [prevInitialNumber, setPrevInitialNumber] = useState(initialTrackingNumber);
+  const [prevInitialSlug, setPrevInitialSlug] = useState(initialCarrierSlug);
+
+  if (initialTrackingNumber !== prevInitialNumber) {
+    setPrevInitialNumber(initialTrackingNumber);
+    setTrackingNumber(initialTrackingNumber || '');
+  }
+
+  if (initialCarrierSlug !== prevInitialSlug) {
+    setPrevInitialSlug(initialCarrierSlug);
+    setSelectedCarrierSlug(initialCarrierSlug);
+  }
 
   useEffect(() => {
     let active = true;

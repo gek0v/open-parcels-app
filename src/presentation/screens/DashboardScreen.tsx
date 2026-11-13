@@ -172,17 +172,19 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   }, []);
 
   useEffect(() => {
-    void checkClipboard();
-  }, [checkClipboard, parcels]);
-
-  useEffect(() => {
     const sub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
       if (nextState === 'active') {
         void checkClipboard();
       }
     });
+
+    const timer = setTimeout(() => {
+      void checkClipboard();
+    }, 150);
+
     return () => {
       sub.remove();
+      clearTimeout(timer);
     };
   }, [checkClipboard]);
 
