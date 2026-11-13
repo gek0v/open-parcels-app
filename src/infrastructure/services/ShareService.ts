@@ -1,4 +1,4 @@
-import { Share } from 'react-native';
+import * as ReactNative from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Parcel } from '../../domain/models/parcel';
 
@@ -107,10 +107,12 @@ export class ShareService {
     try {
       const message = formatParcelShareSummary(parcel, options);
       const title = parcel.customAlias || parcel.trackingNumber;
-      await Share.share({
-        message,
-        title,
-      });
+      if (ReactNative.Share && typeof ReactNative.Share.share === 'function') {
+        await ReactNative.Share.share({
+          message,
+          title,
+        });
+      }
       return true;
     } catch (err) {
       console.warn('ShareService.shareParcel failed:', err);

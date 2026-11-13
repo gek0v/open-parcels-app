@@ -28,6 +28,7 @@ describe('NativeGoTrackingEngine On-Device Execution', () => {
     mock.module('react-native', () => ({
       Platform: { OS: 'ios', select: (obj: any) => obj.ios || obj.default },
       Linking: { openURL: async () => {} },
+      Share: { share: async () => ({ action: 'sharedAction' }) },
       TurboModuleRegistry: {
         get: () => ({
           isAvailable: () => available,

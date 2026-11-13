@@ -157,6 +157,9 @@ mock.module('react-native', () => ({
       openURLCalls.push(url);
     },
   },
+  Share: {
+    share: async () => ({ action: 'sharedAction' }),
+  },
   TurboModuleRegistry: {
     get: () => null,
   },
