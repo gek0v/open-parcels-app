@@ -5,15 +5,16 @@ import { AdaptiveCard } from '../common/AdaptiveCard';
 import { StatusBadge } from '../common/StatusBadge';
 import { ProgressBar } from '../common/ProgressBar';
 import { Theme } from '../../theme/adaptiveTheme';
-import { ArrowRight, Clock, Edit2 } from 'lucide-react-native';
+import { ArrowRight, Clock, Edit2, Share2 } from 'lucide-react-native';
 
 interface ParcelCardProps {
   parcel: Parcel;
   onPress: () => void;
   onRename?: () => void;
+  onShare?: () => void;
 }
 
-export const ParcelCard: React.FC<ParcelCardProps> = ({ parcel, onPress, onRename }) => {
+export const ParcelCard: React.FC<ParcelCardProps> = ({ parcel, onPress, onRename, onShare }) => {
   const latestEvent = parcel.events[parcel.events.length - 1];
   const isChained = !!(parcel.additionalCarriers && parcel.additionalCarriers.length > 0);
 
@@ -45,23 +46,42 @@ export const ParcelCard: React.FC<ParcelCardProps> = ({ parcel, onPress, onRenam
           <Text style={styles.alias} numberOfLines={1}>
             {parcel.customAlias || parcel.trackingNumber}
           </Text>
-          {onRename && (
-            <Pressable
-              accessibilityLabel="Renombrar paquete"
-              accessibilityRole="button"
-              onPress={(e) => {
-                e.stopPropagation();
-                onRename();
-              }}
-              style={({ pressed }) => [
-                styles.cardRenameButton,
-                pressed && styles.iconButtonPressed,
-              ]}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Edit2 size={13} color="#000000" strokeWidth={2.5} />
-            </Pressable>
-          )}
+          <View style={styles.actionButtonsRow}>
+            {onShare && (
+              <Pressable
+                accessibilityLabel="Compartir paquete"
+                accessibilityRole="button"
+                onPress={(e) => {
+                  e.stopPropagation();
+                  onShare();
+                }}
+                style={({ pressed }) => [
+                  styles.cardRenameButton,
+                  pressed && styles.iconButtonPressed,
+                ]}
+                hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+              >
+                <Share2 size={13} color="#000000" strokeWidth={2.5} />
+              </Pressable>
+            )}
+            {onRename && (
+              <Pressable
+                accessibilityLabel="Renombrar paquete"
+                accessibilityRole="button"
+                onPress={(e) => {
+                  e.stopPropagation();
+                  onRename();
+                }}
+                style={({ pressed }) => [
+                  styles.cardRenameButton,
+                  pressed && styles.iconButtonPressed,
+                ]}
+                hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+              >
+                <Edit2 size={13} color="#000000" strokeWidth={2.5} />
+              </Pressable>
+            )}
+          </View>
         </View>
 
         <View style={styles.trackingBox}>
@@ -151,6 +171,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  actionButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   cardRenameButton: {
     width: 28,

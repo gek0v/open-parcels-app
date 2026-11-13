@@ -33,6 +33,17 @@ export const es = {
     deliveredSub: 'HISTORIAL COMPLETADO',
     scanBtn: 'ESCANEAR',
     scanSub: 'CÁMARA / MANUAL',
+    avgDays: 'DÍAS MEDIOS',
+    avgDaysSub: 'TIEMPO ENTREGA',
+    topCarrier: 'TRANSPORTISTA TOP',
+    topCarrierSub: 'MÁS UTILIZADO',
+    pace: 'PUNTUALIDAD',
+    paceOptimal: 'ÓPTIMO',
+    paceNormal: 'NORMAL',
+    paceAlert: 'ATENCIÓN',
+    paceUpToDate: 'AL DÍA',
+    ofShipments: 'de envíos',
+    noData: 'Sin datos',
   },
 
   // Filters
@@ -94,6 +105,8 @@ export const es = {
     unarchive: 'DESARCHIVAR',
     delete: 'ELIMINAR',
     officialSite: 'CONSULTAR EN WEB OFICIAL',
+    copySummaryBtn: 'COPIAR RESUMEN',
+    shareSummaryBtn: 'COMPARTIR',
   },
 
   // Modals
@@ -158,6 +171,36 @@ export const es = {
     toastTitlePrefix: 'NUEVA VERSIÓN',
     toastSubtitle: 'Toca aquí para descargar e instalar',
     toastReadySubtitle: 'Descargado • Toca para instalar ahora',
+  },
+
+  // Backup & Restore
+  backup: {
+    title: 'COPIAS DE SEGURIDAD',
+    subtitle: 'Gestión local y privada de tus paquetes en JSON',
+    btnLabel: 'BACKUP',
+    exportCardTitle: 'EXPORTAR COPIA DE SEGURIDAD',
+    exportCardDesc: 'Guarda un archivo JSON con todos tus envíos, eventos y alias para salvaguardarlos o transferirlos.',
+    exportBtn: 'EXPORTAR ARCHIVO JSON',
+    exportSuccess: 'Copia de seguridad exportada con éxito (%d paquetes).',
+    exportError: 'No se pudo exportar la copia de seguridad.',
+    importCardTitle: 'RESTAURAR DESDE ARCHIVO JSON',
+    importCardDesc: 'Selecciona una copia previa. Se fusionarán los paquetes existentes sin duplicados.',
+    importBtn: 'SELECCIONAR ARCHIVO JSON',
+    importSuccessTitle: 'Restauración Completada',
+    importSuccessDesc: '%d nuevos paquetes importados, %d paquetes actualizados.',
+    importErrorTitle: 'Error de Restauración',
+    importInvalid: 'El archivo seleccionado no tiene una estructura válida de Open Parcels.',
+    close: 'CERRAR',
+  },
+
+  // Share
+  share: {
+    shareAria: 'Compartir datos del paquete',
+    copySummary: 'Copiar resumen',
+    shareSummary: 'Compartir resumen',
+    copiedToast: '¡Resumen estructurado copiado al portapapeles!',
+    copyBtn: 'COPIAR RESUMEN',
+    shareBtn: 'COMPARTIR',
   },
 };
 

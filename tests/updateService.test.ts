@@ -37,9 +37,7 @@ mock.module('@react-native-async-storage/async-storage', () => ({
   },
 }));
 
-mock.module('expo-file-system/legacy', () => ({
-  documentDirectory: 'file:///data/user/0/com.openparcels.app/files/',
-  cacheDirectory: 'file:///data/user/0/com.openparcels.app/cache/',
+const fsHandlers = {
   getInfoAsync: async (uri: string) => {
     const file = mockFiles[uri];
     if (!file || !file.exists) {
@@ -106,6 +104,14 @@ mock.module('expo-file-system/legacy', () => ({
     };
     return task;
   },
+};
+
+(globalThis as any).__mockFsHandlers = fsHandlers;
+
+mock.module('expo-file-system/legacy', () => ({
+  documentDirectory: 'file:///data/user/0/com.openparcels.app/files/',
+  cacheDirectory: 'file:///data/user/0/com.openparcels.app/cache/',
+  ...fsHandlers,
 }));
 
 mock.module('expo-intent-launcher', () => ({

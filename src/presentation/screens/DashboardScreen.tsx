@@ -7,9 +7,6 @@ import {
   RefreshControl,
   Pressable,
   TextInput,
-  Modal,
-  KeyboardAvoidingView,
-  Platform,
   AppState,
   AppStateStatus,
 } from 'react-native';
@@ -26,9 +23,11 @@ import { BentoStatsWidget } from '../components/dashboard/BentoStatsWidget';
 import { SegmentedFilter, FilterTab } from '../components/dashboard/SegmentedFilter';
 import { RenameParcelModal } from '../components/common/RenameParcelModal';
 import { ThemeSelectorModal } from '../components/common/ThemeSelectorModal';
+import { BackupModal } from '../components/common/BackupModal';
 import { ClipboardDetectedBanner } from '../components/dashboard/ClipboardDetectedBanner';
 import { useI18n } from '../../infrastructure/i18n';
 import { useTheme } from '../theme/ThemeContext';
+import { ShareService } from '../../infrastructure/services/ShareService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import {
@@ -42,6 +41,7 @@ import {
   Monitor,
   Languages,
   Palette,
+  HardDrive,
   Clock,
   Calendar,
   Truck,
@@ -73,6 +73,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const [sortBy, setSortBy] = useState<SortOption>('updated');
   const [renamingParcel, setRenamingParcel] = useState<Parcel | null>(null);
   const [isThemeModalVisible, setIsThemeModalVisible] = useState(false);
+  const [isBackupModalVisible, setIsBackupModalVisible] = useState(false);
 
   const [detectedClipboard, setDetectedClipboard] = useState<{
     trackingNumber: string;
@@ -206,6 +207,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     await loadParcels();
   };
 
+  const handleShareParcel = async (parcel: Parcel) => {
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    await ShareService.shareParcel(parcel);
+  };
+
   // Filter parcels according to active tab and search query
   const filteredParcels = parcels.filter((p) => {
     if (activeTab === 'archived') {
@@ -292,6 +300,17 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 <Palette size={12} color="#000000" strokeWidth={2.5} />
                 <Text style={styles.langToggleText}>TEMAS</Text>
               </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Copia de seguridad y restauración"
+                onPress={() => setIsBackupModalVisible(true)}
+                style={({ pressed }) => [styles.langToggleBtn, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }, pressed && styles.pressed]}
+                hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+              >
+                <HardDrive size={12} color="#000000" strokeWidth={2.5} />
+                <Text style={styles.langToggleText}>{t.backup.btnLabel}</Text>
+              </Pressable>
             </View>
           </View>
         </View>
@@ -302,6 +321,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         activeCount={counts.active}
         outForDeliveryCount={outForDeliveryCount}
         deliveredCount={counts.delivered}
+        parcels={parcels}
         onScanPress={onOpenNewParcel}
       />
 
@@ -558,6 +578,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               parcel,
               onPress: () => onSelectParcel(parcel),
               onRename: () => setRenamingParcel(parcel),
+              onShare: () => handleShareParcel(parcel),
             };
 
             if (cardStyle === 'industrial') {
@@ -616,6 +637,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       <ThemeSelectorModal
         visible={isThemeModalVisible}
         onClose={() => setIsThemeModalVisible(false)}
+      />
+
+      {/* Modal for Backup & Restore JSON */}
+      <BackupModal
+        visible={isBackupModalVisible}
+        onClose={() => setIsBackupModalVisible(false)}
+        onRestoreSuccess={loadParcels}
       />
     </View>
   );

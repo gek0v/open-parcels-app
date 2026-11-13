@@ -7,7 +7,6 @@ import {
   Pressable,
   Alert,
   Linking,
-  Share,
   ActivityIndicator,
 } from 'react-native';
 import { Parcel } from '../../domain/models/parcel';
@@ -31,7 +30,9 @@ import {
   Calendar,
   Edit2,
   RefreshCw,
+  Copy,
 } from 'lucide-react-native';
+import { ShareService } from '../../infrastructure/services/ShareService';
 
 interface ParcelDetailScreenProps {
   parcel: Parcel;
@@ -105,9 +106,16 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
 
   const handleShare = async () => {
     try {
-      await Share.share({
-        message: `📦 Envío Open Parcels: ${parcel.customAlias || ''} (${parcel.trackingNumber})\nEstado: ${parcel.statusText} (${parcel.progress}%)\nTransportista: ${parcel.carrier.name}`,
-      });
+      await ShareService.shareParcel(parcel);
+    } catch {}
+  };
+
+  const handleCopySummary = async () => {
+    try {
+      const ok = await ShareService.copyParcelSummary(parcel);
+      if (ok) {
+        Alert.alert('Copiado', '¡Resumen estructurado copiado al portapapeles!');
+      }
     } catch {}
   };
 
@@ -343,6 +351,37 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
 
         {/* Multi-Carrier Journey Flow Component */}
         <JourneyFlow parcel={parcel} />
+
+        {/* Share and Copy Summary Actions */}
+        <View style={styles.shareButtonsRow}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Compartir resumen del envío"
+            onPress={handleShare}
+            style={({ pressed }) => [
+              styles.shareActionButton,
+              { backgroundColor: theme.yellow, borderColor: theme.border },
+              pressed && styles.pressed,
+            ]}
+          >
+            <Share2 size={15} color="#000000" strokeWidth={2.5} />
+            <Text style={styles.shareActionText}>COMPARTIR</Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Copiar resumen del envío al portapapeles"
+            onPress={handleCopySummary}
+            style={({ pressed }) => [
+              styles.shareActionButton,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+              pressed && styles.pressed,
+            ]}
+          >
+            <Copy size={15} color={theme.textPrimary} strokeWidth={2.5} />
+            <Text style={[styles.shareActionText, { color: theme.textPrimary }]}>COPIAR RESUMEN</Text>
+          </Pressable>
+        </View>
 
         {/* Carrier Official Website Action Button */}
         <Pressable
@@ -654,6 +693,37 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#000000',
     letterSpacing: 0.5,
+  },
+  shareButtonsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginHorizontal: 20,
+    marginBottom: 16,
+  },
+  shareActionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: 44,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: Theme.radius.sm,
+    borderWidth: 2,
+    borderColor: '#000000',
+    shadowColor: '#000000',
+    shadowOffset: { width: 2.5, height: 2.5 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 3,
+    ...(Theme.isWeb ? ({ boxShadow: '2.5px 2.5px 0px #000000' } as any) : {}),
+  },
+  shareActionText: {
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.4,
+    color: '#000000',
   },
   carrierLinkButton: {
     flexDirection: 'row',
