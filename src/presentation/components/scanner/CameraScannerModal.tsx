@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Modal, Pressable, Platform } from 'react-native
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Theme } from '../../theme/adaptiveTheme';
 import { X, Flashlight, Barcode } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 
 interface CameraScannerModalProps {
   visible: boolean;
@@ -19,10 +20,23 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
   const [torchEnabled, setTorchEnabled] = useState(false);
   const [scanned, setScanned] = useState(false);
 
-  const handleBarcodeScanned = ({ data }: { data: string }) => {
+  const handleBarcodeScanned = async ({ data }: { data: string }) => {
     if (scanned) return;
     setScanned(true);
+
+    try {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {}
+
     onScanResult(data);
+    onClose();
+  };
+
+  const handleSampleSelected = async (code: string) => {
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+    onScanResult(code);
     onClose();
   };
 
@@ -42,6 +56,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
             accessibilityRole="button"
             accessibilityLabel="Cerrar escáner"
             onPress={onClose}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             style={({ pressed }) => [styles.iconButton, pressed && styles.controlPressed]}
           >
             <X size={24} color="#FFF" strokeWidth={2.5} />
@@ -54,7 +69,13 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Alternar linterna"
-            onPress={() => setTorchEnabled(!torchEnabled)}
+            onPress={async () => {
+              try {
+                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              } catch {}
+              setTorchEnabled(!torchEnabled);
+            }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             style={({ pressed }) => [
               styles.iconButton,
               torchEnabled && styles.iconButtonActive,
@@ -78,6 +99,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                 accessibilityLabel="Conceder permiso de cámara"
                 onPress={requestPermission}
                 style={({ pressed }) => [styles.grantButton, pressed && styles.controlPressed]}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <Text style={styles.grantButtonText}>CONCEDER PERMISO</Text>
               </Pressable>
@@ -124,10 +146,8 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                 key={s.code}
                 accessibilityRole="button"
                 accessibilityLabel={`Probar código ${s.label}`}
-                onPress={() => {
-                  onScanResult(s.code);
-                  onClose();
-                }}
+                onPress={() => handleSampleSelected(s.code)}
+                hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
                 style={({ pressed }) => [styles.sampleChip, pressed && styles.sampleChipPressed]}
               >
                 <Text style={styles.sampleChipText}>{s.label}</Text>
@@ -166,6 +186,10 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   iconButton: {
+    minWidth: 48,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
     padding: 8,
     borderRadius: Theme.radius.sm,
     borderWidth: 2,
@@ -258,6 +282,8 @@ const styles = StyleSheet.create({
   },
   grantButton: {
     backgroundColor: Theme.colors.primary,
+    minHeight: 48,
+    justifyContent: 'center',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: Theme.radius.sm,
@@ -290,8 +316,10 @@ const styles = StyleSheet.create({
   },
   sampleChip: {
     backgroundColor: '#F1F5F9',
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    minHeight: 48,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: Theme.radius.sm,
     borderWidth: 2,
     borderColor: '#000000',
