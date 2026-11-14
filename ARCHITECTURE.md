@@ -28,7 +28,7 @@
 │                   Capa de Presentación                  │
 │  - Dashboard: Bento Hero Widget, Segmented Filters     │
 │  - Detail Screen: Journey Flow, Event Timeline         │
-│  - Modales: Camera Scanner, Rename, Delete, Update     │
+│  - Modales: Theme Selector, Rename, Delete, Update     │
 │  - Design System: Neo-Brutalist Theme Tokens           │
 └───────────────────────────┬────────────────────────────┘
                             │

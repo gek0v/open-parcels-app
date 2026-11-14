@@ -26,8 +26,8 @@
 5. **Sistema de Diseño Adaptativo (Adaptive HIG / Material You):**
    - **iOS:** Filosofía Human Interface Guidelines con estética limpia, tipografía SF Pro, bordes suaves, desenfoque y cabeceras nativas.
    - **Android:** Material Design 3 con superficies tonales, Floating Action Button (FAB) expresivo y elevación visual.
-6. **Escaneo de Código de Barras y QR con Cámara:**
-   - Lector integrado con `expo-camera` para Code 128, Code 39, QR y DataMatrix en paquetes físicos o pantallas.
+6. **Autodetección reactiva y portapapeles:**
+   - Detección automática al teclear o pegar números de seguimiento, con banner de portapapeles en tiempo real.
 
 ---
 
@@ -61,7 +61,7 @@ open-parcels-app/
 │       ├── components/
 │       │   ├── common/             # AdaptiveCard, ProgressBar, StatusBadge, AdaptiveHeader
 │       │   ├── dashboard/          # ParcelCard, SegmentedFilter
-│       │   ├── scanner/            # CameraScannerModal, CarrierDetectorBar
+│       │   ├── scanner/            # CarrierDetectorBar
 │       │   └── detail/             # JourneyFlow, EventTimeline
 │       └── screens/
 │           ├── DashboardScreen.tsx # Lista con tabs, buscador, FAB y toggle de motor

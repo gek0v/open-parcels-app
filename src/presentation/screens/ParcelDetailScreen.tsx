@@ -33,6 +33,7 @@ import {
   Copy,
 } from 'lucide-react-native';
 import { ShareService } from '../../infrastructure/services/ShareService';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface ParcelDetailScreenProps {
   parcel: Parcel;
@@ -52,6 +53,7 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
   onParcelUpdated,
 }) => {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const [renameModalVisible, setRenameModalVisible] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -139,7 +141,7 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
   return (
     <View style={[styles.container, { backgroundColor: theme.canvas }]}>
       {/* Top Navigation Bar */}
-      <View style={[styles.navBar, { backgroundColor: theme.canvas }]}>
+      <View style={[styles.navBar, { backgroundColor: theme.canvas, paddingTop: Math.max(insets.top + 8, 20) }]}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Volver al listado"
@@ -228,7 +230,7 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom + 24, 32) }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Main Status & Progress Hero Card */}
@@ -248,7 +250,7 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
             <View style={styles.progressHeader}>
               <Text style={[styles.progressLabel, { color: theme.textTertiary }]}>PROGRESO DEL ENVÍO</Text>
               <View style={[styles.progressPercentBadge, { backgroundColor: theme.yellow, borderColor: theme.border }]}>
-                <Text style={[styles.progressPercent, { color: theme.textPrimary }]}>{parcel.progress}%</Text>
+                <Text style={[styles.progressPercent, { color: '#000000' }]}>{parcel.progress}%</Text>
               </View>
             </View>
             <ProgressBar progress={parcel.progress} status={parcel.status} height={14} />
@@ -270,8 +272,8 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
                   ]}
                   hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                 >
-                  <Edit2 size={11} color={theme.textPrimary} strokeWidth={2.5} />
-                  <Text style={[styles.inlineRenameText, { color: theme.textPrimary }]}>EDITAR</Text>
+                  <Edit2 size={11} color="#000000" strokeWidth={2.5} />
+                  <Text style={[styles.inlineRenameText, { color: '#000000' }]}>EDITAR</Text>
                 </Pressable>
               </View>
               <Text style={[styles.metaAliasText, { color: theme.textPrimary }]} numberOfLines={1}>
@@ -296,23 +298,23 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
           </View>
 
           {(!!parcel.serviceType || !!parcel.weight || !!parcel.lastMileTrackingNumber) && (
-            <View style={styles.metaBox}>
+            <View style={[styles.metaBox, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
               {!!parcel.serviceType && (
                 <View style={styles.metaItem}>
-                  <Text style={styles.metaLabel}>SERVICIO</Text>
-                  <Text style={styles.metaValue} numberOfLines={1}>{parcel.serviceType}</Text>
+                  <Text style={[styles.metaLabel, { color: theme.textTertiary }]}>SERVICIO</Text>
+                  <Text style={[styles.metaValue, { color: theme.textPrimary }]} numberOfLines={1}>{parcel.serviceType}</Text>
                 </View>
               )}
               {!!parcel.weight && (
-                <View style={[styles.metaItem, styles.postalItem]}>
-                  <Text style={styles.metaLabel}>PESO</Text>
-                  <Text style={styles.metaValue}>{parcel.weight}</Text>
+                <View style={[styles.metaItem, styles.postalItem, { borderLeftColor: theme.border }]}>
+                  <Text style={[styles.metaLabel, { color: theme.textTertiary }]}>PESO</Text>
+                  <Text style={[styles.metaValue, { color: theme.textPrimary }]}>{parcel.weight}</Text>
                 </View>
               )}
               {!!parcel.lastMileTrackingNumber && !parcel.weight && (
-                <View style={[styles.metaItem, styles.postalItem]}>
-                  <Text style={styles.metaLabel}>ÚLTIMA MILLA</Text>
-                  <Text style={styles.metaValueMono} numberOfLines={1}>{parcel.lastMileTrackingNumber}</Text>
+                <View style={[styles.metaItem, styles.postalItem, { borderLeftColor: theme.border }]}>
+                  <Text style={[styles.metaLabel, { color: theme.textTertiary }]}>ÚLTIMA MILLA</Text>
+                  <Text style={[styles.metaValueMono, { color: theme.textPrimary }]} numberOfLines={1}>{parcel.lastMileTrackingNumber}</Text>
                 </View>
               )}
             </View>

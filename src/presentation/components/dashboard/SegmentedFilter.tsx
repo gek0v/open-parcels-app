@@ -31,7 +31,15 @@ export const SegmentedFilter: React.FC<SegmentedFilterProps> = ({
   ];
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: theme.surfaceSubtle,
+          borderColor: theme.border,
+        },
+      ]}
+    >
       {tabs.map((tab) => {
         const isActive = activeTab === tab.key;
         return (
@@ -43,19 +51,45 @@ export const SegmentedFilter: React.FC<SegmentedFilterProps> = ({
             onPress={() => onTabChange(tab.key)}
             style={({ pressed }) => [
               styles.tab,
-              isActive && [styles.activeTab, { backgroundColor: tab.color }],
+              isActive
+                ? [
+                    styles.activeTab,
+                    {
+                      backgroundColor: tab.color,
+                      borderColor: theme.border,
+                    },
+                  ]
+                : styles.inactiveTab,
               pressed && styles.pressed,
             ]}
           >
             <Text
               numberOfLines={1}
-              style={[styles.tabLabel, isActive && styles.activeTabLabel]}
+              style={[
+                styles.tabLabel,
+                { color: isActive ? '#000000' : theme.textPrimary },
+                isActive && styles.activeTabLabel,
+              ]}
             >
               {tab.label}
             </Text>
             {tab.count > 0 && (
-              <View style={styles.countBadge}>
-                <Text style={styles.countText}>{tab.count}</Text>
+              <View
+                style={[
+                  styles.countBadge,
+                  {
+                    backgroundColor: isActive ? '#000000' : theme.surfaceDark,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.countText,
+                    { color: isActive ? '#FFFFFF' : theme.textInverse },
+                  ]}
+                >
+                  {tab.count}
+                </Text>
               </View>
             )}
           </Pressable>
@@ -68,9 +102,13 @@ export const SegmentedFilter: React.FC<SegmentedFilterProps> = ({
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 4,
     marginHorizontal: 20,
-    marginBottom: 16,
+    marginBottom: 14,
+    padding: 4,
+    borderRadius: Theme.radius.sm,
+    borderWidth: 2,
+    ...Theme.shadows.sm,
   },
   tab: {
     flex: 1,
@@ -78,24 +116,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 9,
+    paddingVertical: 8,
     paddingHorizontal: 6,
-    borderRadius: Theme.radius.sm,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#000000',
-    ...Theme.shadows.sm,
+    borderRadius: Theme.radius.xs,
   },
   activeTab: {
-    borderWidth: 2.5,
+    borderWidth: 2,
+    ...Theme.shadows.sm,
+  },
+  inactiveTab: {
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
   pressed: {
-    ...Theme.pressed,
+    opacity: 0.85,
   },
   tabLabel: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#000000',
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
@@ -108,13 +147,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: Theme.radius.xs,
-    backgroundColor: '#000000',
     alignItems: 'center',
     justifyContent: 'center',
   },
   countText: {
     fontSize: 10,
     fontWeight: '900',
-    color: '#FFFFFF',
   },
 });

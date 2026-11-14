@@ -8,9 +8,11 @@ import {
   Platform,
 } from 'react-native';
 import { Theme } from '../../theme/adaptiveTheme';
+import { useTheme } from '../../theme/ThemeContext';
 import { UpdateInfo, updateService } from '../../../infrastructure/services/UpdateService';
 import { Sparkles, Download, X, Check } from 'lucide-react-native';
 import { useI18n } from '../../../infrastructure/i18n';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface UpdateToastProps {
   updateInfo: UpdateInfo;
@@ -24,6 +26,8 @@ export const UpdateToast: React.FC<UpdateToastProps> = ({
   onDismiss,
 }) => {
   const { t } = useI18n();
+  const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const [slideAnim] = useState(() => new Animated.Value(-120));
   const [opacityAnim] = useState(() => new Animated.Value(0));
   const [isDownloaded, setIsDownloaded] = useState(false);
@@ -78,6 +82,7 @@ export const UpdateToast: React.FC<UpdateToastProps> = ({
       style={[
         styles.toastWrapper,
         {
+          top: Math.max(insets.top + 8, 16),
           transform: [{ translateY: slideAnim }],
           opacity: opacityAnim,
         },
@@ -87,10 +92,14 @@ export const UpdateToast: React.FC<UpdateToastProps> = ({
         accessibilityRole="button"
         accessibilityLabel={`${t.updateModal.title}: v${updateInfo.version}. ${isDownloaded ? t.updateModal.toastReadySubtitle : t.updateModal.toastSubtitle}`}
         onPress={onPress}
-        style={({ pressed }) => [styles.toastCard, pressed && styles.pressed]}
+        style={({ pressed }) => [
+          styles.toastCard,
+          { backgroundColor: theme.yellow, borderColor: theme.border },
+          pressed && styles.pressed,
+        ]}
       >
         {/* Left Badge Icon */}
-        <View style={[styles.iconCircle, isDownloaded && styles.iconCircleReady]}>
+        <View style={[styles.iconCircle, { borderColor: theme.border }, isDownloaded && { backgroundColor: theme.mint }]}>
           {isDownloaded ? (
             <Check size={16} color="#000000" strokeWidth={3} />
           ) : (
@@ -105,7 +114,7 @@ export const UpdateToast: React.FC<UpdateToastProps> = ({
               {t.updateModal.toastTitlePrefix} v{updateInfo.version}
             </Text>
             {updateInfo.apkSizeMb && (
-              <View style={styles.sizePill}>
+              <View style={[styles.sizePill, { borderColor: theme.border }]}>
                 <Text style={styles.sizePillText}>{updateInfo.apkSizeMb} MB</Text>
               </View>
             )}
@@ -116,7 +125,7 @@ export const UpdateToast: React.FC<UpdateToastProps> = ({
         </View>
 
         {/* Action Button */}
-        <View style={[styles.actionBtn, isDownloaded && styles.actionBtnReady]}>
+        <View style={[styles.actionBtn, { borderColor: theme.border }, isDownloaded && styles.actionBtnReady]}>
           <Download size={13} color="#FFFFFF" strokeWidth={3} />
           <Text style={styles.actionBtnText}>
             {isDownloaded ? t.updateModal.installNowBtn : t.updateModal.updateBtn}
@@ -128,8 +137,8 @@ export const UpdateToast: React.FC<UpdateToastProps> = ({
           accessibilityRole="button"
           accessibilityLabel={t.updateModal.laterBtn}
           onPress={handleDismiss}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          style={({ pressed }) => [styles.dismissBtn, pressed && styles.pressed]}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          style={({ pressed }) => [styles.dismissBtn, { borderColor: theme.border }, pressed && styles.pressed]}
         >
           <X size={14} color="#000000" strokeWidth={3} />
         </Pressable>
@@ -141,7 +150,6 @@ export const UpdateToast: React.FC<UpdateToastProps> = ({
 const styles = StyleSheet.create({
   toastWrapper: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 54 : 16,
     left: 16,
     right: 16,
     zIndex: 999999,
@@ -152,12 +160,10 @@ const styles = StyleSheet.create({
     maxWidth: 520,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Theme.colors.yellow, // Cyber Yellow
     borderRadius: Theme.radius.sm,
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderWidth: Theme.borders.width,
-    borderColor: '#000000',
     ...Theme.shadows.md,
   },
   iconCircle: {

@@ -85,7 +85,7 @@ export const es = {
     noDelivered: 'NO HAY PAQUETES ENTREGADOS',
     noArchived: 'NO HAY ENVÍOS ARCHIVADOS',
     subNoResults: 'Prueba con otro término de búsqueda o número de albarán.',
-    subActive: 'Pulsa el botón "+" o "ESCANEAR" para registrar tu primer paquete escaneando su código de barras o introduciendo el número.',
+    subActive: 'Pulsa el botón "+" o "RASTREAR PRIMER ENVÍO" para registrar tu paquete introduciendo el número de seguimiento.',
     trackFirstBtn: 'RASTREAR PRIMER ENVÍO',
   },
 
@@ -112,7 +112,7 @@ export const es = {
   // Modals
   newParcelModal: {
     title: 'NUEVO SEGUIMIENTO',
-    subtitle: 'Introduce el código o escanea la etiqueta',
+    subtitle: 'Introduce el código o número de seguimiento',
     trackingNumberLabel: 'NÚMERO DE SEGUIMIENTO',
     trackingPlaceholder: 'ej. 1Z9999999999999999 o PQ481920391ES',
     postalCodeLabel: 'CÓDIGO POSTAL (OBLIGATORIO)',
