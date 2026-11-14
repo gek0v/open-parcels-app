@@ -14,13 +14,13 @@ import {
 import { Theme } from '../theme/adaptiveTheme';
 import { useTheme } from '../theme/ThemeContext';
 import { useI18n } from '../../infrastructure/i18n';
-import { CameraScannerModal } from '../components/scanner/CameraScannerModal';
 import { CarrierDetectorBar } from '../components/scanner/CarrierDetectorBar';
 import { trackingEngineManager } from '../../infrastructure/engine';
 import { parcelRepository } from '../../infrastructure/storage/ParcelRepository';
 import { DetectedCarrier } from '../../domain/models/carrier';
 import { Parcel } from '../../domain/models/parcel';
-import { X, Camera, Plus, ShieldAlert, Cpu } from 'lucide-react-native';
+import { X, Plus, ShieldAlert, Cpu } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
 interface NewParcelModalProps {
@@ -40,13 +40,13 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
 }) => {
   const { theme } = useTheme();
   const { t } = useI18n();
+  const insets = useSafeAreaInsets();
   const [trackingNumber, setTrackingNumber] = useState(initialTrackingNumber || '');
   const [customAlias, setCustomAlias] = useState('');
   const [postalCode, setPostalCode] = useState('');
   const [selectedCarrierSlug, setSelectedCarrierSlug] = useState<string | undefined>(initialCarrierSlug);
   const [candidates, setCandidates] = useState<DetectedCarrier[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [cameraVisible, setCameraVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [prevInitialNumber, setPrevInitialNumber] = useState(initialTrackingNumber);
@@ -177,7 +177,16 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
       >
         <View style={[styles.container, { backgroundColor: theme.canvas, borderColor: theme.border }]}>
           {/* Header */}
-          <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
+          <View
+            style={[
+              styles.header,
+              {
+                backgroundColor: theme.surface,
+                borderBottomColor: theme.border,
+                paddingTop: Math.max(insets.top, 16),
+              },
+            ]}
+          >
             <View style={styles.headerCopy}>
               <View style={styles.windowDots}>
                 <View style={[styles.dot, { backgroundColor: theme.coral, borderColor: theme.border }]} />
@@ -211,16 +220,16 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
 
           <ScrollView
             style={styles.content}
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom + 24, 32) }]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            {/* Tracking Number Input & Scanner Trigger */}
+            {/* Tracking Number Input */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.fieldLabel, { color: theme.textPrimary }]}>
                 {t.newParcelModal.trackingNumberLabel} *
               </Text>
-              <View style={[styles.inputWithActions, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <View style={[styles.inputBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                 <TextInput
                   accessibilityLabel={t.newParcelModal.trackingNumberLabel}
                   style={[styles.mainInput, { color: theme.textPrimary }]}
@@ -235,24 +244,6 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
                   autoCorrect={false}
                   returnKeyType="done"
                 />
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={t.newParcelModal.cameraScanBtn || 'Escanear código de barras'}
-                  onPress={async () => {
-                    try {
-                      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    } catch {}
-                    setCameraVisible(true);
-                  }}
-                  style={({ pressed }) => [
-                    styles.scannerIconButton,
-                    { backgroundColor: theme.yellow, borderColor: theme.border },
-                    pressed && styles.smallPressed,
-                  ]}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Camera size={22} color="#000000" strokeWidth={2.5} />
-                </Pressable>
               </View>
               <Text style={[styles.helperText, { color: theme.textSecondary }]}>
                 {t.newParcelModal.subtitle || 'Detectamos el transportista automáticamente al escribir el código.'}
@@ -336,13 +327,6 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
               )}
             </Pressable>
           </ScrollView>
-
-          {/* Camera Scanner Modal */}
-          <CameraScannerModal
-            visible={cameraVisible}
-            onClose={() => setCameraVisible(false)}
-            onScanResult={(scanned) => setTrackingNumber(scanned)}
-          />
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -440,19 +424,18 @@ const styles = StyleSheet.create({
     marginBottom: 7,
     letterSpacing: 0.6,
   },
-  inputWithActions: {
+  inputBox: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: Theme.radius.sm,
     borderWidth: 2.5,
-    paddingLeft: 12,
-    paddingRight: 6,
-    height: 56,
+    paddingHorizontal: 14,
+    height: 54,
     ...Theme.shadows.md,
   },
   mainInput: {
     flex: 1,
-    height: 50,
+    height: 48,
     fontSize: 14,
     fontFamily: Theme.isIOS ? 'Courier' : 'monospace',
     fontWeight: '700',
@@ -462,16 +445,6 @@ const styles = StyleSheet.create({
     marginTop: 7,
     fontSize: 10,
     fontWeight: '700',
-  },
-  scannerIconButton: {
-    minWidth: 48,
-    minHeight: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: Theme.radius.xs,
-    borderWidth: 2,
-    marginLeft: 6,
-    ...Theme.shadows.sm,
   },
   standardInput: {
     height: 52,

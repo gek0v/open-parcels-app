@@ -30,6 +30,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { ShareService } from '../../infrastructure/services/ShareService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Plus,
   Search,
@@ -64,6 +65,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 }) => {
   const { t, lang, toggleLang } = useI18n();
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const [parcels, setParcels] = useState<Parcel[]>([]);
   const [activeTab, setActiveTab] = useState<FilterTab>('active');
   const [searchQuery, setSearchQuery] = useState('');
@@ -262,7 +264,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   return (
     <View style={[styles.container, { backgroundColor: theme.canvas }]}>
       {/* Top Bar with Brand and Mode Toggle */}
-      <View style={[styles.topBar, { backgroundColor: theme.canvas }]}>
+      <View style={[styles.topBar, { backgroundColor: theme.canvas, paddingTop: Math.max(insets.top + 8, 20) }]}>
         <View style={styles.brandRow}>
           <View style={[styles.brandBadge, { backgroundColor: theme.yellow, borderColor: theme.border }]}>
             <Package size={22} color="#000000" strokeWidth={2.5} />
@@ -273,10 +275,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             </Text>
             <View style={styles.headerChipsRow}>
               <View
-                style={[styles.engineBadge, { backgroundColor: theme.yellow, borderColor: theme.border }]}
+                style={[styles.engineBadge, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}
               >
-                <Cpu size={12} color="#000000" strokeWidth={2.5} />
-                <Text style={styles.engineBadgeText}>LOCAL-FIRST</Text>
+                <Cpu size={12} color={theme.textPrimary} strokeWidth={2.5} />
+                <Text style={[styles.engineBadgeText, { color: theme.textPrimary }]}>LOCAL</Text>
               </View>
 
               <Pressable
@@ -286,8 +288,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 style={({ pressed }) => [styles.langToggleBtn, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }, pressed && styles.pressed]}
                 hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
               >
-                <Languages size={12} color="#000000" strokeWidth={2.5} />
-                <Text style={styles.langToggleText}>{lang.toUpperCase()}</Text>
+                <Languages size={12} color={theme.textPrimary} strokeWidth={2.5} />
+                <Text style={[styles.langToggleText, { color: theme.textPrimary }]}>{lang.toUpperCase()}</Text>
               </Pressable>
 
               <Pressable
@@ -297,8 +299,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 style={({ pressed }) => [styles.langToggleBtn, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }, pressed && styles.pressed]}
                 hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
               >
-                <Palette size={12} color="#000000" strokeWidth={2.5} />
-                <Text style={styles.langToggleText}>TEMAS</Text>
+                <Palette size={12} color={theme.textPrimary} strokeWidth={2.5} />
+                <Text style={[styles.langToggleText, { color: theme.textPrimary }]}>TEMAS</Text>
               </Pressable>
 
               <Pressable
@@ -308,27 +310,26 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 style={({ pressed }) => [styles.langToggleBtn, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }, pressed && styles.pressed]}
                 hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
               >
-                <HardDrive size={12} color="#000000" strokeWidth={2.5} />
-                <Text style={styles.langToggleText}>{t.backup.btnLabel}</Text>
+                <HardDrive size={12} color={theme.textPrimary} strokeWidth={2.5} />
+                <Text style={[styles.langToggleText, { color: theme.textPrimary }]}>{t.backup.btnLabel}</Text>
               </Pressable>
             </View>
           </View>
         </View>
       </View>
 
-      {/* Hero Bento Stats Widget */}
+      {/* Hero Bento Stats Widget (Compact, Themed, Zero Camera) */}
       <BentoStatsWidget
         activeCount={counts.active}
         outForDeliveryCount={outForDeliveryCount}
         deliveredCount={counts.delivered}
         parcels={parcels}
-        onScanPress={onOpenNewParcel}
       />
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <View style={[styles.searchBox, { backgroundColor: theme.surface, borderColor: theme.border }, isSearchFocused && styles.searchBoxFocused]}>
-          <Search size={18} color="#000000" strokeWidth={2.5} style={styles.searchIcon} />
+          <Search size={18} color={theme.textTertiary} strokeWidth={2.5} style={styles.searchIcon} />
           <TextInput
             accessibilityLabel={t.search.searchAria}
             style={[styles.searchInput, { color: theme.textPrimary }]}
@@ -350,7 +351,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               style={({ pressed }) => [styles.clearSearch, pressed && styles.clearSearchPressed]}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <X size={16} color="#000000" strokeWidth={2.5} />
+              <X size={16} color={theme.textPrimary} strokeWidth={2.5} />
             </Pressable>
           )}
         </View>
@@ -359,180 +360,158 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       {/* Segmented Filter */}
       <SegmentedFilter activeTab={activeTab} onTabChange={setActiveTab} counts={counts} />
 
-      {/* Sorting & Card Style Controls */}
+      {/* Compact Sorting & Card Style Controls */}
       <View style={styles.controlsBar}>
         {/* Sort Selector */}
-        <View style={styles.controlGroup}>
-          <Text style={[styles.controlLabel, { color: theme.textSecondary }]}>
-            {t.sort.label}
-          </Text>
-          <View style={styles.controlTabs}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`${t.sort.updated} - Ordenar por más reciente`}
-              onPress={() => handleSortChange('updated')}
-              style={({ pressed }) => [
-                styles.controlBtn,
-                { backgroundColor: theme.surface, borderColor: theme.border },
-                sortBy === 'updated' && [styles.controlBtnActive, { backgroundColor: theme.yellow }],
-                pressed && styles.pressed,
+        <View style={styles.controlTabs}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${t.sort.updated} - Ordenar por más reciente`}
+            onPress={() => handleSortChange('updated')}
+            style={({ pressed }) => [
+              styles.controlBtn,
+              {
+                backgroundColor: sortBy === 'updated' ? theme.yellow : theme.surfaceSubtle,
+                borderColor: theme.border,
+              },
+              pressed && styles.pressed,
+            ]}
+            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+          >
+            <Clock size={11} color={sortBy === 'updated' ? '#000000' : theme.textSecondary} strokeWidth={2.5} />
+            <Text
+              style={[
+                styles.controlBtnText,
+                { color: sortBy === 'updated' ? '#000000' : theme.textSecondary },
+                sortBy === 'updated' && styles.controlBtnTextActive,
               ]}
-              hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
             >
-              <Clock size={11} color={sortBy === 'updated' ? '#000000' : theme.textTertiary} strokeWidth={2.5} />
-              <Text
-                style={[
-                  styles.controlBtnText,
-                  { color: theme.textTertiary },
-                  sortBy === 'updated' && styles.controlBtnTextActive,
-                ]}
-              >
-                {t.sort.updated}
-              </Text>
-            </Pressable>
+              {t.sort.updated}
+            </Text>
+          </Pressable>
 
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`${t.sort.days} - Ordenar por días en tránsito`}
-              onPress={() => handleSortChange('days')}
-              style={({ pressed }) => [
-                styles.controlBtn,
-                { backgroundColor: theme.surface, borderColor: theme.border },
-                sortBy === 'days' && [styles.controlBtnActive, { backgroundColor: theme.yellow }],
-                pressed && styles.pressed,
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${t.sort.days} - Ordenar por días en tránsito`}
+            onPress={() => handleSortChange('days')}
+            style={({ pressed }) => [
+              styles.controlBtn,
+              {
+                backgroundColor: sortBy === 'days' ? theme.yellow : theme.surfaceSubtle,
+                borderColor: theme.border,
+              },
+              pressed && styles.pressed,
+            ]}
+            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+          >
+            <Calendar size={11} color={sortBy === 'days' ? '#000000' : theme.textSecondary} strokeWidth={2.5} />
+            <Text
+              style={[
+                styles.controlBtnText,
+                { color: sortBy === 'days' ? '#000000' : theme.textSecondary },
+                sortBy === 'days' && styles.controlBtnTextActive,
               ]}
-              hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
             >
-              <Calendar size={11} color={sortBy === 'days' ? '#000000' : theme.textTertiary} strokeWidth={2.5} />
-              <Text
-                style={[
-                  styles.controlBtnText,
-                  { color: theme.textTertiary },
-                  sortBy === 'days' && styles.controlBtnTextActive,
-                ]}
-              >
-                {t.sort.days}
-              </Text>
-            </Pressable>
+              {t.sort.days}
+            </Text>
+          </Pressable>
 
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`${t.sort.carrier} - Ordenar por transportista`}
-              onPress={() => handleSortChange('carrier')}
-              style={({ pressed }) => [
-                styles.controlBtn,
-                { backgroundColor: theme.surface, borderColor: theme.border },
-                sortBy === 'carrier' && [styles.controlBtnActive, { backgroundColor: theme.yellow }],
-                pressed && styles.pressed,
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${t.sort.carrier} - Ordenar por transportista`}
+            onPress={() => handleSortChange('carrier')}
+            style={({ pressed }) => [
+              styles.controlBtn,
+              {
+                backgroundColor: sortBy === 'carrier' ? theme.yellow : theme.surfaceSubtle,
+                borderColor: theme.border,
+              },
+              pressed && styles.pressed,
+            ]}
+            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+          >
+            <Truck size={11} color={sortBy === 'carrier' ? '#000000' : theme.textSecondary} strokeWidth={2.5} />
+            <Text
+              style={[
+                styles.controlBtnText,
+                { color: sortBy === 'carrier' ? '#000000' : theme.textSecondary },
+                sortBy === 'carrier' && styles.controlBtnTextActive,
               ]}
-              hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
             >
-              <Truck size={11} color={sortBy === 'carrier' ? '#000000' : theme.textTertiary} strokeWidth={2.5} />
-              <Text
-                style={[
-                  styles.controlBtnText,
-                  { color: theme.textTertiary },
-                  sortBy === 'carrier' && styles.controlBtnTextActive,
-                ]}
-              >
-                {t.sort.carrier}
-              </Text>
-            </Pressable>
-          </View>
+              {t.sort.carrier}
+            </Text>
+          </Pressable>
         </View>
 
         {/* Card Style Switcher */}
-        <View style={styles.controlGroup}>
-          <Text style={[styles.controlLabel, { color: theme.textSecondary }]}>
-            {t.filter.design}
-          </Text>
-          <View style={styles.controlTabs}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Estilo Bento"
-              onPress={() => handleCardStyleChange('bento')}
-              style={({ pressed }) => [
-                styles.controlBtn,
-                { backgroundColor: theme.surface, borderColor: theme.border },
-                cardStyle === 'bento' && [styles.controlBtnActive, { backgroundColor: theme.yellow }],
-                pressed && styles.pressed,
-              ]}
-              hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-            >
-              <LayoutGrid size={11} color={cardStyle === 'bento' ? '#000000' : theme.textTertiary} strokeWidth={2.5} />
-              <Text
-                style={[
-                  styles.controlBtnText,
-                  { color: theme.textTertiary },
-                  cardStyle === 'bento' && styles.controlBtnTextActive,
-                ]}
-              >
-                BENTO
-              </Text>
-            </Pressable>
+        <View style={styles.controlTabs}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Estilo Bento"
+            onPress={() => handleCardStyleChange('bento')}
+            style={({ pressed }) => [
+              styles.controlIconBtn,
+              {
+                backgroundColor: cardStyle === 'bento' ? theme.yellow : theme.surfaceSubtle,
+                borderColor: theme.border,
+              },
+              pressed && styles.pressed,
+            ]}
+            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+          >
+            <LayoutGrid size={13} color={cardStyle === 'bento' ? '#000000' : theme.textSecondary} strokeWidth={2.5} />
+          </Pressable>
 
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Estilo Industrial"
-              onPress={() => handleCardStyleChange('industrial')}
-              style={({ pressed }) => [
-                styles.controlBtn,
-                { backgroundColor: theme.surface, borderColor: theme.border },
-                cardStyle === 'industrial' && [styles.controlBtnActive, { backgroundColor: theme.yellow }],
-                pressed && styles.pressed,
-              ]}
-              hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-            >
-              <Barcode size={11} color={cardStyle === 'industrial' ? '#000000' : theme.textTertiary} strokeWidth={2.5} />
-              <Text
-                style={[
-                  styles.controlBtnText,
-                  { color: theme.textTertiary },
-                  cardStyle === 'industrial' && styles.controlBtnTextActive,
-                ]}
-              >
-                IND
-              </Text>
-            </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Estilo Industrial"
+            onPress={() => handleCardStyleChange('industrial')}
+            style={({ pressed }) => [
+              styles.controlIconBtn,
+              {
+                backgroundColor: cardStyle === 'industrial' ? theme.yellow : theme.surfaceSubtle,
+                borderColor: theme.border,
+              },
+              pressed && styles.pressed,
+            ]}
+            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+          >
+            <Barcode size={13} color={cardStyle === 'industrial' ? '#000000' : theme.textSecondary} strokeWidth={2.5} />
+          </Pressable>
 
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Estilo Retro OS"
-              onPress={() => handleCardStyleChange('retro')}
-              style={({ pressed }) => [
-                styles.controlBtn,
-                { backgroundColor: theme.surface, borderColor: theme.border },
-                cardStyle === 'retro' && [styles.controlBtnActive, { backgroundColor: theme.yellow }],
-                pressed && styles.pressed,
-              ]}
-              hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-            >
-              <Monitor size={11} color={cardStyle === 'retro' ? '#000000' : theme.textTertiary} strokeWidth={2.5} />
-              <Text
-                style={[
-                  styles.controlBtnText,
-                  { color: theme.textTertiary },
-                  cardStyle === 'retro' && styles.controlBtnTextActive,
-                ]}
-              >
-                RETRO
-              </Text>
-            </Pressable>
-          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Estilo Retro OS"
+            onPress={() => handleCardStyleChange('retro')}
+            style={({ pressed }) => [
+              styles.controlIconBtn,
+              {
+                backgroundColor: cardStyle === 'retro' ? theme.yellow : theme.surfaceSubtle,
+                borderColor: theme.border,
+              },
+              pressed && styles.pressed,
+            ]}
+            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+          >
+            <Monitor size={13} color={cardStyle === 'retro' ? '#000000' : theme.textSecondary} strokeWidth={2.5} />
+          </Pressable>
         </View>
       </View>
 
       {/* Parcels List */}
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Math.max(insets.bottom + 100, 110) },
+        ]}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={handleRefresh}
-            tintColor="#000000"
-            colors={['#000000']}
-            progressBackgroundColor="#FFE600"
+            tintColor={theme.textPrimary}
+            colors={[theme.primary]}
+            progressBackgroundColor={theme.surface}
           />
         }
       >
@@ -567,7 +546,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 ]}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Plus size={16} color="#000000" strokeWidth={3} />
+                <Plus size={16} color="#FFFFFF" strokeWidth={3} />
                 <Text style={styles.emptyAddBtnText}>{t.empty.trackFirstBtn}</Text>
               </Pressable>
             )}
@@ -611,11 +590,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         onPress={() => onOpenNewParcel()}
         style={({ pressed }) => [
           styles.fab,
-          { backgroundColor: theme.coral, borderColor: theme.border },
+          {
+            backgroundColor: theme.coral,
+            borderColor: theme.border,
+            bottom: Math.max(insets.bottom + 20, 24),
+          },
           pressed && styles.pressed,
         ]}
       >
-        <Plus size={28} color="#000000" strokeWidth={3} />
+        <Plus size={28} color="#FFFFFF" strokeWidth={3} />
       </Pressable>
 
       {/* Modal to rename shipment */}
@@ -877,22 +860,15 @@ const styles = StyleSheet.create({
   },
   controlsBar: {
     paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 6,
-    gap: 8,
-  },
-  controlGroup: {
+    paddingTop: 4,
+    paddingBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  controlLabel: {
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 0.6,
-  },
   controlTabs: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
   },
   controlBtn: {
@@ -906,8 +882,14 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     ...Theme.shadows.sm,
   },
-  controlBtnActive: {
-    borderColor: '#000000',
+  controlIconBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 32,
+    height: 32,
+    borderRadius: Theme.radius.xs,
+    borderWidth: 1.5,
+    ...Theme.shadows.sm,
   },
   controlBtnText: {
     fontSize: 9,
@@ -915,7 +897,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   controlBtnTextActive: {
-    color: '#000000',
     fontWeight: '900',
   },
   scroll: {
@@ -931,10 +912,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 36,
     paddingHorizontal: 24,
-    backgroundColor: '#FFFFFF',
     borderRadius: Theme.radius.md,
     borderWidth: Theme.borders.width,
-    borderColor: '#000000',
     marginTop: 16,
     ...Theme.shadows.md,
   },
@@ -942,18 +921,15 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: Theme.radius.sm,
-    backgroundColor: Theme.colors.yellow,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
     borderWidth: 2.5,
-    borderColor: '#000000',
     ...Theme.shadows.sm,
   },
   emptyTitle: {
     fontSize: 16,
     fontWeight: '900',
-    color: '#000000',
     textAlign: 'center',
     marginBottom: 8,
     letterSpacing: 0.5,
@@ -961,7 +937,6 @@ const styles = StyleSheet.create({
   emptySubtitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: Theme.colors.textSecondary,
     textAlign: 'center',
     lineHeight: 19,
   },
@@ -969,19 +944,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: Theme.colors.coral,
     paddingVertical: 12,
     paddingHorizontal: 18,
     borderRadius: Theme.radius.sm,
     marginTop: 16,
     borderWidth: 2,
-    borderColor: '#000000',
     ...Theme.shadows.sm,
   },
   emptyAddBtnText: {
     fontSize: 12,
     fontWeight: '900',
-    color: '#000000',
+    color: '#FFFFFF',
     letterSpacing: 0.5,
   },
   fab: {

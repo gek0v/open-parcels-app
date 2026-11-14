@@ -87,7 +87,7 @@ export const en: TranslationKey = {
     noDelivered: 'NO DELIVERED PARCELS',
     noArchived: 'NO ARCHIVED PARCELS',
     subNoResults: 'Try searching with a different parcel code, alias or carrier name.',
-    subActive: 'Tap "+" or "SCAN CODE" to track your first shipment with camera or tracking code.',
+    subActive: 'Tap "+" or "TRACK FIRST SHIPMENT" to track your shipment by entering the tracking number.',
     trackFirstBtn: 'TRACK FIRST SHIPMENT',
   },
 
@@ -114,7 +114,7 @@ export const en: TranslationKey = {
   // Modals
   newParcelModal: {
     title: 'NEW SHIPMENT',
-    subtitle: 'Enter tracking code or scan the barcode',
+    subtitle: 'Enter tracking code or reference number',
     trackingNumberLabel: 'TRACKING NUMBER',
     trackingPlaceholder: 'e.g. 1Z9999999999999999 or PQ481920391ES',
     postalCodeLabel: 'POSTAL CODE (REQUIRED)',

@@ -161,7 +161,7 @@ export const GoldenPalettes: Record<string, ColorPalette> = {
     blue: '#38BDF8',
     purple: '#A855F7',
     pink: '#F472B6',
-    border: '#38BDF8',
+    border: '#334155',
     status: {
       pending: '#94A3B8',
       info_received: '#C084FC',

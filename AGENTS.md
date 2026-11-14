@@ -44,3 +44,10 @@ Docs: https://docs.expo.dev/eas/index.md
 - **Worktree Safety**: Always use `startFromOrigin: false` when branching from local base or testing sync with `open-parcels` to avoid remote fetch errors.
 - **Orchestration Discipline**: Keep coordinator threads focused on dispatching tasks via `delegate_task` (`isolation: "worktree"`) or `t3_thread_launch` (`startFromOrigin: false`). Rotate coordinators before reaching ~200 items or ~150k context.
 - **PowerShell Quoting**: Never use inline `python -c "..."` in PowerShell; use here-strings (`@' ... '@ | python -`) or `apply_patch`.
+
+## Antigravity Optimization Rules (100% Antigravity Stack)
+1. **Micro-Workers (2-4 turns):** Dispatch tasks with `delegate_task(..., isolation: "worktree")` or `t3_thread_launch(..., workspaceStrategy: {type: "worktree"})`. Each worker must test, verify, output diff summary, and exit within 4 turns.
+2. **Context Rotation:** If this coordinator reaches 10 turns or ~80k tokens, checkpoint into `PROGRESS.md` or `ORCHESTRATION_STATE.md` and start a clean successor thread to prevent 15m timeouts and degraded reasoning.
+3. **No Massive File Dumps:** Never use `Read` on whole files with hundreds/thousands of lines. Use `rg -n` or line-slice reads (`view_file` with StartLine/EndLine).
+4. **Instance Balance:** Prioritize `antigravity_8` (xtehuti), `antigravity_5` (gekodev2), `antigravity_4` (gekodev1), `antigravity_7` (gekodev0-proton), or `antigravity_6` (gek0v-proton). Never route to `antigravity` (gekodev3).
+5. **No Inline Python in PowerShell:** Write temporary `.py` files to disk and run `python script.py` instead of multiline `python -c "..."`.
