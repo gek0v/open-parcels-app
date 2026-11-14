@@ -14,7 +14,11 @@ import {
   fetchGLSSpainLive,
   fetchSEURLive,
 } from '../src/infrastructure/engine/spainCouriersLive';
-import { parseInPostHtmlToParcel } from '../src/infrastructure/engine/inpostLive';
+import {
+  parseInPostHtmlToParcel,
+  parseInPostShipXPayloadToParcel,
+  enrichInPostParcelWithShipX,
+} from '../src/infrastructure/engine/inpostLive';
 
 const originalFetch = globalThis.fetch;
 
@@ -87,6 +91,74 @@ describe('InPost Live Parser & Local Engine Integration', () => {
 <astro-island uid="test-inpost" props="{&quot;locale&quot;:[0,&quot;es&quot;],&quot;country&quot;:[0,&quot;ES&quot;],&quot;zipCode&quot;:[0,&quot;47140&quot;],&quot;trackingDetails&quot;:[0,{&quot;packageId&quot;:[0,&quot;75616714&quot;],&quot;milestones&quot;:[1,[[0,{&quot;type&quot;:[0,&quot;IN_TRANSIT&quot;],&quot;name&quot;:[0,&quot;En camino&quot;],&quot;date&quot;:[0,&quot;2026-11-11T12:53:58.564Z&quot;],&quot;events&quot;:[1,[[0,{&quot;code&quot;:[0,&quot;MMD.1001&quot;],&quot;name&quot;:[0,&quot;Recibido en el centro logístico&quot;],&quot;date&quot;:[0,&quot;2026-11-11T12:53:58.564Z&quot;],&quot;description&quot;:[0,&quot;Tu paquete ha sido recibido en uno de nuestros centros logísticos.&quot;]}],[0,{&quot;code&quot;:[0,&quot;FMD.1002&quot;],&quot;name&quot;:[0,&quot;Recogido por el mensajero&quot;],&quot;date&quot;:[0,&quot;2026-11-11T10:56:51.253Z&quot;],&quot;description&quot;:[0,&quot;Tu paquete ha iniciado el tránsito y se dirige a uno de nuestros centros logísticos.&quot;]}]]]}],[0,{&quot;type&quot;:[0,&quot;AT_THE_ORIGIN&quot;],&quot;name&quot;:[0,&quot;En preparación&quot;],&quot;date&quot;:[0,&quot;2026-11-10T19:01:43.002Z&quot;],&quot;events&quot;:[1,[[0,{&quot;code&quot;:[0,&quot;FMD.1001&quot;],&quot;name&quot;:[0,&quot;Listo para ser recogido por el mensajero&quot;],&quot;date&quot;:[0,&quot;2026-11-10T19:01:43.002Z&quot;],&quot;description&quot;:[0,&quot;Tu paquete está preparado y será recogido por nuestros mensajeros pronto.&quot;]}],[0,{&quot;code&quot;:[0,&quot;CRE.1001&quot;],&quot;name&quot;:[0,&quot;En preparación&quot;],&quot;date&quot;:[0,&quot;2026-11-06T18:52:46Z&quot;],&quot;description&quot;:[0,&quot;El envío ha sido registrado informáticamente y estamos a la espera de recibir el paquete.&quot;]}]]]}]]]}],&quot;trackingDetailsStatus&quot;:[0,200]}" client="load"></astro-island>
 </body></html>`;
 
+  const sampleShipxPayload = [
+    {
+      mainTrackingNumber: '75616714',
+      events: [
+        {
+          eventCode: 'MMD.1001',
+          timestamp: '2026-11-11T12:53:58.564+00:00',
+          carrier: 'ILS_IT',
+          eventTitle: 'Parcel in the warehouse',
+          eventDescription: 'The parcel is in our warehouse, from here it will continue its journey.',
+          location: {
+            type: 'LOGISTIC_CENTER',
+            countryCode: 'IT',
+            city: 'Roma (RM)',
+          },
+        },
+        {
+          eventCode: 'FMD.1002',
+          timestamp: '2026-11-11T10:56:51.253+00:00',
+          carrier: 'ILS_PTES',
+          eventTitle: 'Collected by courier',
+          eventDescription:
+            'Your parcel has been picked up by the courier and it is on its way to one of our sorting centers.',
+          location: {
+            type: 'PUDO_POINT',
+            locationCode: 'ITLOC00001',
+            countryCode: 'IT',
+            city: 'Roma',
+          },
+        },
+        {
+          eventCode: 'FMD.1001',
+          timestamp: '2026-11-10T19:01:43.002+00:00',
+          carrier: 'ILS_IT',
+          eventTitle: 'Parcel handed over to Locker or InPost Point',
+          eventDescription:
+            'The parcel has been delivered to the Locker or InPost Point and soon our courier will pick it up.',
+          location: {
+            type: 'PUDO_POINT',
+            locationCode: 'ITLOC00001',
+            countryCode: 'IT',
+            city: 'Roma',
+          },
+        },
+        {
+          eventCode: 'CRE.1001',
+          timestamp: '2026-11-06T19:52:46.000+01:00',
+          eventTitle: 'In preparation',
+          eventDescription:
+            'The shipment has been created but your parcel has not been yet handed over to our network.',
+          location: null,
+        },
+      ],
+      origin: {
+        countryCode: 'IT',
+        postalCode: '00100',
+        city: 'Roma',
+        street: 'Via Example 1',
+      },
+      destination: {
+        countryCode: 'ES',
+        postalCode: '28001',
+        city: 'Madrid',
+        street: 'Calle Ejemplo 1',
+      },
+    },
+  ];
+
   it('correctly extracts Astro props and normalizes InPost live events without false delivered status', () => {
     const parcel = parseInPostHtmlToParcel(
       sampleInPostHtml,
@@ -111,10 +183,61 @@ describe('InPost Live Parser & Local Engine Integration', () => {
     expect(parcel.events[3].status).toBe('info_received');
   });
 
-  it('LocalTrackingEngine calls live InPost fetch when online', async () => {
-    globalThis.fetch = (async () =>
-      new Response(sampleInPostHtml, { status: 200, headers: { 'Content-Type': 'text/html' } })
-    ) as unknown as typeof fetch;
+  it('enriches InPost parcel events with exact hub locations, origin and destination via ShipX time proximity', () => {
+    const baseParcel = parseInPostHtmlToParcel(
+      sampleInPostHtml,
+      '75616714',
+      '47140',
+      findCarrierBySlug('inpost'),
+      'ES',
+      'es'
+    );
+
+    const enriched = enrichInPostParcelWithShipX(baseParcel, sampleShipxPayload, 'es');
+
+    expect(enriched.origin?.name).toBe('Roma, Italy');
+    expect(enriched.origin?.code).toBe('IT');
+    expect(enriched.destination?.name).toBe('Madrid, Spain');
+    expect(enriched.destination?.code).toBe('ES');
+
+    // Milestones enriched by time proximity (matching timestamps within 10 min window)
+    expect(enriched.events[0].location).toBe('Roma (RM), Italy');
+    expect(enriched.events[1].location).toBe('Roma, Italy');
+    expect(enriched.events[2].location).toBe('Roma, Italy');
+    // Event 3 (CRE.1001) has no explicit location in ShipX, gets origin fallback
+    expect(enriched.events[3].location).toBe('Roma, Italy');
+  });
+
+  it('parses InPost ShipX payload directly for inpost-it carrier', () => {
+    const itCarrier = findCarrierBySlug('inpost-it');
+    const parcel = parseInPostShipXPayloadToParcel(
+      sampleShipxPayload,
+      '75616714',
+      itCarrier,
+      'es'
+    );
+
+    expect(parcel.trackingNumber).toBe('75616714');
+    expect(parcel.status).toBe('in_transit');
+    expect(parcel.origin?.name).toBe('Roma, Italy');
+    expect(parcel.destination?.name).toBe('Madrid, Spain');
+    expect(parcel.events[0].location).toBe('Roma (RM), Italy');
+  });
+
+  it('LocalTrackingEngine calls live InPost fetch when online and enriches locations', async () => {
+    globalThis.fetch = (async (url: any) => {
+      const u = String(url);
+      if (u.includes('shipx-proxy')) {
+        return new Response(JSON.stringify(sampleShipxPayload), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(sampleInPostHtml, {
+        status: 200,
+        headers: { 'Content-Type': 'text/html' },
+      });
+    }) as unknown as typeof fetch;
 
     const engine = new LocalTrackingEngine();
     const parcel = await engine.track({
@@ -126,9 +249,36 @@ describe('InPost Live Parser & Local Engine Integration', () => {
     expect(parcel.trackingNumber).toBe('75616714');
     expect(parcel.status).toBe('in_transit');
     expect(parcel.isLiveData).toBe(true);
-    expect(parcel.events[0].description).toBe(
-      'Tu paquete ha sido recibido en uno de nuestros centros logísticos.'
-    );
+    expect(parcel.events[0].location).toBe('Roma (RM), Italy');
+    expect(parcel.origin?.name).toBe('Roma, Italy');
+  });
+
+  it('LocalTrackingEngine auto-detect falls back to inpost-it when postal code is not provided', async () => {
+    globalThis.fetch = (async (url: any) => {
+      const u = String(url);
+      if (u.includes('shipx-proxy')) {
+        return new Response(JSON.stringify(sampleShipxPayload), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response('Not found', { status: 404 });
+    }) as unknown as typeof fetch;
+
+    const engine = new LocalTrackingEngine();
+
+    // No carrierHint and no postalCode provided:
+    // inpost candidate fails with POSTAL_CODE_REQUIRED
+    // auto-detect fallback seamlessly tries inpost-it candidate and succeeds
+    const parcel = await engine.track({
+      trackingNumber: '75616714',
+      allowSimulated: false,
+    });
+
+    expect(parcel.trackingNumber).toBe('75616714');
+    expect(parcel.carrier.slug).toBe('inpost-it');
+    expect(parcel.origin?.name).toBe('Roma, Italy');
+    expect(parcel.events[0].location).toBe('Roma (RM), Italy');
   });
 });
 

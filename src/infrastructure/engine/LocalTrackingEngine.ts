@@ -10,7 +10,7 @@ import {
 } from '../../domain/validators/detection';
 import { TrackingEngineError } from './errors';
 import { getLocalizedStatusText } from './mapper';
-import { fetchInPostLive } from './inpostLive';
+import { fetchInPostLive, fetchInPostItalyShipXLive } from './inpostLive';
 import { fetchCorreosSpainLive, fetchCorreosExpressLive } from './correosLive';
 import { fetchGLSSpainLive, fetchSEURLive } from './spainCouriersLive';
 
@@ -36,21 +36,61 @@ export class LocalTrackingEngine implements ITrackingEngine {
       );
     }
 
-    const candidates = await this.detect(rawNumber, params.destinationCountry);
-    let selectedCarrier: Carrier;
-
     if (params.carrierHint) {
-      selectedCarrier = findCarrierBySlug(params.carrierHint);
-    } else if (candidates.length > 0) {
+      const selectedCarrier = findCarrierBySlug(params.carrierHint);
+      return await this.executeTrackForCarrier(rawNumber, selectedCarrier, params);
+    }
+
+    // Auto-detection mode (commit 2faeace / PR #70):
+    // Fallback across candidate carriers if primary candidate fails with POSTAL_CODE_REQUIRED or SHIPMENT_NOT_FOUND
+    const candidates = await this.detect(rawNumber, params.destinationCountry);
+    let primaryCarrier: Carrier;
+
+    if (candidates.length > 0) {
       const liveCandidate =
         params.allowSimulated === true
           ? undefined
           : candidates.find((c) => c.carrier.hasLiveTracking);
-      selectedCarrier = liveCandidate ? liveCandidate.carrier : candidates[0].carrier;
+      primaryCarrier = liveCandidate ? liveCandidate.carrier : candidates[0].carrier;
     } else {
-      selectedCarrier = findCarrierBySlug('correos-spain');
+      primaryCarrier = findCarrierBySlug('correos-spain');
     }
 
+    const triedSlugs = new Set<string>([primaryCarrier.slug]);
+
+    try {
+      return await this.executeTrackForCarrier(rawNumber, primaryCarrier, params);
+    } catch (primaryErr) {
+      const isRecoverable =
+        primaryErr instanceof TrackingEngineError &&
+        (primaryErr.code === 'POSTAL_CODE_REQUIRED' || primaryErr.code === 'SHIPMENT_NOT_FOUND');
+
+      if (isRecoverable && candidates.length > 1) {
+        for (const cand of candidates) {
+          const altCarrier = cand.carrier;
+          if (triedSlugs.has(altCarrier.slug)) continue;
+          triedSlugs.add(altCarrier.slug);
+
+          if (params.allowSimulated === false && !altCarrier.hasLiveTracking) continue;
+          if (altCarrier.requiresPostalCode && !params.postalCode?.trim()) continue;
+
+          try {
+            return await this.executeTrackForCarrier(rawNumber, altCarrier, params);
+          } catch {
+            // Continue testing alternative candidate
+          }
+        }
+      }
+
+      throw primaryErr;
+    }
+  }
+
+  private async executeTrackForCarrier(
+    rawNumber: string,
+    selectedCarrier: Carrier,
+    params: TrackRequestParams
+  ): Promise<Parcel> {
     if (selectedCarrier.requiresPostalCode && !params.postalCode?.trim()) {
       throw new TrackingEngineError(
         `Código postal obligatorio para ${selectedCarrier.name}`,
@@ -88,6 +128,18 @@ export class LocalTrackingEngine implements ITrackingEngine {
           throw err;
         }
         console.warn('InPost live fetch failed, falling back to local backup:', err);
+      }
+    }
+
+    // Real live tracking for InPost Italy (ShipX)
+    if (slug === 'inpost-it' && params.allowSimulated !== true) {
+      try {
+        return await fetchInPostItalyShipXLive(rawNumber, selectedCarrier, params.lang);
+      } catch (err) {
+        if (params.allowSimulated === false) {
+          throw err;
+        }
+        console.warn('InPost Italy live fetch failed, falling back to local backup:', err);
       }
     }
 
@@ -199,6 +251,37 @@ export class LocalTrackingEngine implements ITrackingEngine {
           carrierSlug: slug,
           carrierName: selectedCarrier.name,
           eventCode: 'INP.LOC.02',
+        },
+      ];
+    } else if (slug === 'inpost-it') {
+      origin = { code: 'IT', name: 'Italia' };
+      destination = { code: 'IT', name: 'Italia' };
+      status = 'in_transit';
+      progress = 35;
+      serviceType = 'InPost Locker / Punto';
+
+      events = [
+        {
+          id: 'ev-1',
+          date: new Date(now.getTime() - 3600 * 1000 * 24).toISOString(),
+          status: 'info_received',
+          stage: 'created',
+          description: 'Spedizione registrata dal mittente per il punto di ritiro / locker.',
+          location: 'Punto InPost Milano, Italy',
+          carrierSlug: slug,
+          carrierName: selectedCarrier.name,
+          eventCode: 'CRE.1001',
+        },
+        {
+          id: 'ev-2',
+          date: new Date(now.getTime() - 3600 * 1000 * 12).toISOString(),
+          status: 'in_transit',
+          stage: 'transit',
+          description: 'Pacco ritirato e in transito verso il centro logistico.',
+          location: 'Hub InPost Bologna, Italy',
+          carrierSlug: slug,
+          carrierName: selectedCarrier.name,
+          eventCode: 'MMD.1001',
         },
       ];
     } else if (slug === 'seur') {
