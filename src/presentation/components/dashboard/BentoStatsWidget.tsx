@@ -29,6 +29,7 @@ export const BentoStatsWidget: React.FC<BentoStatsWidgetProps> = ({
   activeCount: propActiveCount,
   outForDeliveryCount: propOutForDeliveryCount,
   deliveredCount: propDeliveredCount,
+  avgDeliveryDays: propAvgDeliveryDays,
   activePace: propActivePace,
   parcels,
 }) => {
@@ -41,6 +42,7 @@ export const BentoStatsWidget: React.FC<BentoStatsWidgetProps> = ({
   const activeCount = computed ? computed.activeCount : propActiveCount;
   const outForDeliveryCount = computed ? computed.outForDeliveryCount : propOutForDeliveryCount;
   const deliveredCount = computed ? computed.deliveredCount : propDeliveredCount;
+  const avgDeliveryDays = computed ? computed.avgDeliveryDays : (propAvgDeliveryDays ?? 0);
   const activePace = computed
     ? computed.activePace
     : (propActivePace ?? { rate: 100, label: t.stats.paceUpToDate, hasAlerts: false, problemCount: 0 });
