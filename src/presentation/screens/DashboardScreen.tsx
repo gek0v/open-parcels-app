@@ -30,7 +30,6 @@ import { useTheme } from '../theme/ThemeContext';
 import { ShareService } from '../../infrastructure/services/ShareService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Plus,
   Search,
@@ -65,7 +64,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 }) => {
   const { t, lang, toggleLang } = useI18n();
   const { theme } = useTheme();
-  const insets = useSafeAreaInsets();
   const [parcels, setParcels] = useState<Parcel[]>([]);
   const [activeTab, setActiveTab] = useState<FilterTab>('active');
   const [searchQuery, setSearchQuery] = useState('');
@@ -264,7 +262,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   return (
     <View style={[styles.container, { backgroundColor: theme.canvas }]}>
       {/* Top Bar with Brand and Mode Toggle */}
-      <View style={[styles.topBar, { backgroundColor: theme.canvas, paddingTop: Math.max(insets.top + 8, 20) }]}>
+      <View style={[styles.topBar, { backgroundColor: theme.canvas }]}>
         <View style={styles.brandRow}>
           <View style={[styles.brandBadge, { backgroundColor: theme.yellow, borderColor: theme.border }]}>
             <Package size={22} color="#000000" strokeWidth={2.5} />
@@ -501,10 +499,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       {/* Parcels List */}
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: Math.max(insets.bottom + 100, 110) },
-        ]}
+        contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -593,7 +588,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           {
             backgroundColor: theme.coral,
             borderColor: theme.border,
-            bottom: Math.max(insets.bottom + 20, 24),
           },
           pressed && styles.pressed,
         ]}
@@ -718,8 +712,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: Theme.isIOS ? 54 : 20,
-    paddingBottom: 14,
+    paddingTop: 8,
+    paddingBottom: 10,
     backgroundColor: Theme.colors.background,
   },
   brandRow: {

@@ -11,7 +11,6 @@ import { Theme } from '../../theme/adaptiveTheme';
 import { useTheme } from '../../theme/ThemeContext';
 import { useI18n } from '../../../infrastructure/i18n';
 import { Clipboard, Plus, X, Tag } from 'lucide-react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
 export interface ClipboardDetectedBannerProps {
@@ -32,7 +31,6 @@ export const ClipboardDetectedBanner: React.FC<ClipboardDetectedBannerProps> = (
 }) => {
   const { theme } = useTheme();
   const { t } = useI18n();
-  const insets = useSafeAreaInsets();
   const [slideAnim] = useState(() => new Animated.Value(80));
   const [opacityAnim] = useState(() => new Animated.Value(0));
 
@@ -87,7 +85,7 @@ export const ClipboardDetectedBanner: React.FC<ClipboardDetectedBannerProps> = (
       style={[
         styles.bannerWrapper,
         {
-          bottom: Math.max(insets.bottom + 84, 90),
+          bottom: 92,
           transform: [{ translateY: slideAnim }],
           opacity: opacityAnim,
         },

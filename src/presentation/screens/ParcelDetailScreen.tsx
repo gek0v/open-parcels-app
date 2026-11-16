@@ -33,7 +33,6 @@ import {
   Copy,
 } from 'lucide-react-native';
 import { ShareService } from '../../infrastructure/services/ShareService';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface ParcelDetailScreenProps {
   parcel: Parcel;
@@ -53,7 +52,6 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
   onParcelUpdated,
 }) => {
   const { theme } = useTheme();
-  const insets = useSafeAreaInsets();
   const [renameModalVisible, setRenameModalVisible] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -141,7 +139,7 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
   return (
     <View style={[styles.container, { backgroundColor: theme.canvas }]}>
       {/* Top Navigation Bar */}
-      <View style={[styles.navBar, { backgroundColor: theme.canvas, paddingTop: Math.max(insets.top + 8, 20) }]}>
+      <View style={[styles.navBar, { backgroundColor: theme.canvas }]}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Volver al listado"
@@ -230,7 +228,7 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom + 24, 32) }]}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {/* Main Status & Progress Hero Card */}
@@ -461,8 +459,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: Theme.isIOS ? 54 : 20,
-    paddingBottom: 14,
+    paddingTop: 8,
+    paddingBottom: 10,
     backgroundColor: Theme.colors.background,
   },
   navButton: {
@@ -508,7 +506,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingVertical: 12,
+    paddingTop: 8,
+    paddingBottom: 32,
   },
   heroCard: {
     backgroundColor: '#FFFFFF',
