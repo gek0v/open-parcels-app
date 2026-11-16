@@ -15,11 +15,13 @@ import { Theme } from '../theme/adaptiveTheme';
 import { useTheme } from '../theme/ThemeContext';
 import { useI18n } from '../../infrastructure/i18n';
 import { CarrierDetectorBar } from '../components/scanner/CarrierDetectorBar';
+import { CarrierSelectorModal } from '../components/common/CarrierSelectorModal';
 import { trackingEngineManager } from '../../infrastructure/engine';
 import { parcelRepository } from '../../infrastructure/storage/ParcelRepository';
-import { DetectedCarrier } from '../../domain/models/carrier';
+import { Carrier, DetectedCarrier } from '../../domain/models/carrier';
 import { Parcel } from '../../domain/models/parcel';
-import { X, Plus, ShieldAlert, Cpu } from 'lucide-react-native';
+import { findCarrierBySlug } from '../../domain/validators/detection';
+import { X, Plus, ShieldAlert, Cpu, ArrowRightLeft, Sparkles, Truck, Zap } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
@@ -48,6 +50,8 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
   const [candidates, setCandidates] = useState<DetectedCarrier[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isCatalogModalVisible, setIsCatalogModalVisible] = useState(false);
+  const [isManuallySelected, setIsManuallySelected] = useState(false);
 
   const [prevInitialNumber, setPrevInitialNumber] = useState(initialTrackingNumber);
   const [prevInitialSlug, setPrevInitialSlug] = useState(initialCarrierSlug);
@@ -66,12 +70,22 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
     let active = true;
     const clean = trackingNumber.trim();
 
+    if (clean.length === 0) {
+      setCandidates([]);
+      if (!isManuallySelected) {
+        setSelectedCarrierSlug(undefined);
+      }
+      return;
+    }
+
     // Debounce detection so we do not re-scan on every keystroke.
     const timer = setTimeout(async () => {
       if (clean.length < 4) {
         if (!active) return;
         setCandidates([]);
-        setSelectedCarrierSlug(undefined);
+        if (!isManuallySelected) {
+          setSelectedCarrierSlug(undefined);
+        }
         return;
       }
 
@@ -79,27 +93,45 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
       if (!active) return;
 
       setCandidates(results);
-      setSelectedCarrierSlug((previous) => {
-        if (results.length === 0) return undefined;
-        // Keep initial or previously selected carrier if still in candidate list
-        const stillAvailable = results.some((r) => r.carrier.slug === previous);
-        if (stillAvailable) return previous;
-        const liveCandidate = results.find((r) => r.carrier.hasLiveTracking);
-        return (liveCandidate || results[0]).carrier.slug;
-      });
+      if (!isManuallySelected) {
+        setSelectedCarrierSlug((previous) => {
+          if (results.length === 0) return undefined;
+          // Keep initial or previously selected carrier if still in candidate list
+          const stillAvailable = results.some((r) => r.carrier.slug === previous);
+          if (stillAvailable) return previous;
+          const liveCandidate = results.find((r) => r.carrier.hasLiveTracking);
+          return (liveCandidate || results[0]).carrier.slug;
+        });
+      }
     }, 180);
 
     return () => {
       active = false;
       clearTimeout(timer);
     };
-  }, [trackingNumber]);
+  }, [trackingNumber, isManuallySelected]);
+
+  const currentSelectedCarrier: Carrier | undefined = selectedCarrierSlug
+    ? findCarrierBySlug(selectedCarrierSlug)
+    : undefined;
 
   const currentSelectedCandidate = candidates.find(
     (c) => c.carrier.slug === selectedCarrierSlug
   );
-  const requiresPostalCode = currentSelectedCandidate?.carrier.requiresPostalCode ?? false;
+  const requiresPostalCode = currentSelectedCarrier?.requiresPostalCode ?? false;
   const canSubmit = !!trackingNumber.trim() && !isLoading;
+
+  const handleSelectCarrier = (slug: string) => {
+    setSelectedCarrierSlug(slug);
+    setIsManuallySelected(true);
+    setErrorMessage(null);
+  };
+
+  const handleSelectCarrierFromCatalog = (carrier: Carrier) => {
+    setSelectedCarrierSlug(carrier.slug);
+    setIsManuallySelected(true);
+    setErrorMessage(null);
+  };
 
   const handleTrackAndSave = async () => {
     const cleanNumber = trackingNumber.trim();
@@ -109,7 +141,7 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
     }
 
     if (requiresPostalCode && !postalCode.trim()) {
-      const carrierName = currentSelectedCandidate?.carrier.name || 'este transportista';
+      const carrierName = currentSelectedCarrier?.name || 'este transportista';
       setErrorMessage(`${t.newParcelModal.postalCodeHint || 'Este transportista exige código postal.'} (${carrierName})`);
       return;
     }
@@ -157,8 +189,10 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
     setCustomAlias('');
     setPostalCode('');
     setSelectedCarrierSlug(undefined);
+    setIsManuallySelected(false);
     setCandidates([]);
     setErrorMessage(null);
+    setIsCatalogModalVisible(false);
   };
 
   const handleClose = async () => {
@@ -238,6 +272,9 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
                   value={trackingNumber}
                   onChangeText={(text) => {
                     setTrackingNumber(text);
+                    if (!text.trim()) {
+                      setIsManuallySelected(false);
+                    }
                     setErrorMessage(null);
                   }}
                   autoCapitalize="characters"
@@ -250,11 +287,91 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
               </Text>
             </View>
 
+            {/* Selected Carrier Card & Full Catalog Switcher */}
+            <View
+              style={[
+                styles.selectedCarrierCard,
+                {
+                  backgroundColor: theme.surface,
+                  borderColor: theme.border,
+                },
+              ]}
+            >
+              <View style={styles.selectedCarrierContent}>
+                <View style={styles.selectedCarrierHeader}>
+                  <Text style={[styles.selectedCarrierLabel, { color: theme.textSecondary }]}>
+                    {t.newParcelModal.selectedCarrierLabel}:
+                  </Text>
+                  {currentSelectedCandidate && (
+                    <View style={[styles.recommendedBadge, { backgroundColor: theme.yellow, borderColor: theme.border }]}>
+                      <Sparkles size={10} color="#000000" strokeWidth={3} />
+                      <Text style={styles.recommendedBadgeText}>
+                        {Math.round(currentSelectedCandidate.confidence * 100)}% RECOMENDADO
+                      </Text>
+                    </View>
+                  )}
+                  {currentSelectedCarrier?.hasLiveTracking && (
+                    <View style={[styles.liveBadgeSmall, { backgroundColor: theme.mint, borderColor: theme.border }]}>
+                      <Zap size={9} color="#000000" strokeWidth={3} />
+                      <Text style={styles.liveBadgeSmallText}>LIVE</Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.carrierMainRow}>
+                  <View
+                    style={[
+                      styles.carrierColorDot,
+                      { backgroundColor: currentSelectedCarrier?.color || theme.blue },
+                    ]}
+                  />
+                  <Text
+                    style={[styles.selectedCarrierName, { color: theme.textPrimary }]}
+                    numberOfLines={1}
+                  >
+                    {currentSelectedCarrier ? currentSelectedCarrier.name.toUpperCase() : 'NO SELECCIONADO (AUTO)'}
+                  </Text>
+                </View>
+              </View>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Cambiar transportista entre todos los del catálogo"
+                onPress={async () => {
+                  try {
+                    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  } catch {}
+                  setIsCatalogModalVisible(true);
+                }}
+                style={({ pressed }) => [
+                  styles.changeCarrierBtn,
+                  { backgroundColor: theme.yellow, borderColor: theme.border },
+                  pressed && styles.pressed,
+                ]}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <ArrowRightLeft size={14} color="#000000" strokeWidth={2.5} style={{ marginRight: 5 }} />
+                <Text style={styles.changeCarrierBtnText}>
+                  {t.newParcelModal.changeCarrierBtn}
+                </Text>
+              </Pressable>
+            </View>
+
             {/* Carrier Real-Time Auto-Detection Chips */}
             <CarrierDetectorBar
               candidates={candidates}
               selectedCarrierSlug={selectedCarrierSlug}
-              onSelectCarrier={(slug) => setSelectedCarrierSlug(slug)}
+              onSelectCarrier={handleSelectCarrier}
+              onOpenCatalog={() => setIsCatalogModalVisible(true)}
+            />
+
+            {/* Carrier Selector Modal (Full Catalog with Recommended Options) */}
+            <CarrierSelectorModal
+              visible={isCatalogModalVisible}
+              onClose={() => setIsCatalogModalVisible(false)}
+              onSelectCarrier={handleSelectCarrierFromCatalog}
+              selectedCarrierSlug={selectedCarrierSlug}
+              candidates={candidates}
             />
 
             {/* Conditional Postal Code Input (for InPost / CTT / SEUR / GLS) */}
@@ -263,7 +380,7 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
                 <View style={styles.conditionalHeader}>
                   <ShieldAlert size={16} color="#000000" strokeWidth={3} />
                   <Text style={styles.conditionalTitle} numberOfLines={2}>
-                    {t.newParcelModal.postalCodeLabel} ({currentSelectedCandidate?.carrier.name.toUpperCase()})
+                    {t.newParcelModal.postalCodeLabel} ({currentSelectedCarrier?.name.toUpperCase() || ''})
                   </Text>
                 </View>
                 <TextInput
@@ -514,5 +631,91 @@ const styles = StyleSheet.create({
   },
   smallPressed: {
     ...Theme.pressed,
+  },
+  selectedCarrierCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: Theme.radius.sm,
+    borderWidth: 2,
+    marginBottom: 12,
+    ...Theme.shadows.sm,
+  },
+  selectedCarrierContent: {
+    flex: 1,
+    marginRight: 10,
+  },
+  selectedCarrierHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 4,
+  },
+  selectedCarrierLabel: {
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  recommendedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: Theme.radius.xs,
+    borderWidth: 1,
+  },
+  recommendedBadgeText: {
+    fontSize: 8,
+    fontWeight: '900',
+    color: '#000000',
+  },
+  liveBadgeSmall: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: Theme.radius.xs,
+    borderWidth: 1,
+  },
+  liveBadgeSmallText: {
+    fontSize: 8,
+    fontWeight: '900',
+    color: '#000000',
+  },
+  carrierMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  carrierColorDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  selectedCarrierName: {
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+  changeCarrierBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: Theme.radius.xs,
+    borderWidth: 1.5,
+    ...Theme.shadows.sm,
+  },
+  changeCarrierBtnText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: 0.4,
   },
 });

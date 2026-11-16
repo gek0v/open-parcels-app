@@ -109,6 +109,8 @@ export const en: TranslationKey = {
     officialSite: 'VIEW ON OFFICIAL SITE',
     copySummaryBtn: 'COPY SUMMARY',
     shareSummaryBtn: 'SHARE',
+    changeCarrier: 'CHANGE COURIER',
+    carrierChangedToast: 'Courier updated successfully!',
   },
 
   // Modals
@@ -127,6 +129,21 @@ export const en: TranslationKey = {
     startTrackingBtn: 'START TRACKING',
     cameraScanBtn: 'SCAN WITH CAMERA',
     cancelBtn: 'CANCEL',
+    selectedCarrierLabel: 'SELECTED COURIER',
+    changeCarrierBtn: 'CHANGE',
+    catalogModalTitle: 'COURIER CATALOG',
+    searchCarriersPlaceholder: 'Search by name, country or code...',
+    recommendedSection: 'RECOMMENDED OPTIONS',
+    recommendedSubtitle: 'Suggested according to tracking code pattern',
+    allCarriersSection: 'ALL COURIERS',
+    liveTrackingBadge: 'LIVE',
+    requiresPostalBadge: 'POSTAL REQ.',
+    filterAll: 'ALL',
+    filterSpain: 'SPAIN',
+    filterGlobal: 'GLOBAL',
+    filterLive: 'LIVE',
+    noCarriersFound: 'No couriers found matching your query.',
+    openCatalogBtn: 'VIEW FULL CATALOG',
   },
 
   deleteModal: {

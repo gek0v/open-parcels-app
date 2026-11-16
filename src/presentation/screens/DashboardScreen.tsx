@@ -29,6 +29,7 @@ import { useI18n } from '../../infrastructure/i18n';
 import { useTheme } from '../theme/ThemeContext';
 import { ShareService } from '../../infrastructure/services/ShareService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
   Plus,
@@ -150,17 +151,43 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   useEffect(() => {
     let active = true;
 
-    (async () => {
+    const fetchParcels = async () => {
       const list = await parcelRepository.getAll();
       if (active) {
         setParcels(list);
       }
-    })();
+    };
+
+    void fetchParcels();
+
+    const unsubscribe = parcelRepository.subscribe(() => {
+      void fetchParcels();
+    });
 
     return () => {
       active = false;
+      unsubscribe();
     };
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+
+      (async () => {
+        const list = await parcelRepository.getAll();
+        if (active) {
+          setParcels(list);
+        }
+      })();
+
+      void checkClipboard();
+
+      return () => {
+        active = false;
+      };
+    }, [checkClipboard])
+  );
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (nextState: AppStateStatus) => {

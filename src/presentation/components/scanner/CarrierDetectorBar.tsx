@@ -3,30 +3,92 @@ import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { DetectedCarrier } from '../../../domain/models/carrier';
 import { Theme } from '../../theme/adaptiveTheme';
 import { useTheme } from '../../theme/ThemeContext';
-import { Sparkles, Check } from 'lucide-react-native';
+import { Sparkles, Check, Layers, ChevronRight, Truck } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 
 interface CarrierDetectorBarProps {
   candidates: DetectedCarrier[];
   selectedCarrierSlug?: string;
   onSelectCarrier: (slug: string) => void;
+  onOpenCatalog?: () => void;
 }
 
 export const CarrierDetectorBar: React.FC<CarrierDetectorBarProps> = ({
   candidates,
   selectedCarrierSlug,
   onSelectCarrier,
+  onOpenCatalog,
 }) => {
   const { theme } = useTheme();
-  if (candidates.length === 0) return null;
+
+  if (candidates.length === 0) {
+    if (!onOpenCatalog) return null;
+
+    return (
+      <View style={styles.container}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Abrir catálogo completo de transportistas"
+          onPress={async () => {
+            try {
+              await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            } catch {}
+            onOpenCatalog();
+          }}
+          style={({ pressed }) => [
+            styles.emptyCatalogPrompt,
+            { backgroundColor: theme.surface, borderColor: theme.border },
+            pressed && styles.pressed,
+          ]}
+        >
+          <View style={styles.promptLeft}>
+            <Truck size={16} color={theme.textPrimary} strokeWidth={2.5} style={{ marginRight: 8 }} />
+            <Text style={[styles.promptText, { color: theme.textPrimary }]}>
+              ELEGIR TRANSPORTISTA DEL CATÁLOGO
+            </Text>
+          </View>
+          <View style={styles.promptRight}>
+            <Text style={[styles.promptCount, { color: theme.textSecondary }]}>28 disp.</Text>
+            <ChevronRight size={16} color={theme.textPrimary} strokeWidth={2.5} />
+          </View>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       <View style={styles.labelRow}>
-        <Sparkles size={14} color={theme.textPrimary} strokeWidth={2.5} style={styles.sparkleIcon} />
-        <Text style={[styles.headerLabel, { color: theme.textPrimary }]}>
-          TRANSPORTISTAS DETECTADOS:
-        </Text>
+        <View style={styles.labelLeft}>
+          <Sparkles size={14} color={theme.yellow} strokeWidth={3} style={styles.sparkleIcon} />
+          <Text style={[styles.headerLabel, { color: theme.textPrimary }]}>
+            OPCIONES RECOMENDADAS:
+          </Text>
+        </View>
+
+        {onOpenCatalog && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Ver catálogo completo de transportistas"
+            onPress={async () => {
+              try {
+                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              } catch {}
+              onOpenCatalog();
+            }}
+            style={({ pressed }) => [
+              styles.openCatalogHeaderBtn,
+              { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+              pressed && styles.pressed,
+            ]}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <Layers size={12} color={theme.textPrimary} strokeWidth={2.5} style={{ marginRight: 4 }} />
+            <Text style={[styles.openCatalogHeaderText, { color: theme.textPrimary }]}>
+              CATÁLOGO
+            </Text>
+          </Pressable>
+        )}
       </View>
 
       <ScrollView
@@ -91,6 +153,30 @@ export const CarrierDetectorBar: React.FC<CarrierDetectorBarProps> = ({
             </Pressable>
           );
         })}
+
+        {onOpenCatalog && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Ver más transportistas del catálogo"
+            onPress={async () => {
+              try {
+                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              } catch {}
+              onOpenCatalog();
+            }}
+            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+            style={({ pressed }) => [
+              styles.catalogChip,
+              { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+              pressed && styles.pressed,
+            ]}
+          >
+            <Layers size={14} color={theme.textPrimary} strokeWidth={2.5} style={{ marginRight: 6 }} />
+            <Text style={[styles.catalogChipText, { color: theme.textPrimary }]}>
+              + CATÁLOGO (28)
+            </Text>
+          </Pressable>
+        )}
       </ScrollView>
     </View>
   );
@@ -104,7 +190,12 @@ const styles = StyleSheet.create({
   labelRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 8,
+  },
+  labelLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   sparkleIcon: {
     marginRight: 6,
@@ -112,8 +203,20 @@ const styles = StyleSheet.create({
   headerLabel: {
     fontSize: 10,
     fontWeight: '900',
-    color: '#000000',
     letterSpacing: 0.6,
+  },
+  openCatalogHeaderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: Theme.radius.xs,
+    borderWidth: 1.5,
+  },
+  openCatalogHeaderText: {
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.4,
   },
   scrollList: {
     flexDirection: 'row',
@@ -124,13 +227,12 @@ const styles = StyleSheet.create({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 48,
+    minHeight: 44,
     minWidth: 48,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 8,
     borderRadius: Theme.radius.sm,
     borderWidth: 2,
-    borderColor: '#000000',
     marginRight: 10,
     ...Theme.shadows.sm,
   },
@@ -143,7 +245,6 @@ const styles = StyleSheet.create({
   carrierName: {
     fontSize: 11,
     fontWeight: '900',
-    color: '#000000',
     letterSpacing: 0.2,
   },
   confidenceBadge: {
@@ -166,5 +267,49 @@ const styles = StyleSheet.create({
   },
   checkIcon: {
     marginLeft: 5,
+  },
+  catalogChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 44,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: Theme.radius.sm,
+    borderWidth: 2,
+    marginRight: 4,
+    ...Theme.shadows.sm,
+  },
+  catalogChipText: {
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+  emptyCatalogPrompt: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: Theme.radius.sm,
+    borderWidth: 2,
+    ...Theme.shadows.sm,
+  },
+  promptLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  promptText: {
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+  promptRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  promptCount: {
+    fontSize: 10,
+    fontWeight: '700',
   },
 });

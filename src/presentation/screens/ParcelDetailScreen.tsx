@@ -17,9 +17,13 @@ import { JourneyFlow } from '../components/detail/JourneyFlow';
 import { EventTimeline } from '../components/detail/EventTimeline';
 import { RenameParcelModal } from '../components/common/RenameParcelModal';
 import { DeleteParcelModal } from '../components/common/DeleteParcelModal';
+import { CarrierSelectorModal } from '../components/common/CarrierSelectorModal';
 import { trackingEngineManager } from '../../infrastructure/engine';
 import { parcelRepository } from '../../infrastructure/storage/ParcelRepository';
 import { useTheme } from '../theme/ThemeContext';
+import { useI18n } from '../../infrastructure/i18n';
+import { Carrier, DetectedCarrier } from '../../domain/models/carrier';
+import * as Haptics from 'expo-haptics';
 import {
   ArrowLeft,
   ExternalLink,
@@ -31,6 +35,7 @@ import {
   Edit2,
   RefreshCw,
   Copy,
+  ArrowRightLeft,
 } from 'lucide-react-native';
 import { ShareService } from '../../infrastructure/services/ShareService';
 
@@ -52,9 +57,69 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
   onParcelUpdated,
 }) => {
   const { theme } = useTheme();
+  const { t } = useI18n();
   const [renameModalVisible, setRenameModalVisible] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [carrierModalVisible, setCarrierModalVisible] = useState(false);
+  const [carrierCandidates, setCarrierCandidates] = useState<DetectedCarrier[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleOpenCarrierSelector = async () => {
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+
+    try {
+      const candidates = await trackingEngineManager.current.detect(parcel.trackingNumber);
+      setCarrierCandidates(candidates);
+    } catch {
+      setCarrierCandidates([]);
+    }
+    setCarrierModalVisible(true);
+  };
+
+  const handleChangeCarrier = async (newCarrier: Carrier) => {
+    setCarrierModalVisible(false);
+    if (newCarrier.slug === parcel.carrier.slug) return;
+
+    try {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {}
+
+    const updated: Parcel = {
+      ...parcel,
+      carrier: newCarrier,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await parcelRepository.save(updated);
+    if (onParcelUpdated) {
+      onParcelUpdated(updated);
+    }
+
+    setIsRefreshing(true);
+    try {
+      const refreshed = await trackingEngineManager.current.track({
+        trackingNumber: updated.trackingNumber,
+        carrierHint: newCarrier.slug,
+        postalCode: updated.postalCode,
+        lang: 'es',
+      });
+      if (updated.customAlias) {
+        refreshed.customAlias = updated.customAlias;
+      }
+      refreshed.id = updated.id;
+      refreshed.isArchived = updated.isArchived;
+      await parcelRepository.save(refreshed);
+      if (onParcelUpdated) {
+        onParcelUpdated(refreshed);
+      }
+    } catch {
+      // Retain manual carrier selection even if live API fetch errors
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handleFetchUpdate = async () => {
     setIsRefreshing(true);
@@ -154,14 +219,23 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
           <ArrowLeft size={20} color={theme.textPrimary} strokeWidth={3} />
         </Pressable>
 
-        <View style={styles.navTitleBox}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Cambiar transportista"
+          onPress={handleOpenCarrierSelector}
+          style={({ pressed }) => [styles.navTitleBox, pressed && styles.smallPressed]}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        >
           <Text style={[styles.navTitle, { color: theme.textPrimary }]} numberOfLines={1}>
             {parcel.customAlias || parcel.trackingNumber}
           </Text>
-          <Text style={[styles.navSubtitle, { color: theme.textTertiary }]} numberOfLines={1}>
-            {parcel.carrier.name.toUpperCase()}
-          </Text>
-        </View>
+          <View style={styles.navSubtitleRow}>
+            <Text style={[styles.navSubtitle, { color: theme.textTertiary }]} numberOfLines={1}>
+              {parcel.carrier.name.toUpperCase()}
+            </Text>
+            <ArrowRightLeft size={11} color={theme.textTertiary} strokeWidth={2.5} style={{ marginLeft: 5 }} />
+          </View>
+        </Pressable>
 
         <View style={styles.navActions}>
           <Pressable
@@ -400,6 +474,23 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
           <ExternalLink size={16} color={theme.textPrimary} strokeWidth={3} />
         </Pressable>
 
+        {/* Change Carrier Action Button */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Cambiar transportista actual (${parcel.carrier.name})`}
+          onPress={handleOpenCarrierSelector}
+          style={({ pressed }) => [
+            styles.changeCarrierButton,
+            { backgroundColor: theme.yellow, borderColor: theme.border },
+            pressed && styles.pressed,
+          ]}
+        >
+          <ArrowRightLeft size={16} color="#000000" strokeWidth={2.5} style={{ marginRight: 8 }} />
+          <Text style={styles.changeCarrierButtonText} numberOfLines={1}>
+            {t.detail.changeCarrier || 'CAMBIAR TRANSPORTISTA'} ({parcel.carrier.name.toUpperCase()})
+          </Text>
+        </Pressable>
+
         {/* Full Event Timeline */}
         <EventTimeline events={parcel.events} />
 
@@ -445,6 +536,16 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
           }}
         />
       )}
+
+      {/* Carrier Selector Modal (Full Catalog with Recommended Options) */}
+      <CarrierSelectorModal
+        visible={carrierModalVisible}
+        onClose={() => setCarrierModalVisible(false)}
+        onSelectCarrier={handleChangeCarrier}
+        selectedCarrierSlug={parcel.carrier.slug}
+        candidates={carrierCandidates}
+        title={t.detail.changeCarrier}
+      />
     </View>
   );
 };
@@ -736,7 +837,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: Theme.radius.sm,
     marginHorizontal: 20,
-    marginBottom: 16,
+    marginBottom: 12,
     borderWidth: Theme.borders.width,
     borderColor: '#000000',
     ...Theme.shadows.md,
@@ -748,6 +849,30 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 0.4,
     marginRight: 8,
+  },
+  changeCarrierButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 46,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: Theme.radius.sm,
+    marginHorizontal: 20,
+    marginBottom: 16,
+    borderWidth: Theme.borders.width,
+    ...Theme.shadows.sm,
+  },
+  changeCarrierButtonText: {
+    flexShrink: 1,
+    color: '#000000',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  navSubtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   deleteButton: {
     flexDirection: 'row',
@@ -773,6 +898,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   pressed: {
+    ...Theme.pressed,
+  },
+  smallPressed: {
     ...Theme.pressed,
   },
 });

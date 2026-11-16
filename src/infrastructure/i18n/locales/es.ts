@@ -107,6 +107,8 @@ export const es = {
     officialSite: 'CONSULTAR EN WEB OFICIAL',
     copySummaryBtn: 'COPIAR RESUMEN',
     shareSummaryBtn: 'COMPARTIR',
+    changeCarrier: 'CAMBIAR TRANSPORTISTA',
+    carrierChangedToast: '¡Transportista actualizado con éxito!',
   },
 
   // Modals
@@ -125,6 +127,21 @@ export const es = {
     startTrackingBtn: 'INICIAR SEGUIMIENTO',
     cameraScanBtn: 'ESCANEAR CON CÁMARA',
     cancelBtn: 'CANCELAR',
+    selectedCarrierLabel: 'TRANSPORTISTA SELECCIONADO',
+    changeCarrierBtn: 'CAMBIAR',
+    catalogModalTitle: 'CATÁLOGO DE TRANSPORTISTAS',
+    searchCarriersPlaceholder: 'Buscar por nombre, país o código...',
+    recommendedSection: 'OPCIONES RECOMENDADAS',
+    recommendedSubtitle: 'Sugeridas según el formato del código',
+    allCarriersSection: 'TODOS LOS TRANSPORTISTAS',
+    liveTrackingBadge: 'EN VIVO',
+    requiresPostalBadge: 'REQUIERE C.P.',
+    filterAll: 'TODOS',
+    filterSpain: 'ESPAÑA',
+    filterGlobal: 'INTERNACIONAL',
+    filterLive: 'EN VIVO',
+    noCarriersFound: 'No se encontró ningún transportista con esa búsqueda.',
+    openCatalogBtn: 'VER CATÁLOGO COMPLETO',
   },
 
   deleteModal: {

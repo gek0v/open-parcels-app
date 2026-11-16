@@ -4,8 +4,28 @@ import { sqliteParcelRepository } from './sqlite/SqliteParcelRepository';
 
 const STORAGE_KEY = '@open_parcels:saved_parcels_v1';
 
+export type ParcelRepositoryListener = () => void;
+
 export class ParcelRepository {
   private useSqlite = true;
+  private listeners: Set<ParcelRepositoryListener> = new Set();
+
+  subscribe(listener: ParcelRepositoryListener): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  notify(): void {
+    for (const listener of this.listeners) {
+      try {
+        listener();
+      } catch (err) {
+        console.warn('ParcelRepository listener error:', err);
+      }
+    }
+  }
 
   async getAll(): Promise<Parcel[]> {
     if (this.useSqlite) {
@@ -47,6 +67,7 @@ export class ParcelRepository {
     if (this.useSqlite) {
       try {
         await sqliteParcelRepository.save(parcel);
+        this.notify();
         return;
       } catch {
         this.useSqlite = false;
@@ -65,12 +86,14 @@ export class ParcelRepository {
     }
 
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+    this.notify();
   }
 
   async delete(id: string): Promise<void> {
     if (this.useSqlite) {
       try {
         await sqliteParcelRepository.delete(id);
+        this.notify();
         return;
       } catch {
         this.useSqlite = false;
@@ -80,12 +103,15 @@ export class ParcelRepository {
     const all = await this.getAll();
     const filtered = all.filter((p) => p.id !== id);
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+    this.notify();
   }
 
   async updateAlias(id: string, newAlias: string): Promise<Parcel | null> {
     if (this.useSqlite) {
       try {
-        return await sqliteParcelRepository.updateAlias(id, newAlias);
+        const res = await sqliteParcelRepository.updateAlias(id, newAlias);
+        this.notify();
+        return res;
       } catch {
         this.useSqlite = false;
       }
@@ -103,13 +129,16 @@ export class ParcelRepository {
     };
 
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+    this.notify();
     return all[index];
   }
 
   async toggleArchive(id: string): Promise<Parcel | null> {
     if (this.useSqlite) {
       try {
-        return await sqliteParcelRepository.toggleArchive(id);
+        const res = await sqliteParcelRepository.toggleArchive(id);
+        this.notify();
+        return res;
       } catch {
         this.useSqlite = false;
       }
@@ -126,6 +155,7 @@ export class ParcelRepository {
     };
 
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+    this.notify();
     return all[index];
   }
 }
