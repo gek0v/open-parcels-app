@@ -20,14 +20,22 @@ mock.module('expo-clipboard', () => ({
 };
 
 mock.module('react-native', () => ({
+  View: 'View',
+  Text: 'Text',
+  StyleSheet: { create: (styles: any) => styles, absoluteFill: {} },
+  Pressable: 'Pressable',
+  ScrollView: 'ScrollView',
+  Platform: {
+    OS: 'android',
+    select: (obj: any) => obj.android || obj.default,
+  },
+  Linking: { openURL: async () => {}, canOpenURL: async () => true },
+  TurboModuleRegistry: { get: () => null },
   Share: {
     share: async (content: any) => {
       shareCalls.push(content);
       return { action: 'sharedAction' };
     },
-  },
-  Platform: {
-    OS: 'android',
   },
 }));
 

@@ -3,16 +3,27 @@ import { describe, expect, it, mock, beforeEach } from 'bun:test';
 let mockStorage: Record<string, string> = {};
 
 mock.module('react-native', () => ({
+  View: 'View',
+  Text: 'Text',
   Platform: { OS: 'android', select: (obj: any) => obj.android ?? obj.default },
   StyleSheet: {
     create: (styles: any) => styles,
     absoluteFill: {},
   },
+  Linking: { openURL: async () => {}, canOpenURL: async () => true },
   AppState: {
     addEventListener: () => ({ remove: () => {} }),
   },
   TurboModuleRegistry: {
     get: () => null,
+  },
+  Share: {
+    share: async (content: any) => {
+      if ((globalThis as any).__mockShareFn) {
+        return (globalThis as any).__mockShareFn(content);
+      }
+      return { action: 'sharedAction' };
+    },
   },
 }));
 

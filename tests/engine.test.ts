@@ -30,9 +30,21 @@ describe('NativeGoTrackingEngine On-Device Execution', () => {
   it('handles NativeGoTrackingEngine fallback and Go JSON payload mapping', async () => {
     let available = false;
     mock.module('react-native', () => ({
+      View: 'View',
+      Text: 'Text',
+      StyleSheet: { create: (styles: any) => styles, absoluteFill: {} },
+      Pressable: 'Pressable',
+      ScrollView: 'ScrollView',
       Platform: { OS: 'ios', select: (obj: any) => obj.ios || obj.default },
-      Linking: { openURL: async () => {} },
-      Share: { share: async () => ({ action: 'sharedAction' }) },
+      Linking: { openURL: async () => {}, canOpenURL: async () => true },
+      Share: {
+        share: async (content: any) => {
+          if ((globalThis as any).__mockShareFn) {
+            return (globalThis as any).__mockShareFn(content);
+          }
+          return { action: 'sharedAction' };
+        },
+      },
       TurboModuleRegistry: {
         get: () => ({
           isAvailable: () => available,

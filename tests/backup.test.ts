@@ -153,7 +153,14 @@ mock.module('expo-document-picker', () => ({
 }));
 
 mock.module('react-native', () => ({
+  View: 'View',
+  Text: 'Text',
+  StyleSheet: { create: (styles: any) => styles, absoluteFill: {} },
+  Pressable: 'Pressable',
+  ScrollView: 'ScrollView',
   Platform: { OS: 'android', select: (obj: any) => obj.android || obj.default },
+  Linking: { openURL: async () => {}, canOpenURL: async () => true },
+  TurboModuleRegistry: { get: () => null },
   Share: {
     share: async (content: any) => {
       if ((globalThis as any).__mockShareFn) {

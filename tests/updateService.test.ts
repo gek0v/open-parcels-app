@@ -146,6 +146,11 @@ mock.module('expo-intent-launcher', () => ({
 }));
 
 mock.module('react-native', () => ({
+  View: 'View',
+  Text: 'Text',
+  StyleSheet: { create: (styles: any) => styles, absoluteFill: {} },
+  Pressable: 'Pressable',
+  ScrollView: 'ScrollView',
   Platform: {
     get OS() {
       return mockPlatformOS;
@@ -156,9 +161,15 @@ mock.module('react-native', () => ({
     openURL: async (url: string) => {
       openURLCalls.push(url);
     },
+    canOpenURL: async () => true,
   },
   Share: {
-    share: async () => ({ action: 'sharedAction' }),
+    share: async (content: any) => {
+      if ((globalThis as any).__mockShareFn) {
+        return (globalThis as any).__mockShareFn(content);
+      }
+      return { action: 'sharedAction' };
+    },
   },
   TurboModuleRegistry: {
     get: () => null,
