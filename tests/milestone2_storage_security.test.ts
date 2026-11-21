@@ -43,6 +43,14 @@ mock.module('react-native', () => ({
   TurboModuleRegistry: {
     get: () => null,
   },
+  Share: {
+    share: async (content: any) => {
+      if ((globalThis as any).__mockShareFn) {
+        return (globalThis as any).__mockShareFn(content);
+      }
+      return { action: 'sharedAction' };
+    },
+  },
 }));
 
 const asyncStorageStore = new Map<string, string>();

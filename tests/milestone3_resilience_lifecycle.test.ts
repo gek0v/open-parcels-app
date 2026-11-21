@@ -22,6 +22,14 @@ mock.module('react-native', () => ({
     parallel: (anims: any[]) => ({ start: (cb?: any) => cb?.() }),
   },
   TurboModuleRegistry: { get: () => null },
+  Share: {
+    share: async (content: any) => {
+      if ((globalThis as any).__mockShareFn) {
+        return (globalThis as any).__mockShareFn(content);
+      }
+      return { action: 'sharedAction' };
+    },
+  },
 }));
 
 mock.module('expo-haptics', () => ({
@@ -96,6 +104,24 @@ mock.module('lucide-react-native', () => ({
   LayoutGrid: 'LayoutGrid',
   Plus: 'Plus',
   Search: 'Search',
+  Sparkles: 'Sparkles',
+  Zap: 'Zap',
+  Copy: 'Copy',
+  Archive: 'Archive',
+  ExternalLink: 'ExternalLink',
+  Calendar: 'Calendar',
+  ArrowRightLeft: 'ArrowRightLeft',
+  Download: 'Download',
+  Upload: 'Upload',
+  Database: 'Database',
+  CheckCircle: 'CheckCircle',
+  ShieldAlert: 'ShieldAlert',
+  ShieldCheck: 'ShieldCheck',
+  Palette: 'Palette',
+  CheckCheck: 'CheckCheck',
+  Layers: 'Layers',
+  ChevronRight: 'ChevronRight',
+  Clipboard: 'Clipboard',
 }));
 
 const { ErrorBoundary } = await import('../src/presentation/components/common/ErrorBoundary');

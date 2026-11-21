@@ -47,7 +47,14 @@ mock.module('react-native', () => ({
     get: () => ({ width: 375, height: 812, scale: 2, fontScale: 1 }),
     addEventListener: () => ({ remove: () => {} }),
   },
-  Share: { share: async () => ({ action: 'sharedAction' }) },
+  Share: {
+    share: async (content: any) => {
+      if ((globalThis as any).__mockShareFn) {
+        return (globalThis as any).__mockShareFn(content);
+      }
+      return { action: 'sharedAction' };
+    },
+  },
 }));
 
 mock.module('expo-modules-core', () => ({
@@ -94,7 +101,11 @@ mock.module('expo-file-system/legacy', () => ({
 
 mock.module('expo-sharing', () => ({
   isAvailableAsync: async () => true,
-  shareAsync: async () => {},
+  shareAsync: async (uri: string) => {
+    if ((globalThis as any).__backupSharedFiles) {
+      (globalThis as any).__backupSharedFiles.push(uri);
+    }
+  },
 }));
 
 mock.module('expo-document-picker', () => ({
@@ -122,6 +133,14 @@ mock.module('expo-clipboard', () => ({
 }));
 
 mock.module('lucide-react-native', () => ({
+  AlertTriangle: 'AlertTriangle',
+  RefreshCw: 'RefreshCw',
+  ChevronDown: 'ChevronDown',
+  ChevronUp: 'ChevronUp',
+  Compass: 'Compass',
+  Home: 'Home',
+  ArrowLeft: 'ArrowLeft',
+  AlertCircle: 'AlertCircle',
   Plane: 'Plane',
   Truck: 'Truck',
   MapPin: 'MapPin',
@@ -137,7 +156,29 @@ mock.module('lucide-react-native', () => ({
   X: 'X',
   Check: 'Check',
   Trash2: 'Trash2',
-  AlertTriangle: 'AlertTriangle',
+  Package: 'Package',
+  Cpu: 'Cpu',
+  LayoutGrid: 'LayoutGrid',
+  Plus: 'Plus',
+  Search: 'Search',
+  Sparkles: 'Sparkles',
+  Zap: 'Zap',
+  Copy: 'Copy',
+  Archive: 'Archive',
+  ExternalLink: 'ExternalLink',
+  Calendar: 'Calendar',
+  ArrowRightLeft: 'ArrowRightLeft',
+  Download: 'Download',
+  Upload: 'Upload',
+  Database: 'Database',
+  CheckCircle: 'CheckCircle',
+  ShieldAlert: 'ShieldAlert',
+  ShieldCheck: 'ShieldCheck',
+  Palette: 'Palette',
+  CheckCheck: 'CheckCheck',
+  Layers: 'Layers',
+  ChevronRight: 'ChevronRight',
+  Clipboard: 'Clipboard',
 }));
 
 const { getLatestEvent } = await import('../src/domain/entities/events');

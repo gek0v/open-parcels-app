@@ -131,6 +131,9 @@ mock.module('expo-sharing', () => ({
   isAvailableAsync: async () => true,
   shareAsync: async (uri: string) => {
     sharedFiles.push(uri);
+    if ((globalThis as any).__backupSharedFiles && (globalThis as any).__backupSharedFiles !== sharedFiles) {
+      (globalThis as any).__backupSharedFiles.push(uri);
+    }
   },
 }));
 
@@ -152,7 +155,12 @@ mock.module('expo-document-picker', () => ({
 mock.module('react-native', () => ({
   Platform: { OS: 'android', select: (obj: any) => obj.android || obj.default },
   Share: {
-    share: async () => ({ action: 'sharedAction' }),
+    share: async (content: any) => {
+      if ((globalThis as any).__mockShareFn) {
+        return (globalThis as any).__mockShareFn(content);
+      }
+      return { action: 'sharedAction' };
+    },
   },
 }));
 
@@ -465,6 +473,7 @@ describe('BackupService Full Flow', () => {
     mockFiles = {};
     (globalThis as any).__backupMockFiles = mockFiles;
     sharedFiles = [];
+    (globalThis as any).__backupSharedFiles = sharedFiles;
   });
 
   it('creates versioned backup payload with current repository parcels', async () => {
