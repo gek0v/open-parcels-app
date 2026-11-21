@@ -1,4 +1,8 @@
-import { Linking } from 'react-native';
+import * as ReactNative from 'react-native';
+
+const getLinking = () => {
+  return (ReactNative as any).Linking || (ReactNative as any).default?.Linking;
+};
 
 /**
  * Checks whether the given URL string is a safe web URL (http:// or https:// only).
@@ -54,8 +58,12 @@ export async function openSafeWebUrl(
   }
 
   try {
-    await Linking.openURL(targetUrl);
-    return true;
+    const linking = getLinking();
+    if (linking && typeof linking.openURL === 'function') {
+      await linking.openURL(targetUrl);
+      return true;
+    }
+    return false;
   } catch (err) {
     console.warn('Failed to open safe web URL:', targetUrl, err);
     return false;

@@ -131,7 +131,8 @@ mock.module('expo-intent-launcher', () => ({
 
 const { safeJsonParse } = await import('../src/infrastructure/utils/safeJson');
 const { isSafeWebUrl, openSafeWebUrl } = await import('../src/infrastructure/utils/url');
-const { Linking } = await import('react-native');
+const ReactNative = await import('react-native');
+const Linking = (ReactNative as any).Linking || (ReactNative as any).default?.Linking;
 const {
   isTrustedDownloadUrl,
   UpdateService,
