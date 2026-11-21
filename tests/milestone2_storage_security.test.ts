@@ -189,6 +189,11 @@ describe('Milestone 2: safeJsonParse', () => {
 describe('Milestone 2: URL Safety & Protocols (url.ts)', () => {
   beforeEach(() => {
     mockOpenURL.mockClear();
+    (globalThis as any).__mockOpenURL = mockOpenURL;
+    (globalThis as any).__mockLinking = {
+      openURL: mockOpenURL,
+      canOpenURL: mock(async () => true),
+    };
   });
 
   test('isSafeWebUrl accepts valid http:// and https:// URLs', () => {

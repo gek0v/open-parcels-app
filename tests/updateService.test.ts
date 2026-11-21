@@ -512,6 +512,15 @@ describe('UpdateService Native Android Installer & Intent Launching', () => {
   });
 
   it('openInBrowser delegates to Linking.openURL', async () => {
+    (globalThis as any).__mockOpenURL = async (url: string) => {
+      openURLCalls.push(url);
+    };
+    (globalThis as any).__mockLinking = {
+      openURL: async (url: string) => {
+        openURLCalls.push(url);
+      },
+      canOpenURL: async () => true,
+    };
     await service.openInBrowser('https://github.com/gek0v/open-parcels-app');
     expect(openURLCalls).toContain('https://github.com/gek0v/open-parcels-app');
   });

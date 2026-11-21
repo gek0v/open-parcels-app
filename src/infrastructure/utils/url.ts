@@ -1,6 +1,9 @@
 import * as ReactNative from 'react-native';
 
 const getLinking = () => {
+  if ((globalThis as any).__mockLinking) {
+    return (globalThis as any).__mockLinking;
+  }
   return (ReactNative as any).Linking || (ReactNative as any).default?.Linking;
 };
 
