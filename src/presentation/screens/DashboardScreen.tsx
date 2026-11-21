@@ -13,6 +13,7 @@ import {
 import * as Clipboard from 'expo-clipboard';
 import { Parcel } from '../../domain/models/parcel';
 import { parcelRepository } from '../../infrastructure/storage/ParcelRepository';
+import { trackingEngineManager } from '../../infrastructure/engine';
 import { validateTrackingNumber } from '../../domain/validators/detection';
 import { cleanTrackingNumber } from '../../domain/validators/checksums';
 import { Theme } from '../theme/adaptiveTheme';
@@ -83,18 +84,40 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     confidence?: number;
   } | null>(null);
   const dismissedClipboardRef = useRef<Set<string>>(new Set());
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
-    AsyncStorage.getItem(CARD_STYLE_KEY).then((stored) => {
-      if (stored === 'bento' || stored === 'industrial' || stored === 'retro') {
-        setCardStyle(stored);
-      }
-    });
-    AsyncStorage.getItem(SORT_OPTION_KEY).then((stored) => {
-      if (stored === 'updated' || stored === 'days' || stored === 'carrier') {
-        setSortBy(stored);
-      }
-    });
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    AsyncStorage.getItem(CARD_STYLE_KEY)
+      .then((stored) => {
+        if (isMounted && (stored === 'bento' || stored === 'industrial' || stored === 'retro')) {
+          setCardStyle(stored);
+        }
+      })
+      .catch((err) => {
+        console.warn('[DashboardScreen] load card style error:', err);
+      });
+
+    AsyncStorage.getItem(SORT_OPTION_KEY)
+      .then((stored) => {
+        if (isMounted && (stored === 'updated' || stored === 'days' || stored === 'carrier')) {
+          setSortBy(stored);
+        }
+      })
+      .catch((err) => {
+        console.warn('[DashboardScreen] load sort option error:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const handleCardStyleChange = async (style: CardStyle) => {
@@ -120,22 +143,24 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
   const checkClipboard = useCallback(async () => {
     try {
-      const hasString = await Clipboard.hasStringAsync();
-      if (!hasString) return;
-      const text = await Clipboard.getStringAsync();
-      if (!text) return;
+      if (!isMountedRef.current) return;
+      const hasString = await Clipboard.hasStringAsync().catch(() => false);
+      if (!hasString || !isMountedRef.current) return;
+      const text = await Clipboard.getStringAsync().catch(() => '');
+      if (!text || !isMountedRef.current) return;
 
       const validation = validateTrackingNumber(text);
-      if (!validation.isValid) return;
+      if (!validation.isValid || !isMountedRef.current) return;
 
       if (dismissedClipboardRef.current.has(validation.cleanNumber)) return;
 
       // Check if parcel is already saved in repository
-      const all = await parcelRepository.getAll();
+      const all = await parcelRepository.getAll().catch(() => []);
+      if (!isMountedRef.current) return;
       const alreadySaved = all.some(
         (p) => cleanTrackingNumber(p.trackingNumber) === validation.cleanNumber
       );
-      if (alreadySaved) return;
+      if (alreadySaved || !isMountedRef.current) return;
 
       setDetectedClipboard({
         trackingNumber: validation.cleanNumber,
@@ -224,8 +249,53 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await loadParcels();
-    setIsRefreshing(false);
+    try {
+      const currentParcels = await parcelRepository.getAll();
+      const activeParcels = currentParcels.filter((p) => !p.isArchived && p.status !== 'delivered');
+
+      if (activeParcels.length > 0) {
+        const engine = trackingEngineManager.current;
+        const updatedParcels: Parcel[] = [];
+
+        for (const parcel of activeParcels) {
+          try {
+            const refreshed = await engine.track({
+              trackingNumber: parcel.trackingNumber,
+              carrierHint: parcel.carrier.slug,
+              postalCode: parcel.postalCode,
+              destinationCountry: parcel.destination?.code,
+              allowSimulated: false,
+              lang,
+            });
+
+            if (refreshed && refreshed.isLiveData !== false && !refreshed.error) {
+              const merged: Parcel = {
+                ...refreshed,
+                id: parcel.id,
+                customAlias: parcel.customAlias,
+                notes: parcel.notes,
+                isArchived: parcel.isArchived,
+                createdAt: parcel.createdAt,
+                updatedAt: new Date().toISOString(),
+              };
+              updatedParcels.push(merged);
+            }
+          } catch (trackErr) {
+            console.warn(`[DashboardScreen] Refresh failed for ${parcel.trackingNumber}:`, trackErr);
+          }
+        }
+
+        if (updatedParcels.length > 0) {
+          await parcelRepository.saveAll(updatedParcels);
+        }
+      }
+
+      await loadParcels();
+    } catch (err) {
+      console.warn('[DashboardScreen] handleRefresh error:', err);
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
 
@@ -256,7 +326,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       const matchAlias = p.customAlias?.toLowerCase().includes(q);
       const matchCode = p.trackingNumber.toLowerCase().includes(q);
       const matchCarrier = p.carrier.name.toLowerCase().includes(q);
-      return matchAlias || matchCode || matchCarrier;
+      const matchLastMileCode = p.lastMileTrackingNumber?.toLowerCase().includes(q);
+      const matchLastMileCarrier = p.lastMileCarrier?.name.toLowerCase().includes(q);
+      return matchAlias || matchCode || matchCarrier || matchLastMileCode || matchLastMileCarrier;
     }
 
     return true;
@@ -657,54 +729,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Theme.colors.background,
-  },
-  mockupSwitcher: {
-    backgroundColor: '#000000',
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 10,
-    borderBottomWidth: 2.5,
-    borderBottomColor: '#000000',
-  },
-  mockupHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 6,
-  },
-  mockupSwitcherLabel: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: '#FFE600',
-    letterSpacing: 0.5,
-  },
-  mockupTabs: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  mockupTab: {
-    flex: 1,
-    paddingVertical: 7,
-    paddingHorizontal: 4,
-    borderRadius: Theme.radius.xs,
-    backgroundColor: '#1E293B',
-    borderWidth: 1.5,
-    borderColor: '#475569',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mockupTabActive: {
-    backgroundColor: '#FFE600',
-    borderColor: '#000000',
-  },
-  mockupTabText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#94A3B8',
-  },
-  mockupTabTextActive: {
-    color: '#000000',
-    fontWeight: '900',
   },
   retroOsBanner: {
     backgroundColor: '#7C3AED',

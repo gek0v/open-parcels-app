@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Parcel } from '../../../domain/models/parcel';
+import { getLatestEvent } from '../../../domain/entities/events';
 import { AdaptiveCard } from '../common/AdaptiveCard';
 import { StatusBadge } from '../common/StatusBadge';
 import { ProgressBar } from '../common/ProgressBar';
@@ -15,7 +16,7 @@ interface ParcelCardProps {
 }
 
 export const ParcelCard: React.FC<ParcelCardProps> = ({ parcel, onPress, onRename, onShare }) => {
-  const latestEvent = parcel.events[parcel.events.length - 1];
+  const latestEvent = getLatestEvent(parcel.events);
   const isChained = !!(parcel.additionalCarriers && parcel.additionalCarriers.length > 0);
 
   return (

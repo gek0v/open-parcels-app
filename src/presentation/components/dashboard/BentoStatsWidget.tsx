@@ -33,11 +33,11 @@ export const BentoStatsWidget: React.FC<BentoStatsWidgetProps> = ({
   activePace: propActivePace,
   parcels,
 }) => {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { theme } = useTheme();
 
   // Compute computed stats from parcels if available, else use props
-  const computed = parcels ? computeBentoStats(parcels) : null;
+  const computed = parcels ? computeBentoStats(parcels, lang) : null;
 
   const activeCount = computed ? computed.activeCount : propActiveCount;
   const outForDeliveryCount = computed ? computed.outForDeliveryCount : propOutForDeliveryCount;

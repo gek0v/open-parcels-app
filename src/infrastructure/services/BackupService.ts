@@ -2,6 +2,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { Parcel } from '../../domain/models/parcel';
+import { getLatestEvent } from '../../domain/entities/events';
 import { parcelRepository } from '../storage/ParcelRepository';
 import { cleanTrackingNumber } from '../../domain/validators/checksums';
 import { findCarrierBySlug } from '../../domain/validators/detection';
@@ -178,12 +179,10 @@ export function mergeParcels(
       importedCount++;
     } else {
       // Existing parcel: check if incoming is newer or has more events
-      const existingLatestDate = existing.events?.length
-        ? new Date(existing.events[existing.events.length - 1].date).getTime()
-        : 0;
-      const incomingLatestDate = inc.events?.length
-        ? new Date(inc.events[inc.events.length - 1].date).getTime()
-        : 0;
+      const existingLatest = getLatestEvent(existing.events);
+      const incomingLatest = getLatestEvent(inc.events);
+      const existingLatestDate = existingLatest ? new Date(existingLatest.date).getTime() : 0;
+      const incomingLatestDate = incomingLatest ? new Date(incomingLatest.date).getTime() : 0;
       const existingUpdated = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
       const incomingUpdated = new Date(inc.updatedAt || inc.createdAt || 0).getTime();
 
@@ -348,9 +347,15 @@ export class BackupService {
     const currentParcels = await parcelRepository.getAll();
     const merge = mergeParcels(currentParcels, validation.data.parcels);
 
-    // Save changed parcels to repository
-    for (const p of merge.changedParcels) {
-      await parcelRepository.save(p);
+    // Save changed parcels to repository in batch to avoid N+1 notification storm
+    if (merge.changedParcels.length > 0) {
+      if (typeof (parcelRepository as any).saveAll === 'function') {
+        await parcelRepository.saveAll(merge.changedParcels);
+      } else {
+        for (const p of merge.changedParcels) {
+          await parcelRepository.save(p);
+        }
+      }
     }
 
     return {

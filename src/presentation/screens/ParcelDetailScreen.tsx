@@ -6,7 +6,6 @@ import {
   ScrollView,
   Pressable,
   Alert,
-  Linking,
   ActivityIndicator,
 } from 'react-native';
 import { Parcel } from '../../domain/models/parcel';
@@ -23,6 +22,7 @@ import { parcelRepository } from '../../infrastructure/storage/ParcelRepository'
 import { useTheme } from '../theme/ThemeContext';
 import { useI18n } from '../../infrastructure/i18n';
 import { Carrier, DetectedCarrier } from '../../domain/models/carrier';
+import { openSafeWebUrl } from '../../infrastructure/utils/url';
 import * as Haptics from 'expo-haptics';
 import {
   ArrowLeft,
@@ -57,7 +57,7 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
   onParcelUpdated,
 }) => {
   const { theme } = useTheme();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [renameModalVisible, setRenameModalVisible] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [carrierModalVisible, setCarrierModalVisible] = useState(false);
@@ -97,13 +97,20 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
       onParcelUpdated(updated);
     }
 
+    if (newCarrier.requiresPostalCode && !updated.postalCode) {
+      Alert.alert(
+        t.newParcelModal?.postalCodeLabel || 'Código Postal Requerido',
+        `${t.newParcelModal?.postalCodeHint || 'Este transportista exige código postal.'} (${newCarrier.name})`
+      );
+    }
+
     setIsRefreshing(true);
     try {
       const refreshed = await trackingEngineManager.current.track({
         trackingNumber: updated.trackingNumber,
         carrierHint: newCarrier.slug,
         postalCode: updated.postalCode,
-        lang: 'es',
+        lang: lang || 'es',
       });
       if (updated.customAlias) {
         refreshed.customAlias = updated.customAlias;
@@ -114,7 +121,13 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
       if (onParcelUpdated) {
         onParcelUpdated(refreshed);
       }
-    } catch {
+    } catch (err: any) {
+      if (err?.code === 'POSTAL_CODE_REQUIRED' || err?.message?.includes('código postal')) {
+        Alert.alert(
+          t.newParcelModal?.postalCodeLabel || 'Código Postal Requerido',
+          err.message || `${t.newParcelModal?.postalCodeHint || 'Este transportista exige código postal.'} (${newCarrier.name})`
+        );
+      }
       // Retain manual carrier selection even if live API fetch errors
     } finally {
       setIsRefreshing(false);
@@ -130,7 +143,7 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
         postalCode: parcel.postalCode,
         destinationCountry: parcel.destination?.code,
         allowSimulated: parcel.isLiveData ? false : undefined,
-        lang: 'es',
+        lang: lang || 'es',
       });
 
       if (parcel.isLiveData && updated.isLiveData === false) {
@@ -162,11 +175,14 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
     }
   };
 
-  const handleOpenCarrierWeb = () => {
-    const url = parcel.carrier.website || 'https://openparcels.com';
-    Linking.openURL(url).catch(() => {
+  const handleOpenCarrierWeb = async () => {
+    const success = await openSafeWebUrl(
+      parcel.carrier.website,
+      'https://openparcels.com'
+    );
+    if (!success) {
       Alert.alert('No se pudo abrir el navegador');
-    });
+    }
   };
 
   const handleShare = async () => {

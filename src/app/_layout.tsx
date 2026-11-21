@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -13,14 +13,17 @@ import { notificationService } from '../infrastructure/services/NotificationServ
 import { registerBackgroundSync } from '../infrastructure/services/BackgroundSyncService';
 import { trackingEngineManager } from '../infrastructure/engine';
 import { Theme } from '../presentation/theme/adaptiveTheme';
+import { ErrorBoundary } from '../presentation/components/common/ErrorBoundary';
 
 export default function RootLayout() {
   return (
-    <I18nProvider>
-      <ThemeProvider>
-        <RootLayoutContent />
-      </ThemeProvider>
-    </I18nProvider>
+    <ErrorBoundary>
+      <I18nProvider>
+        <ThemeProvider>
+          <RootLayoutContent />
+        </ThemeProvider>
+      </I18nProvider>
+    </ErrorBoundary>
   );
 }
 
@@ -31,23 +34,38 @@ function RootLayoutContent() {
   const [updateModalInfo, setUpdateModalInfo] = useState<UpdateInfo | null>(null);
 
   React.useEffect(() => {
-    void trackingEngineManager.hydrate();
-    notificationService.requestPermissions().then((granted) => {
-      if (granted) {
-        registerBackgroundSync();
-      }
+    void trackingEngineManager.hydrate().catch((err) => {
+      console.warn('[RootLayout] trackingEngine hydrate error:', err);
     });
+
+    notificationService
+      .requestPermissions()
+      .then((granted) => {
+        if (granted) {
+          registerBackgroundSync().catch((err) => {
+            console.warn('[RootLayout] registerBackgroundSync error:', err);
+          });
+        }
+      })
+      .catch((err) => {
+        console.warn('[RootLayout] notificationService requestPermissions error:', err);
+      });
   }, []);
 
-  const handleSplashFinish = () => {
+  const handleSplashFinish = useCallback(() => {
     setIsLoadingSplash(false);
     // Check if an update is available on GitHub Releases
-    updateService.checkForUpdate().then((info) => {
-      if (info) {
-        setUpdateToastInfo(info);
-      }
-    });
-  };
+    updateService
+      .checkForUpdate()
+      .then((info) => {
+        if (info) {
+          setUpdateToastInfo(info);
+        }
+      })
+      .catch((err) => {
+        console.warn('[RootLayout] updateService checkForUpdate error:', err);
+      });
+  }, []);
 
   const isDarkMode = themeKey === 'tokyoCyberpunk';
 

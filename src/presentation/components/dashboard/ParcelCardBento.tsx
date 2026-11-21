@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Parcel } from '../../../domain/models/parcel';
+import { getLatestEvent } from '../../../domain/entities/events';
 import { Theme } from '../../theme/adaptiveTheme';
 import { useTheme } from '../../theme/ThemeContext';
 import { StatusBadge } from '../common/StatusBadge';
@@ -22,7 +23,7 @@ export const ParcelCardBento: React.FC<ParcelCardBentoProps> = ({
   onShare,
 }) => {
   const { theme } = useTheme();
-  const latestEvent = parcel.events[parcel.events.length - 1];
+  const latestEvent = getLatestEvent(parcel.events);
   const isChained = !!(parcel.additionalCarriers && parcel.additionalCarriers.length > 0);
 
   const handleCardPress = async () => {

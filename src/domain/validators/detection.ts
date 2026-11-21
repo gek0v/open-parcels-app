@@ -101,9 +101,9 @@ export const CARRIERS_CATALOG: Carrier[] = [
     trackingUrl: 'https://global.cainiao.com/detail.htm?mailNoList=%s',
     region: 'china',
     color: '#FF5000',
-    hasLiveTracking: true,
+    hasLiveTracking: false,
     capabilities: {
-      supportsLiveApi: true,
+      supportsLiveApi: false,
     },
   },
   {
@@ -115,12 +115,12 @@ export const CARRIERS_CATALOG: Carrier[] = [
     website: 'https://ups.com',
     trackingUrl: 'https://www.ups.com/track?tracknum=%s',
     requiresAuth: true,
-    hasLiveTracking: true,
+    hasLiveTracking: false,
     region: 'global',
     color: '#351C15',
     capabilities: {
       requiresAuth: true,
-      supportsLiveApi: true,
+      supportsLiveApi: false,
     },
   },
   {
@@ -132,12 +132,12 @@ export const CARRIERS_CATALOG: Carrier[] = [
     website: 'https://dhl.com',
     trackingUrl: 'https://www.dhl.com/en/express/tracking.html?AWB=%s',
     requiresAuth: true,
-    hasLiveTracking: true,
+    hasLiveTracking: false,
     region: 'global',
     color: '#D40511',
     capabilities: {
       requiresAuth: true,
-      supportsLiveApi: true,
+      supportsLiveApi: false,
     },
   },
   {
@@ -149,12 +149,12 @@ export const CARRIERS_CATALOG: Carrier[] = [
     website: 'https://dhl.de',
     trackingUrl: 'https://www.dhl.de/en/privatkunden/pakete-empfangen/verfolgen.html?piececode=%s',
     requiresAuth: true,
-    hasLiveTracking: true,
+    hasLiveTracking: false,
     region: 'eu',
     color: '#D40511',
     capabilities: {
       requiresAuth: true,
-      supportsLiveApi: true,
+      supportsLiveApi: false,
     },
   },
   {
@@ -176,12 +176,12 @@ export const CARRIERS_CATALOG: Carrier[] = [
     website: 'https://fedex.com',
     trackingUrl: 'https://www.fedex.com/fedextrack/?trknbr=%s',
     requiresAuth: true,
-    hasLiveTracking: true,
+    hasLiveTracking: false,
     region: 'global',
     color: '#4D148C',
     capabilities: {
       requiresAuth: true,
-      supportsLiveApi: true,
+      supportsLiveApi: false,
     },
   },
   {

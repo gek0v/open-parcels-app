@@ -10,6 +10,17 @@ interface JourneyFlowProps {
 
 export const JourneyFlow: React.FC<JourneyFlowProps> = ({ parcel }) => {
   const isChained = !!(parcel.additionalCarriers && parcel.additionalCarriers.length > 0);
+  const isDomestic = !isChained && (
+    (parcel.origin?.code && parcel.destination?.code && parcel.origin.code.toUpperCase() === parcel.destination.code.toUpperCase()) ||
+    (!parcel.origin?.code && !parcel.destination?.code && ['correos', 'correos-express', 'seur', 'gls-spain', 'mrw', 'inpost-es', 'inpost', 'nacex'].includes(parcel.carrier.slug)) ||
+    (parcel.carrier.country === 'ES' && (!parcel.destination?.code || parcel.destination.code === 'ES') && (!parcel.origin?.code || parcel.origin.code === 'ES'))
+  );
+
+  const headerTitle = isChained
+    ? 'TRAYECTO MULTITRANSPORTISTA'
+    : isDomestic
+    ? 'TRAYECTO NACIONAL'
+    : 'TRAYECTO INTERNACIONAL';
 
   return (
     <View style={styles.card}>
@@ -20,7 +31,7 @@ export const JourneyFlow: React.FC<JourneyFlowProps> = ({ parcel }) => {
           <View style={[styles.dot, { backgroundColor: Theme.colors.yellow }]} />
           <View style={[styles.dot, { backgroundColor: Theme.colors.mint }]} />
         </View>
-        <Text style={styles.cardTitle}>TRAYECTO MULTITRANSPORTISTA</Text>
+        <Text style={styles.cardTitle}>{headerTitle}</Text>
       </View>
 
       {/* Origin -> Destination Banner */}
@@ -49,10 +60,14 @@ export const JourneyFlow: React.FC<JourneyFlowProps> = ({ parcel }) => {
         {/* First Leg Carrier */}
         <View style={styles.carrierLeg}>
           <View style={[styles.carrierIconBox, { backgroundColor: Theme.colors.status.in_transit }]}>
-            <Plane size={18} color="#000000" strokeWidth={2.5} />
+            {isDomestic ? (
+              <Truck size={18} color="#000000" strokeWidth={2.5} />
+            ) : (
+              <Plane size={18} color="#000000" strokeWidth={2.5} />
+            )}
           </View>
           <View style={styles.carrierDetails}>
-            <Text style={styles.legRole}>TRAMO INTERNACIONAL</Text>
+            <Text style={styles.legRole}>{isDomestic ? 'TRAYECTO NACIONAL' : 'TRAMO INTERNACIONAL'}</Text>
             <Text style={styles.carrierLegName} numberOfLines={1}>
               {parcel.carrier.name}
             </Text>

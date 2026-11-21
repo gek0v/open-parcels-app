@@ -25,3 +25,5 @@ export interface TrackingEvent {
   eventCode?: string;
   carrierIndex?: number;
 }
+
+export { getLatestEvent } from '../entities/events';

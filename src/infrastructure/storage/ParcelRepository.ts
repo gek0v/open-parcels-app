@@ -85,7 +85,45 @@ export class ParcelRepository {
       all.unshift(parcel);
     }
 
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+    } catch (err) {
+      console.warn('AsyncStorage.setItem error in save:', err);
+    }
+    this.notify();
+  }
+
+  async saveAll(parcels: Parcel[]): Promise<void> {
+    if (!parcels || parcels.length === 0) return;
+
+    if (this.useSqlite) {
+      try {
+        await sqliteParcelRepository.saveBatch(parcels);
+        this.notify();
+        return;
+      } catch (err) {
+        console.warn('SQLite fallback to AsyncStorage in saveAll:', err);
+        this.useSqlite = false;
+      }
+    }
+
+    const all = await this.getAll();
+    for (const parcel of parcels) {
+      const existingIndex = all.findIndex(
+        (p) => p.id === parcel.id || p.trackingNumber === parcel.trackingNumber
+      );
+      if (existingIndex >= 0) {
+        all[existingIndex] = { ...all[existingIndex], ...parcel };
+      } else {
+        all.unshift(parcel);
+      }
+    }
+
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+    } catch (err) {
+      console.warn('AsyncStorage.setItem error in saveAll:', err);
+    }
     this.notify();
   }
 
@@ -102,7 +140,11 @@ export class ParcelRepository {
 
     const all = await this.getAll();
     const filtered = all.filter((p) => p.id !== id);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+    } catch (err) {
+      console.warn('AsyncStorage.setItem error in delete:', err);
+    }
     this.notify();
   }
 
@@ -128,7 +170,11 @@ export class ParcelRepository {
       updatedAt: new Date().toISOString(),
     };
 
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+    } catch (err) {
+      console.warn('AsyncStorage.setItem error in updateAlias:', err);
+    }
     this.notify();
     return all[index];
   }
@@ -154,7 +200,11 @@ export class ParcelRepository {
       updatedAt: new Date().toISOString(),
     };
 
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+    } catch (err) {
+      console.warn('AsyncStorage.setItem error in toggleArchive:', err);
+    }
     this.notify();
     return all[index];
   }

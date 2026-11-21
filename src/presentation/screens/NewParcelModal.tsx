@@ -21,7 +21,7 @@ import { parcelRepository } from '../../infrastructure/storage/ParcelRepository'
 import { Carrier, DetectedCarrier } from '../../domain/models/carrier';
 import { Parcel } from '../../domain/models/parcel';
 import { findCarrierBySlug } from '../../domain/validators/detection';
-import { X, Plus, ShieldAlert, Cpu, ArrowRightLeft, Sparkles, Truck, Zap } from 'lucide-react-native';
+import { X, Plus, ShieldAlert, Cpu, ArrowRightLeft, Sparkles, Zap } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
@@ -41,7 +41,7 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
   onParcelCreated,
 }) => {
   const { theme } = useTheme();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const insets = useSafeAreaInsets();
   const [trackingNumber, setTrackingNumber] = useState(initialTrackingNumber || '');
   const [customAlias, setCustomAlias] = useState('');
@@ -70,18 +70,19 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
     let active = true;
     const clean = trackingNumber.trim();
 
-    if (clean.length === 0) {
-      setCandidates([]);
-      if (!isManuallySelected) {
-        setSelectedCarrierSlug(undefined);
-      }
-      return;
-    }
-
     // Debounce detection so we do not re-scan on every keystroke.
     const timer = setTimeout(async () => {
+      if (!active) return;
+
+      if (clean.length === 0) {
+        setCandidates([]);
+        if (!isManuallySelected) {
+          setSelectedCarrierSlug(undefined);
+        }
+        return;
+      }
+
       if (clean.length < 4) {
-        if (!active) return;
         setCandidates([]);
         if (!isManuallySelected) {
           setSelectedCarrierSlug(undefined);
@@ -158,7 +159,7 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
         trackingNumber: cleanNumber,
         carrierHint: selectedCarrierSlug,
         postalCode: postalCode.trim() || undefined,
-        lang: 'es',
+        lang: lang || 'es',
       });
 
       if (customAlias.trim()) {

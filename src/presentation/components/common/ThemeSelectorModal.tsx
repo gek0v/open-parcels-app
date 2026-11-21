@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Theme } from '../../theme/adaptiveTheme';
 import { useTheme, ThemeKey } from '../../theme/ThemeContext';
-import { ColorPalette } from '../../theme/palettes';
+import type { ColorPalette } from '../../theme/palettes';
 import { X, Sparkles, Check, CheckCircle2, Package, ShieldCheck, Palette, CheckCheck } from 'lucide-react-native';
 
 interface ThemeSelectorModalProps {

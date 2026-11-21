@@ -17,14 +17,31 @@ export default function ParcelDetailRoute() {
 
   useEffect(() => {
     let isMounted = true;
-    if (!id) return;
+    if (!id) {
+      const timer = setTimeout(() => {
+        if (isMounted) setIsLoading(false);
+      }, 0);
+      return () => {
+        isMounted = false;
+        clearTimeout(timer);
+      };
+    }
 
-    parcelRepository.getById(id).then((found) => {
-      if (isMounted) {
-        setParcel(found);
-        setIsLoading(false);
-      }
-    });
+    parcelRepository
+      .getById(id)
+      .then((found) => {
+        if (isMounted) {
+          setParcel(found);
+          setIsLoading(false);
+        }
+      })
+      .catch((error) => {
+        console.warn('[ParcelDetailRoute] Failed to load parcel:', error);
+        if (isMounted) {
+          setParcel(null);
+          setIsLoading(false);
+        }
+      });
 
     return () => {
       isMounted = false;
@@ -32,21 +49,33 @@ export default function ParcelDetailRoute() {
   }, [id]);
 
   const handleToggleArchive = async (parcelId: string) => {
-    const updated = await parcelRepository.toggleArchive(parcelId);
-    if (updated) {
-      setParcel({ ...updated });
+    try {
+      const updated = await parcelRepository.toggleArchive(parcelId);
+      if (updated) {
+        setParcel({ ...updated });
+      }
+    } catch (err) {
+      console.error('[ParcelDetailRoute] toggleArchive error:', err);
     }
   };
 
   const handleDeleteParcel = async (parcelId: string) => {
-    await parcelRepository.delete(parcelId);
-    router.replace('/');
+    try {
+      await parcelRepository.delete(parcelId);
+      router.replace('/');
+    } catch (err) {
+      console.error('[ParcelDetailRoute] delete error:', err);
+    }
   };
 
   const handleUpdateAlias = async (parcelId: string, newAlias: string) => {
-    const updated = await parcelRepository.updateAlias(parcelId, newAlias);
-    if (updated) {
-      setParcel({ ...updated });
+    try {
+      const updated = await parcelRepository.updateAlias(parcelId, newAlias);
+      if (updated) {
+        setParcel({ ...updated });
+      }
+    } catch (err) {
+      console.error('[ParcelDetailRoute] updateAlias error:', err);
     }
   };
 

@@ -21,11 +21,20 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [lang, setLangState] = useState<Language>(detectDefaultLanguage());
 
   useEffect(() => {
-    AsyncStorage.getItem(LANGUAGE_KEY).then((stored) => {
-      if (stored === 'es' || stored === 'en') {
-        setLangState(stored as Language);
-      }
-    });
+    let isMounted = true;
+    AsyncStorage.getItem(LANGUAGE_KEY)
+      .then((stored) => {
+        if (isMounted && (stored === 'es' || stored === 'en')) {
+          setLangState(stored as Language);
+        }
+      })
+      .catch((err) => {
+        console.warn('[i18n] Error reading language from storage:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const setLang = async (newLang: Language) => {

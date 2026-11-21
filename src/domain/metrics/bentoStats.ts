@@ -7,9 +7,12 @@ export interface TopCarrierMetric {
   percentage: number; // 0 to 100
 }
 
+export type PaceLabelKey = 'upToDate' | 'optimal' | 'normal' | 'attention';
+
 export interface ActivePaceMetric {
   rate: number; // 0 to 100 (% of active shipments with no exception or failed attempt)
   label: string; // 'ÓPTIMO' | 'NORMAL' | 'ATENCIÓN' | 'AL DÍA'
+  labelKey?: PaceLabelKey;
   hasAlerts: boolean;
   problemCount: number;
 }
@@ -27,7 +30,10 @@ export interface BentoStatsData {
  * Computes extended Bento statistics for Open Parcels dashboard.
  * All computations are purely local and zero-latency.
  */
-export function computeBentoStats(parcels: Parcel[]): BentoStatsData {
+export function computeBentoStats(
+  parcels: Parcel[],
+  lang: 'es' | 'en' = 'es'
+): BentoStatsData {
   const nonArchived = parcels.filter((p) => !p.isArchived);
   const activeParcels = nonArchived.filter((p) => p.status !== 'delivered');
   const deliveredParcels = nonArchived.filter((p) => p.status === 'delivered');
@@ -81,7 +87,8 @@ export function computeBentoStats(parcels: Parcel[]): BentoStatsData {
   if (activeCount === 0) {
     activePace = {
       rate: 100,
-      label: 'AL DÍA',
+      label: lang === 'en' ? 'UP TO DATE' : 'AL DÍA',
+      labelKey: 'upToDate',
       hasAlerts: false,
       problemCount: 0,
     };
@@ -90,10 +97,24 @@ export function computeBentoStats(parcels: Parcel[]): BentoStatsData {
       (p) => p.status === 'exception' || p.status === 'failed_attempt'
     ).length;
     const rate = Math.round(((activeCount - problemCount) / activeCount) * 100);
-    const label = rate >= 90 ? 'ÓPTIMO' : rate >= 70 ? 'NORMAL' : 'ATENCIÓN';
+    const labelKey: PaceLabelKey = rate >= 90 ? 'optimal' : rate >= 70 ? 'normal' : 'attention';
+    const label =
+      lang === 'en'
+        ? labelKey === 'optimal'
+          ? 'OPTIMAL'
+          : labelKey === 'normal'
+          ? 'NORMAL'
+          : 'ATTENTION'
+        : labelKey === 'optimal'
+        ? 'ÓPTIMO'
+        : labelKey === 'normal'
+        ? 'NORMAL'
+        : 'ATENCIÓN';
+
     activePace = {
       rate,
       label,
+      labelKey,
       hasAlerts: problemCount > 0,
       problemCount,
     };

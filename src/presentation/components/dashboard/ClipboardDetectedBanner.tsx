@@ -47,6 +47,11 @@ export const ClipboardDetectedBanner: React.FC<ClipboardDetectedBannerProps> = (
         useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
+
+    return () => {
+      slideAnim.stopAnimation();
+      opacityAnim.stopAnimation();
+    };
   }, [slideAnim, opacityAnim]);
 
   const handleDismiss = async () => {

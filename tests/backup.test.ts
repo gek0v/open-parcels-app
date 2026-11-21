@@ -8,10 +8,31 @@ let mockFiles: Record<string, string> = {};
 (globalThis as any).__backupMockFiles = mockFiles;
 let sharedFiles: string[] = [];
 
-mock.module('../src/infrastructure/storage/ParcelRepository', () => ({
-  parcelRepository: {
-    getAll: async () => [...inMemoryParcels],
-    save: async (parcel: Parcel) => {
+class MockParcelRepository {
+  private listeners: Set<() => void> = new Set();
+  subscribe(listener: () => void) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+  notify() {
+    for (const l of this.listeners) l();
+  }
+  async getAll() {
+    return [...inMemoryParcels];
+  }
+  async save(parcel: Parcel) {
+    const idx = inMemoryParcels.findIndex(
+      (p) => p.trackingNumber === parcel.trackingNumber || p.id === parcel.id
+    );
+    if (idx >= 0) {
+      inMemoryParcels[idx] = { ...inMemoryParcels[idx], ...parcel };
+    } else {
+      inMemoryParcels.push(parcel);
+    }
+    this.notify();
+  }
+  async saveAll(parcels: Parcel[]) {
+    for (const parcel of parcels) {
       const idx = inMemoryParcels.findIndex(
         (p) => p.trackingNumber === parcel.trackingNumber || p.id === parcel.id
       );
@@ -20,8 +41,42 @@ mock.module('../src/infrastructure/storage/ParcelRepository', () => ({
       } else {
         inMemoryParcels.push(parcel);
       }
-    },
-  },
+    }
+    this.notify();
+  }
+  async getById(id: string) {
+    return inMemoryParcels.find((p) => p.id === id) || null;
+  }
+  async delete(id: string) {
+    inMemoryParcels = inMemoryParcels.filter((p) => p.id !== id);
+    this.notify();
+  }
+  async updateAlias(id: string, newAlias: string) {
+    const idx = inMemoryParcels.findIndex((p) => p.id === id);
+    if (idx >= 0) {
+      inMemoryParcels[idx] = { ...inMemoryParcels[idx], customAlias: newAlias, updatedAt: new Date().toISOString() };
+      this.notify();
+      return inMemoryParcels[idx];
+    }
+    this.notify();
+    return null;
+  }
+  async toggleArchive(id: string) {
+    const idx = inMemoryParcels.findIndex((p) => p.id === id);
+    if (idx >= 0) {
+      inMemoryParcels[idx] = { ...inMemoryParcels[idx], isArchived: !inMemoryParcels[idx].isArchived, updatedAt: new Date().toISOString() };
+      this.notify();
+      return inMemoryParcels[idx];
+    }
+    this.notify();
+    return null;
+  }
+}
+const mockParcelRepoInstance = new MockParcelRepository();
+
+mock.module('../src/infrastructure/storage/ParcelRepository', () => ({
+  ParcelRepository: MockParcelRepository,
+  parcelRepository: mockParcelRepoInstance,
 }));
 
 mock.module('expo-file-system/legacy', () => ({

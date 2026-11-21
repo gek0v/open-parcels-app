@@ -20,13 +20,37 @@ mock.module('@react-native-async-storage/async-storage', () => ({
 }));
 
 mock.module('react-native', () => ({
+  View: 'View',
+  Text: 'Text',
+  StyleSheet: {
+    create: (styles: any) => styles,
+    absoluteFill: {},
+  },
+  Pressable: 'Pressable',
+  ScrollView: 'ScrollView',
+  AppState: {
+    addEventListener: () => ({ remove: () => {} }),
+  },
   Platform: {
     OS: 'android',
     select: (obj: Record<string, unknown>) => obj.android ?? obj.default,
   },
-  Linking: { openURL: async () => {} },
+  Linking: { openURL: async () => {}, canOpenURL: async () => true },
   TurboModuleRegistry: {
     get: () => null,
+  },
+  Alert: {
+    alert: () => {},
+  },
+  Animated: {
+    Value: class {
+      val: number;
+      constructor(val: number) { this.val = val; }
+      stopAnimation = () => {};
+    },
+    timing: () => ({ start: (cb?: any) => cb?.() }),
+    spring: () => ({ start: (cb?: any) => cb?.() }),
+    parallel: (anims: any[]) => ({ start: (cb?: any) => cb?.() }),
   },
   Share: {
     share: async (content: any) => {

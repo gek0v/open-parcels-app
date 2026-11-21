@@ -58,6 +58,11 @@ export const UpdateToast: React.FC<UpdateToastProps> = ({
         useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
+
+    return () => {
+      slideAnim.stopAnimation();
+      opacityAnim.stopAnimation();
+    };
   }, [slideAnim, opacityAnim]);
 
   const handleDismiss = () => {

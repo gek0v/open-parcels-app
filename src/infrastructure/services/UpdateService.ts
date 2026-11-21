@@ -1,12 +1,13 @@
-import { Linking, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { isNewerVersion } from '../../domain/validators/version';
+import { openSafeWebUrl } from '../utils/url';
 
 export { isNewerVersion };
 
-export const CURRENT_APP_VERSION = '1.5.4';
+export const CURRENT_APP_VERSION = '1.5.5';
 export const GITHUB_REPO = 'gek0v/open-parcels-app';
 
 const LAST_CHECK_KEY = '@open_parcels:last_update_check';
@@ -18,6 +19,30 @@ export const FLAG_GRANT_READ_URI_PERMISSION = 1;
 export const FLAG_ACTIVITY_NEW_TASK = 268435456;
 export const ANDROID_APK_MIME_TYPE = 'application/vnd.android.package-archive';
 export const ANDROID_VIEW_ACTION = 'android.intent.action.VIEW';
+
+export const TRUSTED_DOWNLOAD_HOSTS = [
+  'github.com',
+  'api.github.com',
+  'objects.githubusercontent.com',
+  'raw.githubusercontent.com',
+  'github-releases.githubusercontent.com',
+];
+
+export function isTrustedDownloadUrl(urlStr: string): boolean {
+  if (!urlStr || typeof urlStr !== 'string') return false;
+  try {
+    const parsed = new URL(urlStr);
+    if (parsed.protocol !== 'https:') return false;
+    const hostname = parsed.hostname.toLowerCase();
+    return (
+      TRUSTED_DOWNLOAD_HOSTS.includes(hostname) ||
+      hostname.endsWith('.github.com') ||
+      hostname.endsWith('.githubusercontent.com')
+    );
+  } catch {
+    return false;
+  }
+}
 
 export interface UpdateInfo {
   version: string;
@@ -61,8 +86,9 @@ export class UpdateService {
   /**
    * Check GitHub Releases API for a newer version than CURRENT_APP_VERSION
    * @param force - If true, bypasses last check throttling and ignored versions
+   * @param timeoutMs - Optional fetch timeout in milliseconds (defaults to 10000)
    */
-  async checkForUpdate(force = false): Promise<UpdateInfo | null> {
+  async checkForUpdate(force = false, timeoutMs = 10000): Promise<UpdateInfo | null> {
     try {
       if (!force) {
         // Throttling: Check at most once every 30 minutes in normal launch
@@ -78,11 +104,19 @@ export class UpdateService {
 
       await AsyncStorage.setItem(LAST_CHECK_KEY, Date.now().toString());
 
-      const res = await fetch(`https://api.github.com/repos/${this.repo}/releases/latest`, {
-        headers: {
-          Accept: 'application/vnd.github.v3+json',
-        },
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      let res: Response;
+      try {
+        res = await fetch(`https://api.github.com/repos/${this.repo}/releases/latest`, {
+          signal: controller.signal,
+          headers: {
+            Accept: 'application/vnd.github.v3+json',
+          },
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (!res.ok) {
         return null;
@@ -103,48 +137,69 @@ export class UpdateService {
         }
       }
 
-      // Find APK asset
-      const apkAsset = release.assets?.find((a: any) =>
-        a.name?.toLowerCase().endsWith('.apk')
-      );
+      // Find .apk asset in release
+      const apkAsset = Array.isArray(release.assets)
+        ? release.assets.find((asset: any) =>
+            asset.name?.toLowerCase().endsWith('.apk')
+          )
+        : null;
 
-      const downloadUrl = apkAsset?.browser_download_url || release.html_url;
-      const sizeMb = apkAsset ? Math.round((apkAsset.size / (1024 * 1024)) * 10) / 10 : undefined;
+      const apkDownloadUrl = apkAsset?.browser_download_url || release.html_url || '';
+      const apkSizeMb = apkAsset?.size
+        ? Math.round((apkAsset.size / (1024 * 1024)) * 10) / 10
+        : undefined;
 
-      const updateInfo: UpdateInfo = {
-        version: latestTag.replace(/^v/, ''),
-        title: release.name || `Open Parcels v${latestTag}`,
-        changelog: release.body || 'Correcciones y mejoras generales.',
-        publishedAt: release.published_at || new Date().toISOString(),
-        apkDownloadUrl: downloadUrl,
-        apkSizeMb: sizeMb,
-        htmlUrl: release.html_url,
-        hasApkAsset: Boolean(apkAsset?.browser_download_url),
+      return {
+        version: latestTag,
+        title: release.name || latestTag,
+        changelog: release.body || '',
+        publishedAt: release.published_at || '',
+        apkDownloadUrl,
+        apkSizeMb,
+        htmlUrl: release.html_url || '',
+        hasApkAsset: !!apkAsset,
       };
-
-      return updateInfo;
     } catch (err) {
-      console.warn('Update check failed:', err);
+      console.warn('Failed to check for updates:', err);
       return null;
     }
   }
 
   async ignoreVersion(version: string): Promise<void> {
-    await AsyncStorage.setItem(IGNORED_VERSION_KEY, version);
+    try {
+      await AsyncStorage.setItem(IGNORED_VERSION_KEY, version);
+    } catch (err) {
+      console.warn('Failed to save ignored version:', err);
+    }
   }
 
-  /**
-   * Return the canonical local file URI for a given version APK
-   */
+  async resetIgnoredVersion(): Promise<void> {
+    try {
+      await AsyncStorage.removeItem(IGNORED_VERSION_KEY);
+    } catch (err) {
+      console.warn('Failed to reset ignored version:', err);
+    }
+  }
+
+  cancelDownload(): void {
+    this.isCancelled = true;
+    if (this.activeDownload) {
+      try {
+        this.activeDownload.cancelAsync().catch(() => {});
+      } catch {
+        // Ignore error on cancel
+      }
+      this.activeDownload = null;
+    }
+  }
+
   getApkFileUri(version: string): string {
-    const cleanVersion = version.replace(/^v/, '');
-    const dir = FileSystem.documentDirectory || FileSystem.cacheDirectory || '';
-    return `${dir}open-parcels-v${cleanVersion}.apk`;
+    const normalized = version.startsWith('v') ? version : `v${version}`;
+    const cleanVersion = normalized.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const dir = FileSystem.documentDirectory || 'file:///data/user/0/com.openparcels.app/files/';
+    return `${dir}open-parcels-${cleanVersion}.apk`;
   }
 
-  /**
-   * Check whether the APK for a given version is already completely downloaded on disk
-   */
   async isApkDownloaded(version: string, expectedSizeMb?: number): Promise<boolean> {
     try {
       const fileUri = this.getApkFileUri(version);
@@ -152,50 +207,37 @@ export class UpdateService {
       if (!info.exists || !info.size || info.size <= 0) {
         return false;
       }
-
-      // If expected size is known, verify file is not severely truncated (at least 70% of expected size)
       if (expectedSizeMb && expectedSizeMb > 0) {
-        const actualMb = info.size / (1024 * 1024);
-        if (actualMb < expectedSizeMb * 0.7) {
-          return false;
-        }
+        const minBytes = expectedSizeMb * 1024 * 1024 * 0.9;
+        return info.size >= minBytes;
       }
-
       return true;
     } catch {
       return false;
     }
   }
 
-  /**
-   * Download the APK for the specified updateInfo reporting real-time progress.
-   * If the APK is already completely downloaded, skips re-downloading.
-   */
   async downloadApk(
     updateInfo: UpdateInfo,
     onProgress?: DownloadProgressCallback
   ): Promise<string> {
-    const version = updateInfo.version;
-    const destinationUri = this.getApkFileUri(version);
+    if (Platform.OS !== 'android') {
+      throw new Error('ONLY_ANDROID_SUPPORTED');
+    }
+
+    if (!isTrustedDownloadUrl(updateInfo.apkDownloadUrl)) {
+      throw new Error('UNTRUSTED_DOWNLOAD_URL');
+    }
+
+    this.isCancelled = false;
+    const destinationUri = this.getApkFileUri(updateInfo.version);
     const tmpUri = `${destinationUri}.tmp`;
 
-    // Cancel any existing download before starting a new one
-    if (this.activeDownload) {
-      await this.cancelDownload();
-    }
-    this.isCancelled = false;
-
-    // Re-use if already fully downloaded
-    const alreadyDownloaded = await this.isApkDownloaded(version, updateInfo.apkSizeMb);
-    if (this.isCancelled) {
-      throw new DownloadCancelledError();
-    }
-    if (alreadyDownloaded) {
+    // If destination already exists and is valid, return immediately
+    const existing = await FileSystem.getInfoAsync(destinationUri);
+    if (existing.exists && existing.size && existing.size > 0) {
       if (onProgress) {
-        const info = await FileSystem.getInfoAsync(destinationUri);
-        const size =
-          (info.exists && info.size) ||
-          (updateInfo.apkSizeMb ? Math.round(updateInfo.apkSizeMb * 1024 * 1024) : 0);
+        const size = existing.size;
         onProgress({
           progress: 1,
           percent: 100,
@@ -303,26 +345,6 @@ export class UpdateService {
     }
   }
 
-  /**
-   * Cancel an in-progress download task and clean up temporary files
-   */
-  async cancelDownload(): Promise<void> {
-    this.isCancelled = true;
-    const current = this.activeDownload;
-    this.activeDownload = null;
-    if (current) {
-      try {
-        await current.cancelAsync();
-      } catch (err) {
-        console.warn('Error cancelling active download:', err);
-      }
-    }
-  }
-
-  /**
-   * Launch native Android package installer using content:// URI
-   * and IntentLauncher with read permission flags
-   */
   async installApk(fileUriOrVersion: string): Promise<InstallResult> {
     if (Platform.OS !== 'android') {
       return {
@@ -345,56 +367,55 @@ export class UpdateService {
         };
       }
 
-      // Convert local file:// URI to content:// URI via FileSystemFileProvider
       const contentUri = await FileSystem.getContentUriAsync(fileUri);
       const flags = FLAG_GRANT_READ_URI_PERMISSION | FLAG_ACTIVITY_NEW_TASK;
 
       const result = await IntentLauncher.startActivityAsync(ANDROID_VIEW_ACTION, {
         data: contentUri,
-        flags,
         type: ANDROID_APK_MIME_TYPE,
+        flags,
       });
 
       return {
         success: true,
-        cancelled: result?.resultCode === IntentLauncher.ResultCode.Canceled,
+        cancelled:
+          (result as any)?.resultCode === (IntentLauncher as any).ResultCode?.Canceled ||
+          (result as any)?.resultCode === 0,
       };
     } catch (err: any) {
-      const message = err?.message || String(err);
+      console.warn('Install APK error:', err);
+      const errMsg = err?.message || String(err);
       const isPermissionError =
-        /permission|unknown source|not allowed|activity not found|security|install/i.test(message);
+        /permission|unknown source|not allowed|activity not found|security|install/i.test(errMsg);
 
-      console.warn('Error launching APK installer:', message);
       return {
         success: false,
-        error: message,
+        error: errMsg,
         needsPermissionSettings: isPermissionError,
       };
     }
   }
 
-  /**
-   * Open the Android system screen to allow installing unknown apps for this package
-   */
   async openInstallUnknownAppsSettings(): Promise<boolean> {
     if (Platform.OS !== 'android') return false;
 
     try {
-      await IntentLauncher.startActivityAsync(
-        IntentLauncher.ActivityAction.MANAGE_UNKNOWN_APP_SOURCES,
-        {
-          data: `package:${ANDROID_PACKAGE_ID}`,
-        }
-      );
+      const action =
+        (IntentLauncher as any).ActivityAction?.MANAGE_UNKNOWN_APP_SOURCES ||
+        'android.settings.MANAGE_UNKNOWN_APP_SOURCES';
+      await IntentLauncher.startActivityAsync(action, {
+        data: `package:${ANDROID_PACKAGE_ID}`,
+      });
       return true;
-    } catch {
+    } catch (err) {
+      console.warn('Failed to open unknown app sources settings:', err);
       try {
-        await IntentLauncher.startActivityAsync(
-          IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS,
-          {
-            data: `package:${ANDROID_PACKAGE_ID}`,
-          }
-        );
+        const fallbackAction =
+          (IntentLauncher as any).ActivityAction?.APPLICATION_DETAILS_SETTINGS ||
+          'android.settings.APPLICATION_DETAILS_SETTINGS';
+        await IntentLauncher.startActivityAsync(fallbackAction, {
+          data: `package:${ANDROID_PACKAGE_ID}`,
+        });
         return true;
       } catch {
         return false;
@@ -402,29 +423,23 @@ export class UpdateService {
     }
   }
 
-  /**
-   * Fallback: open web URL in system browser
-   */
+  async openInstallPermissionSettings(): Promise<boolean> {
+    return this.openInstallUnknownAppsSettings();
+  }
+
   async openInBrowser(url: string): Promise<void> {
-    try {
-      await Linking.openURL(url);
-    } catch (err) {
-      console.warn('Failed to open URL in browser:', err);
+    const success = await openSafeWebUrl(url);
+    if (!success) {
+      console.warn('Failed to open URL in browser (unsafe or unsupported):', url);
     }
   }
 
-  /**
-   * Delete downloaded APK file and any temporary files for a version
-   */
   async deleteDownloadedApk(version: string): Promise<void> {
     const fileUri = this.getApkFileUri(version);
     await this.safeDelete(fileUri);
     await this.safeDelete(`${fileUri}.tmp`);
   }
 
-  /**
-   * Backward compatibility fallback
-   */
   async startDownload(url: string): Promise<void> {
     await this.openInBrowser(url);
   }

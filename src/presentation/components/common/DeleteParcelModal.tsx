@@ -9,6 +9,8 @@ import {
   Platform,
 } from 'react-native';
 import { Theme } from '../../theme/adaptiveTheme';
+import { useTheme } from '../../theme/ThemeContext';
+import { useI18n } from '../../../infrastructure/i18n';
 import { Trash2, AlertTriangle, X } from 'lucide-react-native';
 
 interface DeleteParcelModalProps {
@@ -28,6 +30,9 @@ export const DeleteParcelModal: React.FC<DeleteParcelModalProps> = ({
   onClose,
   onConfirmDelete,
 }) => {
+  const { theme } = useTheme();
+  const { t } = useI18n();
+
   return (
     <Modal
       visible={visible}
@@ -43,48 +48,64 @@ export const DeleteParcelModal: React.FC<DeleteParcelModalProps> = ({
       >
         <Pressable style={styles.dismissOverlay} onPress={onClose} />
 
-        <View style={styles.dialogCard} accessibilityViewIsModal>
+        <View
+          style={[
+            styles.dialogCard,
+            { backgroundColor: theme.canvas, borderColor: theme.border },
+          ]}
+          accessibilityViewIsModal
+        >
           {/* Retro Window Header */}
-          <View style={styles.header}>
+          <View style={[styles.header, { borderBottomColor: theme.border }]}>
             <View style={styles.dotsRow}>
-              <View style={[styles.dot, { backgroundColor: Theme.colors.coral }]} />
-              <View style={[styles.dot, { backgroundColor: Theme.colors.yellow }]} />
-              <View style={[styles.dot, { backgroundColor: Theme.colors.mint }]} />
+              <View style={[styles.dot, { backgroundColor: theme.coral, borderColor: theme.border }]} />
+              <View style={[styles.dot, { backgroundColor: theme.yellow, borderColor: theme.border }]} />
+              <View style={[styles.dot, { backgroundColor: theme.mint, borderColor: theme.border }]} />
             </View>
-            <Text style={styles.headerTitle}>ELIMINAR ENVÍO</Text>
+            <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
+              {t.deleteModal?.title || 'ELIMINAR ENVÍO'}
+            </Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Cerrar"
+              accessibilityLabel={t.deleteModal?.cancelBtn || 'Cerrar'}
               onPress={onClose}
-              style={({ pressed }) => [styles.closeBtn, pressed && styles.smallPressed]}
+              style={({ pressed }) => [
+                styles.closeBtn,
+                { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+                pressed && styles.smallPressed,
+              ]}
             >
-              <X size={16} color="#000000" strokeWidth={3} />
+              <X size={16} color={theme.textPrimary} strokeWidth={3} />
             </Pressable>
           </View>
 
           {/* Warning Icon & Danger Banner */}
-          <View style={styles.alertBanner}>
-            <View style={styles.alertIconBox}>
+          <View style={[styles.alertBanner, { backgroundColor: theme.yellow, borderColor: theme.border }]}>
+            <View style={[styles.alertIconBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
               <AlertTriangle size={24} color="#000000" strokeWidth={2.5} />
             </View>
             <View style={styles.alertTextBox}>
-              <Text style={styles.alertTitle}>¿CONFIRMAR ELIMINACIÓN?</Text>
-              <Text style={styles.alertSubtitle}>
-                Esta acción borrará el paquete de tu historial local de forma permanente.
+              <Text style={styles.alertTitle}>
+                {t.deleteModal?.heading || '¿CONFIRMAR ELIMINACIÓN?'}
+              </Text>
+              <Text style={[styles.alertSubtitle, { color: theme.textSecondary }]}>
+                {t.deleteModal?.warning || 'Esta acción borrará el paquete de tu historial local de forma permanente.'}
               </Text>
             </View>
           </View>
 
           {/* Parcel Details Preview Box */}
-          <View style={styles.previewCard}>
-            <View style={styles.previewHeaderRow}>
-              <Text style={styles.carrierBadgeText}>{carrierName.toUpperCase()}</Text>
+          <View style={[styles.previewCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <View style={[styles.previewHeaderRow, { backgroundColor: theme.primary }]}>
+              <Text style={[styles.carrierBadgeText, { color: theme.textInverse }]}>
+                {carrierName.toUpperCase()}
+              </Text>
             </View>
-            <Text style={styles.parcelName} numberOfLines={1}>
+            <Text style={[styles.parcelName, { color: theme.textPrimary }]} numberOfLines={1}>
               {parcelTitle}
             </Text>
-            <View style={styles.trackingBox}>
-              <Text style={styles.trackingCode} numberOfLines={1}>
+            <View style={[styles.trackingBox, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
+              <Text style={[styles.trackingCode, { color: theme.textSecondary }]} numberOfLines={1}>
                 {trackingNumber}
               </Text>
             </View>
@@ -94,21 +115,33 @@ export const DeleteParcelModal: React.FC<DeleteParcelModalProps> = ({
           <View style={styles.buttonRow}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Cancelar eliminación"
+              accessibilityLabel={t.deleteModal?.cancelBtn || 'Cancelar'}
               onPress={onClose}
-              style={({ pressed }) => [styles.cancelBtn, pressed && styles.pressed]}
+              style={({ pressed }) => [
+                styles.cancelBtn,
+                { backgroundColor: theme.surface, borderColor: theme.border },
+                pressed && styles.pressed,
+              ]}
             >
-              <Text style={styles.cancelText}>CANCELAR</Text>
+              <Text style={[styles.cancelText, { color: theme.textPrimary }]}>
+                {t.deleteModal?.cancelBtn || 'CANCELAR'}
+              </Text>
             </Pressable>
 
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Confirmar eliminación"
+              accessibilityLabel={t.deleteModal?.confirmBtn || 'Confirmar eliminación'}
               onPress={onConfirmDelete}
-              style={({ pressed }) => [styles.deleteBtn, pressed && styles.pressed]}
+              style={({ pressed }) => [
+                styles.deleteBtn,
+                { backgroundColor: theme.coral, borderColor: theme.border },
+                pressed && styles.pressed,
+              ]}
             >
               <Trash2 size={16} color="#000000" strokeWidth={2.5} style={styles.deleteIcon} />
-              <Text style={styles.deleteText}>SÍ, ELIMINAR</Text>
+              <Text style={styles.deleteText}>
+                {t.deleteModal?.confirmBtn || 'SÍ, ELIMINAR'}
+              </Text>
             </Pressable>
           </View>
         </View>

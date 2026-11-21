@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Image, Animated, Platform } from 'react-native';
 import { Theme } from '../../theme/adaptiveTheme';
+import { CURRENT_APP_VERSION } from '../../../infrastructure/services/UpdateService';
 
 interface AppLoadingSplashProps {
   onFinish: () => void;
@@ -36,6 +37,7 @@ export const AppLoadingSplash: React.FC<AppLoadingSplashProps> = ({
     return () => {
       clearInterval(interval);
       clearTimeout(timer);
+      fadeAnim.stopAnimation();
     };
   }, [minDurationMs, onFinish, fadeAnim]);
 
@@ -59,7 +61,7 @@ export const AppLoadingSplash: React.FC<AppLoadingSplashProps> = ({
 
       {/* Footer */}
       <View style={styles.footer}>
-        <Text style={styles.footerText}>OPEN PARCELS ENGINE v1.0.2 · LOCAL-FIRST</Text>
+        <Text style={styles.footerText}>OPEN PARCELS ENGINE v{(CURRENT_APP_VERSION || '1.5.4').replace(/^v/, '')} · LOCAL-FIRST</Text>
       </View>
     </Animated.View>
   );

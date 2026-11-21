@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { DetectedCarrier } from '../../../domain/models/carrier';
+import { CARRIERS_CATALOG } from '../../../domain/validators/detection';
 import { Theme } from '../../theme/adaptiveTheme';
 import { useTheme } from '../../theme/ThemeContext';
 import { Sparkles, Check, Layers, ChevronRight, Truck } from 'lucide-react-native';
@@ -48,7 +49,7 @@ export const CarrierDetectorBar: React.FC<CarrierDetectorBarProps> = ({
             </Text>
           </View>
           <View style={styles.promptRight}>
-            <Text style={[styles.promptCount, { color: theme.textSecondary }]}>28 disp.</Text>
+            <Text style={[styles.promptCount, { color: theme.textSecondary }]}>{CARRIERS_CATALOG.length} disp.</Text>
             <ChevronRight size={16} color={theme.textPrimary} strokeWidth={2.5} />
           </View>
         </Pressable>
@@ -173,7 +174,7 @@ export const CarrierDetectorBar: React.FC<CarrierDetectorBarProps> = ({
           >
             <Layers size={14} color={theme.textPrimary} strokeWidth={2.5} style={{ marginRight: 6 }} />
             <Text style={[styles.catalogChipText, { color: theme.textPrimary }]}>
-              + CATÁLOGO (28)
+              + CATÁLOGO ({CARRIERS_CATALOG.length})
             </Text>
           </Pressable>
         )}

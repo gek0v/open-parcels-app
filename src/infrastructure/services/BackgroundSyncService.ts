@@ -92,7 +92,8 @@ export async function executeBackgroundSync(): Promise<BackgroundFetch.Backgroun
             await notificationService.sendParcelStatusNotification(
               updated,
               normalizedOldStatus,
-              normalizedNewStatus
+              normalizedNewStatus,
+              lang
             );
           }
         }

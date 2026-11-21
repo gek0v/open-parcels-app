@@ -10,6 +10,8 @@ import {
   Platform,
 } from 'react-native';
 import { Theme } from '../../theme/adaptiveTheme';
+import { useTheme } from '../../theme/ThemeContext';
+import { useI18n } from '../../../infrastructure/i18n';
 import { X, Check } from 'lucide-react-native';
 
 interface RenameParcelModalProps {
@@ -27,7 +29,17 @@ export const RenameParcelModal: React.FC<RenameParcelModalProps> = ({
   onClose,
   onSave,
 }) => {
-  const [alias, setAlias] = useState(initialAlias);
+  const { theme } = useTheme();
+  const { t } = useI18n();
+  const [prevVisible, setPrevVisible] = useState(visible);
+  const [prevInitialAlias, setPrevInitialAlias] = useState(initialAlias);
+  const [alias, setAlias] = useState(initialAlias || '');
+
+  if (visible !== prevVisible || initialAlias !== prevInitialAlias) {
+    setPrevVisible(visible);
+    setPrevInitialAlias(initialAlias);
+    setAlias(initialAlias || '');
+  }
 
   const handleSave = () => {
     onSave(alias);
@@ -42,40 +54,61 @@ export const RenameParcelModal: React.FC<RenameParcelModalProps> = ({
       >
         <Pressable style={styles.dismissOverlay} onPress={onClose} />
 
-        <View style={styles.dialogCard} accessibilityViewIsModal>
+        <View
+          style={[
+            styles.dialogCard,
+            { backgroundColor: theme.canvas, borderColor: theme.border },
+          ]}
+          accessibilityViewIsModal
+        >
           {/* Retro window header */}
-          <View style={styles.header}>
+          <View style={[styles.header, { borderBottomColor: theme.border }]}>
             <View style={styles.dotsRow}>
-              <View style={[styles.dot, { backgroundColor: Theme.colors.coral }]} />
-              <View style={[styles.dot, { backgroundColor: Theme.colors.yellow }]} />
-              <View style={[styles.dot, { backgroundColor: Theme.colors.mint }]} />
+              <View style={[styles.dot, { backgroundColor: theme.coral, borderColor: theme.border }]} />
+              <View style={[styles.dot, { backgroundColor: theme.yellow, borderColor: theme.border }]} />
+              <View style={[styles.dot, { backgroundColor: theme.mint, borderColor: theme.border }]} />
             </View>
             <View style={styles.titleBox}>
-              <Text style={styles.title}>RENOMBRAR ENVÍO</Text>
-              <Text style={styles.subtitle} numberOfLines={1}>
+              <Text style={[styles.title, { color: theme.textPrimary }]}>
+                {t.renameModal?.title || 'RENOMBRAR ENVÍO'}
+              </Text>
+              <Text style={[styles.subtitle, { color: theme.textTertiary }]} numberOfLines={1}>
                 {trackingNumber}
               </Text>
             </View>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Cerrar"
+              accessibilityLabel={t.renameModal?.cancelBtn || 'Cerrar'}
               onPress={onClose}
-              style={({ pressed }) => [styles.closeBtn, pressed && styles.smallPressed]}
+              style={({ pressed }) => [
+                styles.closeBtn,
+                { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+                pressed && styles.smallPressed,
+              ]}
             >
-              <X size={18} color="#000000" strokeWidth={3} />
+              <X size={18} color={theme.textPrimary} strokeWidth={3} />
             </Pressable>
           </View>
 
           {/* Input field */}
           <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>ALIAS / NOMBRE DEL PAQUETE</Text>
+            <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>
+              {t.renameModal?.label || 'ALIAS / NOMBRE DEL PAQUETE'}
+            </Text>
             <TextInput
-              accessibilityLabel="Alias del paquete"
-              style={styles.input}
+              accessibilityLabel={t.renameModal?.label || 'Alias del paquete'}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.surface,
+                  borderColor: theme.border,
+                  color: theme.textPrimary,
+                },
+              ]}
               value={alias}
               onChangeText={setAlias}
-              placeholder="Ej: Zapatillas Nike, Teclado AliExpress..."
-              placeholderTextColor="#64748B"
+              placeholder={t.renameModal?.placeholder || 'Ej: Zapatillas Nike, Teclado AliExpress...'}
+              placeholderTextColor={theme.textTertiary}
               autoFocus
               selectTextOnFocus
               returnKeyType="done"
@@ -87,21 +120,31 @@ export const RenameParcelModal: React.FC<RenameParcelModalProps> = ({
           <View style={styles.buttonRow}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Cancelar"
+              accessibilityLabel={t.renameModal?.cancelBtn || 'Cancelar'}
               onPress={onClose}
-              style={({ pressed }) => [styles.cancelButton, pressed && styles.pressed]}
+              style={({ pressed }) => [
+                styles.cancelButton,
+                { backgroundColor: theme.surface, borderColor: theme.border },
+                pressed && styles.pressed,
+              ]}
             >
-              <Text style={styles.cancelText}>CANCELAR</Text>
+              <Text style={[styles.cancelText, { color: theme.textPrimary }]}>
+                {t.renameModal?.cancelBtn || 'CANCELAR'}
+              </Text>
             </Pressable>
 
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Guardar alias"
+              accessibilityLabel={t.renameModal?.saveBtn || 'Guardar alias'}
               onPress={handleSave}
-              style={({ pressed }) => [styles.saveButton, pressed && styles.pressed]}
+              style={({ pressed }) => [
+                styles.saveButton,
+                { backgroundColor: theme.blue || theme.primary, borderColor: theme.border },
+                pressed && styles.pressed,
+              ]}
             >
               <Check size={16} color="#FFFFFF" strokeWidth={3} style={styles.checkIcon} />
-              <Text style={styles.saveText}>GUARDAR</Text>
+              <Text style={styles.saveText}>{t.renameModal?.saveBtn || 'GUARDAR'}</Text>
             </Pressable>
           </View>
         </View>

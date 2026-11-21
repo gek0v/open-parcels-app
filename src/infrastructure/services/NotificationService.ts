@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { Parcel } from '../../domain/models/parcel';
+import { getLatestEvent } from '../../domain/entities/events';
 import { CANONICAL_STATUS_MAP, CanonicalStatus } from '../../domain/models/status';
 import { normalizeCanonicalStatus } from '../engine/mapper';
 
@@ -59,25 +60,16 @@ export class NotificationService {
   }
 
   private getLatestEventKey(parcel: Parcel): string {
-    if (!Array.isArray(parcel.events) || parcel.events.length === 0) {
-      return '';
-    }
-    const sorted = [...parcel.events].sort((a, b) => {
-      const ta = new Date(a.date).getTime();
-      const tb = new Date(b.date).getTime();
-      if (Number.isNaN(ta) && Number.isNaN(tb)) return 0;
-      if (Number.isNaN(ta)) return 1;
-      if (Number.isNaN(tb)) return -1;
-      return tb - ta;
-    });
-    const latest = sorted[0];
+    const latest = getLatestEvent(parcel.events);
+    if (!latest) return '';
     return `${latest.date || ''}|${latest.eventCode || ''}|${latest.description || ''}`;
   }
 
   async sendParcelStatusNotification(
     parcel: Parcel,
     oldStatus: string,
-    newStatus: string
+    newStatus: string,
+    lang: 'es' | 'en' = 'es'
   ): Promise<boolean> {
     if (Platform.OS === 'web') return false;
     if (parcel.isLiveData === false) return false;
@@ -123,8 +115,12 @@ export class NotificationService {
       }
 
       const meta = CANONICAL_STATUS_MAP[normNew] || CANONICAL_STATUS_MAP.in_transit;
-      const title = `📦 ${parcel.customAlias || parcel.trackingNumber}: ${meta.labelEs.toUpperCase()}`;
-      const body = `Tu envío de ${parcel.carrier.name} ha avanzado a "${meta.labelEs}".`;
+      const isEn = lang === 'en';
+      const statusLabel = isEn ? meta.labelEn : meta.labelEs;
+      const title = `📦 ${parcel.customAlias || parcel.trackingNumber}: ${statusLabel.toUpperCase()}`;
+      const body = isEn
+        ? `Your shipment with ${parcel.carrier.name} has updated to "${statusLabel}".`
+        : `Tu envío de ${parcel.carrier.name} ha avanzado a "${statusLabel}".`;
 
       await Notifications.scheduleNotificationAsync({
         content: {

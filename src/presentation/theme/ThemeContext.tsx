@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { GoldenPalettes, ColorPalette } from './palettes';
+import { GoldenPalettes, type ColorPalette } from './palettes';
 import { Theme } from './adaptiveTheme';
 import * as Haptics from 'expo-haptics';
 
@@ -53,15 +53,24 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [theme, setThemeState] = useState<ColorPalette>(GoldenPalettes.acidCyber);
 
   useEffect(() => {
-    AsyncStorage.getItem(THEME_STORAGE_KEY).then((stored) => {
-      if (stored && stored in GoldenPalettes) {
-        const key = stored as ThemeKey;
-        setThemeKeyState(key);
-        const palette = GoldenPalettes[key];
-        setThemeState(palette);
-        syncStaticTheme(palette);
-      }
-    });
+    let isMounted = true;
+    AsyncStorage.getItem(THEME_STORAGE_KEY)
+      .then((stored) => {
+        if (isMounted && stored && stored in GoldenPalettes) {
+          const key = stored as ThemeKey;
+          setThemeKeyState(key);
+          const palette = GoldenPalettes[key];
+          setThemeState(palette);
+          syncStaticTheme(palette);
+        }
+      })
+      .catch((err) => {
+        console.warn('[ThemeContext] Error reading theme from storage:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const setTheme = useCallback(async (newKey: ThemeKey) => {

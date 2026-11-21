@@ -1,8 +1,9 @@
 import { Platform } from 'react-native';
 import { CanonicalStatus } from '../../domain/models/status';
-import { ColorPalette, GoldenPalettes } from './palettes';
+import { type ColorPalette, GoldenPalettes } from './palettes';
 
-export { ColorPalette, GoldenPalettes };
+export type { ColorPalette };
+export { GoldenPalettes };
 
 export const isIOS = Platform.OS === 'ios';
 export const isAndroid = Platform.OS === 'android';

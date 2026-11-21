@@ -1,6 +1,7 @@
 import * as ReactNative from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Parcel } from '../../domain/models/parcel';
+import { getLatestEvent } from '../../domain/entities/events';
 
 export interface ShareOptions {
   lang?: 'es' | 'en';
@@ -60,8 +61,8 @@ export function formatParcelShareSummary(parcel: Parcel, options?: ShareOptions)
 
   // Latest milestone event
   let eventLine = '';
-  if (parcel.events && parcel.events.length > 0) {
-    const latest = parcel.events[parcel.events.length - 1];
+  const latest = getLatestEvent(parcel.events);
+  if (latest) {
     const formattedDate = formatShortDateTime(latest.date);
     const locationSuffix = latest.location ? ` (${latest.location})` : '';
     eventLine = isEs
