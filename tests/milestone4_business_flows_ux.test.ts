@@ -94,8 +94,14 @@ mock.module('expo-haptics', () => ({
 mock.module('expo-file-system/legacy', () => ({
   cacheDirectory: 'file:///data/cache/',
   documentDirectory: 'file:///data/docs/',
-  writeAsStringAsync: async () => {},
-  readAsStringAsync: async () => '',
+  writeAsStringAsync: async (uri: string, content: string) => {
+    if ((globalThis as any).__backupMockFiles) {
+      (globalThis as any).__backupMockFiles[uri] = content;
+    }
+  },
+  readAsStringAsync: async (uri: string) => {
+    return (globalThis as any).__backupMockFiles?.[uri] || '';
+  },
   getInfoAsync: async () => ({ exists: false, isDirectory: false, size: 0 }),
 }));
 

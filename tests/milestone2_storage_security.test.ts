@@ -101,7 +101,16 @@ mock.module('expo-sqlite', () => ({
 }));
 
 mock.module('expo-file-system/legacy', () => ({
+  cacheDirectory: 'file:///mock/cache/',
   documentDirectory: 'file:///mock/data/',
+  writeAsStringAsync: mock(async (uri: string, content: string) => {
+    if ((globalThis as any).__backupMockFiles) {
+      (globalThis as any).__backupMockFiles[uri] = content;
+    }
+  }),
+  readAsStringAsync: mock(async (uri: string) => {
+    return (globalThis as any).__backupMockFiles?.[uri] || '';
+  }),
   deleteAsync: mock(async () => {}),
   getInfoAsync: mock(async () => ({ exists: true, size: 2048 })),
   moveAsync: mock(async () => {}),
