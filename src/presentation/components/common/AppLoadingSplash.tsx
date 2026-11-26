@@ -67,7 +67,7 @@ export const AppLoadingSplash: React.FC<AppLoadingSplashProps> = ({
 
       {/* Footer */}
       <View style={[styles.footer, { bottom: Math.max(insets.bottom + 16, 30) }]}>
-        <Text style={styles.footerText}>OPEN PARCELS ENGINE v{(CURRENT_APP_VERSION || '1.5.6').replace(/^v/, '')} · LOCAL-FIRST</Text>
+        <Text style={styles.footerText}>OPEN PARCELS ENGINE v{(CURRENT_APP_VERSION || '1.5.7').replace(/^v/, '')} · LOCAL-FIRST</Text>
       </View>
     </Animated.View>
   );

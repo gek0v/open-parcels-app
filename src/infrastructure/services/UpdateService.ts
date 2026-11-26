@@ -7,7 +7,7 @@ import { openSafeWebUrl } from '../utils/url';
 
 export { isNewerVersion };
 
-export const CURRENT_APP_VERSION = '1.5.6';
+export const CURRENT_APP_VERSION = '1.5.7';
 export const GITHUB_REPO = 'gek0v/open-parcels-app';
 
 const LAST_CHECK_KEY = '@open_parcels:last_update_check';

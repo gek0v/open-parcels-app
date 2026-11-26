@@ -12,6 +12,12 @@ import { getLocalizedStatusText } from './mapper';
 import { fetchInPostLive, fetchInPostItalyShipXLive } from './inpostLive';
 import { fetchCorreosSpainLive, fetchCorreosExpressLive } from './correosLive';
 import { fetchGLSSpainLive, fetchSEURLive } from './spainCouriersLive';
+import {
+  fetchCTTExpressLive,
+  fetchMRWLive,
+  fetchNacexLive,
+} from './spainCouriersExtendedLive';
+import { fetchCainiaoLive, fetchYunExpressLive } from './crossBorderLive';
 
 export class LocalTrackingEngine implements ITrackingEngine {
   readonly engineName = 'Open Parcels Embedded (Local-First)';
@@ -116,6 +122,31 @@ export class LocalTrackingEngine implements ITrackingEngine {
     }
     if (slug === 'seur') {
       return await fetchSEURLive(rawNumber, postalCode, selectedCarrier, params.lang);
+    }
+    if (slug === 'cainiao') {
+      return await fetchCainiaoLive(
+        rawNumber,
+        selectedCarrier,
+        params.lang,
+        params.destinationCountry
+      );
+    }
+    if (slug === 'yunexpress') {
+      return await fetchYunExpressLive(
+        rawNumber,
+        selectedCarrier,
+        params.lang,
+        params.destinationCountry
+      );
+    }
+    if (slug === 'ctt-express') {
+      return await fetchCTTExpressLive(rawNumber, selectedCarrier, params.lang);
+    }
+    if (slug === 'mrw-spain') {
+      return await fetchMRWLive(rawNumber, selectedCarrier, params.lang);
+    }
+    if (slug === 'nacex-spain') {
+      return await fetchNacexLive(rawNumber, selectedCarrier, params.lang);
     }
     return null;
   }

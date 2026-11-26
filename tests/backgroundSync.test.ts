@@ -174,8 +174,8 @@ describe('BackgroundSyncService & Anti-False-Notification Guards (100% Local-Fir
 
   it('does NOT notify or overwrite parcels when LocalTrackingEngine lacks a live adapter (allowSimulated: false)', async () => {
     const originalParcel = makeParcel({
-      trackingNumber: 'LP00561234567890',
-      carrier: findCarrierBySlug('cainiao'),
+      trackingNumber: 'TIP123456789',
+      carrier: findCarrierBySlug('tipsa'),
       status: 'in_transit',
       isLiveData: true,
     });

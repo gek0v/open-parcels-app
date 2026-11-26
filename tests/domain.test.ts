@@ -181,12 +181,50 @@ describe('LocalTrackingEngine (Local-First)', () => {
   });
 
   it('performs multi-carrier chaining for Cainiao shipments', async () => {
-    const parcel = await engine.track({
-      trackingNumber: 'LP00561234567890',
-      allowSimulated: true,
-    });
-    expect(parcel.carrier.slug).toBe('cainiao');
-    expect(parcel.status).toBe('pending');
-    expect(parcel.events).toHaveLength(0);
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      new Response(
+        JSON.stringify({
+          success: true,
+          module: [
+            {
+              mailNo: 'LP00561234567890',
+              originCountry: 'China',
+              destCountry: 'Spain',
+              destCp: 'Correos Express',
+              destMailNo: '323000111222333',
+              status: 'DELIVERING',
+              detailList: [
+                {
+                  timeStr: '2026-11-20 10:00:00',
+                  desc: 'En reparto por operador logístico local',
+                  actionCode: 'GTMS_DELIVERING',
+                },
+                {
+                  timeStr: '2026-11-18 08:00:00',
+                  desc: 'Departed from sorting center',
+                  actionCode: 'SC_OUTBOUND',
+                },
+              ],
+            },
+          ],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )) as any;
+
+    try {
+      const parcel = await engine.track({
+        trackingNumber: 'LP00561234567890',
+        allowSimulated: false,
+      });
+      expect(parcel.carrier.slug).toBe('cainiao');
+      expect(parcel.isLiveData).toBe(true);
+      expect(parcel.status).toBe('out_for_delivery');
+      expect(parcel.lastMileCarrier?.slug).toBe('correosexpress');
+      expect(parcel.lastMileTrackingNumber).toBe('323000111222333');
+      expect(parcel.events).toHaveLength(2);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });

@@ -101,9 +101,9 @@ export const CARRIERS_CATALOG: Carrier[] = [
     trackingUrl: 'https://global.cainiao.com/detail.htm?mailNoList=%s',
     region: 'china',
     color: '#FF5000',
-    hasLiveTracking: false,
+    hasLiveTracking: true,
     capabilities: {
-      supportsLiveApi: false,
+      supportsLiveApi: true,
     },
   },
   {
@@ -239,11 +239,14 @@ export const CARRIERS_CATALOG: Carrier[] = [
     type: 'express',
     website: 'https://cttexpress.com',
     trackingUrl: 'https://www.cttexpress.com/localizador-de-envios/?sc=%s',
-    requiresPostalCode: true,
+    requiresPostalCode: false,
+    hasLiveTracking: true,
     region: 'es',
     color: '#E2001A',
     capabilities: {
-      requiresPostalCode: true,
+      requiresPostalCode: false,
+      supportsLiveApi: true,
+      supportsWebScraping: true,
     },
   },
   {
@@ -274,8 +277,14 @@ export const CARRIERS_CATALOG: Carrier[] = [
     countryName: 'Spain',
     type: 'express',
     website: 'https://mrw.es',
+    trackingUrl: 'https://www.mrw.es/seguimiento_envios/mrw_resultados_consulta.asp?modo=nacional&envio=%s',
+    hasLiveTracking: true,
     region: 'es',
     color: '#E30613',
+    capabilities: {
+      supportsLiveApi: true,
+      supportsWebScraping: true,
+    },
   },
   {
     slug: 'nacex-spain',
@@ -284,8 +293,14 @@ export const CARRIERS_CATALOG: Carrier[] = [
     countryName: 'Spain',
     type: 'express',
     website: 'https://nacex.com',
+    trackingUrl: 'https://www.nacex.com/seguimientoDetalle.do?ag_rec=&albaran_rec=%s',
+    hasLiveTracking: true,
     region: 'es',
     color: '#F68B1F',
+    capabilities: {
+      supportsLiveApi: true,
+      supportsWebScraping: true,
+    },
   },
   {
     slug: 'tipsa',
@@ -354,8 +369,14 @@ export const CARRIERS_CATALOG: Carrier[] = [
     countryName: 'China',
     type: 'cross_border',
     website: 'https://yunexpress.com',
+    trackingUrl: 'https://www.yuntrack.com/parcelTracking?id=%s',
+    hasLiveTracking: true,
     region: 'china',
     color: '#0066B3',
+    capabilities: {
+      supportsLiveApi: true,
+      supportsWebScraping: true,
+    },
   },
   {
     slug: 'air-cargo',

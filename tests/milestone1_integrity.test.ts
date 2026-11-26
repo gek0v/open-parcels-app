@@ -41,13 +41,21 @@ describe('Milestone 1: Engine Integrity & Mock Elimination Verification', () => 
     expect(thrownError.httpStatus).toBe(501);
   });
 
-  it('verifies that carriers without live scrapers have hasLiveTracking=false in detection catalog', () => {
-    const unadaptedCarriers = ['cainiao', 'ups', 'dhl-express', 'dhl-parcel', 'fedex'];
+  it('verifies that carriers without live scrapers have hasLiveTracking=false and newly ported live carriers have hasLiveTracking=true', () => {
+    const unadaptedCarriers = ['ups', 'dhl-express', 'dhl-parcel', 'fedex'];
     for (const slug of unadaptedCarriers) {
       const carrier = findCarrierBySlug(slug);
       expect(carrier).toBeDefined();
       expect(carrier?.hasLiveTracking).toBe(false);
       expect(carrier?.capabilities?.supportsLiveApi).toBe(false);
+    }
+
+    const liveCarriers = ['cainiao', 'ctt-express', 'mrw-spain', 'nacex-spain', 'yunexpress'];
+    for (const slug of liveCarriers) {
+      const carrier = findCarrierBySlug(slug);
+      expect(carrier).toBeDefined();
+      expect(carrier?.hasLiveTracking).toBe(true);
+      expect(carrier?.capabilities?.supportsLiveApi).toBe(true);
     }
   });
 
@@ -60,7 +68,7 @@ describe('Milestone 1: Engine Integrity & Mock Elimination Verification', () => 
     const appJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'app.json'), 'utf8'));
     expect(splashFile).not.toContain('v1.0.2');
     expect(splashFile).toContain('CURRENT_APP_VERSION');
-    expect(pkg.version).toBe('1.5.6');
+    expect(pkg.version).toBe('1.5.7');
     expect(appJson.expo.version).toBe(pkg.version);
   });
 
