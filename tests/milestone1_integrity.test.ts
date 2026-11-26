@@ -57,9 +57,11 @@ describe('Milestone 1: Engine Integrity & Mock Elimination Verification', () => 
       'utf8'
     );
     const pkg = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'));
+    const appJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'app.json'), 'utf8'));
     expect(splashFile).not.toContain('v1.0.2');
     expect(splashFile).toContain('CURRENT_APP_VERSION');
-    expect(pkg.version).toBe('1.5.5');
+    expect(pkg.version).toBe('1.5.6');
+    expect(appJson.expo.version).toBe(pkg.version);
   });
 
   it('verifies dynamic count in CarrierDetectorBar', () => {

@@ -80,7 +80,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               </Text>
 
               <View style={styles.errorBox}>
-                <Text style={styles.errorMessage} numberOfLines={showDetails ? undefined : 3}>
+                <Text style={styles.errorMessage} numberOfLines={showDetails ? undefined : 3} selectable>
                   {error.message || String(error)}
                 </Text>
 
@@ -141,6 +141,7 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 420,
+    maxHeight: '90%',
     backgroundColor: '#FFFFFF',
     borderRadius: Theme.radius.md,
     borderWidth: Theme.borders.width,

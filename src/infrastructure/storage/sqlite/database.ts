@@ -92,6 +92,10 @@ export function getDatabase(): Promise<SQLite.SQLiteDatabase> {
 
       // Safe migration for newly added columns if table already existed
       const alterColumns = [
+        'ALTER TABLE parcels ADD COLUMN requires_postal_code INTEGER DEFAULT 0;',
+        'ALTER TABLE parcels ADD COLUMN postal_code TEXT;',
+        'ALTER TABLE parcels ADD COLUMN additional_carriers_json TEXT;',
+        'ALTER TABLE parcels ADD COLUMN last_mile_carrier_json TEXT;',
         'ALTER TABLE parcels ADD COLUMN last_mile_tracking_number TEXT;',
         'ALTER TABLE parcels ADD COLUMN estimated_delivery TEXT;',
         'ALTER TABLE parcels ADD COLUMN weight TEXT;',
@@ -156,28 +160,40 @@ export async function migrateFromAsyncStorage(db: SQLite.SQLiteDatabase): Promis
       const parcels: Parcel[] = JSON.parse(raw);
       if (Array.isArray(parcels) && parcels.length > 0) {
         await db.withTransactionAsync(async () => {
+          const nowIso = new Date().toISOString();
           for (const p of parcels) {
+            if (!p || !p.trackingNumber) continue;
+            const safeId = p.id || `p-${Math.random().toString(36).substring(2, 9)}`;
+            const safeCarrierSlug = p.carrier?.slug || 'unknown';
+            const safeCarrierName = p.carrier?.name || safeCarrierSlug.toUpperCase();
+            const safeStatus = p.status || 'pending';
+            const safeStatusText = p.statusText || safeStatus;
+            const safeProgress = typeof p.progress === 'number' ? p.progress : 0;
+            const safeDays = typeof p.daysInTransit === 'number' ? p.daysInTransit : 0;
+            const safeCreatedAt = p.createdAt || nowIso;
+            const safeUpdatedAt = p.updatedAt || nowIso;
+
             await db.runAsync(
               MIGRATE_PARCEL_SQL,
               [
-                p.id,
+                safeId,
                 p.trackingNumber,
                 p.customAlias || null,
-                p.carrier.slug,
-                p.carrier.name,
-                p.carrier.website || null,
-                p.carrier.color || null,
-                p.carrier.requiresPostalCode ? 1 : 0,
-                p.status,
-                p.statusText,
-                p.progress,
+                safeCarrierSlug,
+                safeCarrierName,
+                p.carrier?.website || null,
+                p.carrier?.color || null,
+                p.carrier?.requiresPostalCode ? 1 : 0,
+                safeStatus,
+                safeStatusText,
+                safeProgress,
                 p.origin?.code || null,
                 p.origin?.name || null,
                 p.destination?.code || null,
                 p.destination?.name || null,
                 p.postalCode || null,
                 p.deliveredAt || null,
-                p.daysInTransit,
+                safeDays,
                 p.isArchived ? 1 : 0,
                 p.additionalCarriers ? JSON.stringify(p.additionalCarriers) : null,
                 p.lastMileCarrier ? JSON.stringify(p.lastMileCarrier) : null,
@@ -189,29 +205,30 @@ export async function migrateFromAsyncStorage(db: SQLite.SQLiteDatabase): Promis
                 p.fromCache ? 1 : 0,
                 p.isLiveData ? 1 : 0,
                 p.notes || null,
-                p.createdAt,
-                p.updatedAt,
+                safeCreatedAt,
+                safeUpdatedAt,
               ]
             );
 
             if (Array.isArray(p.events)) {
               for (let i = 0; i < p.events.length; i++) {
                 const ev = p.events[i];
-                const eventId = `${p.id}_ev_${i}_${ev.date}`;
+                const evDate = ev.date || safeUpdatedAt;
+                const eventId = `${safeId}_ev_${i}_${evDate}`;
                 await db.runAsync(
                   `INSERT OR REPLACE INTO tracking_events (
                     id, parcel_id, date, status, stage, description, location, carrier_slug, carrier_name, event_code
                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
                   [
                     eventId,
-                    p.id,
-                    ev.date,
-                    ev.status,
-                    ev.stage,
-                    ev.description,
+                    safeId,
+                    evDate,
+                    ev.status || safeStatus,
+                    ev.stage || 'transit',
+                    ev.description || '',
                     ev.location || null,
-                    ev.carrierSlug,
-                    ev.carrierName || null,
+                    ev.carrierSlug || safeCarrierSlug,
+                    ev.carrierName || safeCarrierName,
                     ev.eventCode || null,
                   ]
                 );

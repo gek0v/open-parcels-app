@@ -21,7 +21,7 @@ export function getLatestEvent(events?: TrackingEvent[]): TrackingEvent | undefi
   for (let i = 1; i < events.length; i++) {
     const ev = events[i];
     const evTime = parseTimestamp(ev.date);
-    if (evTime >= latestTime) {
+    if (evTime > latestTime) {
       latest = ev;
       latestTime = evTime;
     }

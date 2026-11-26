@@ -62,13 +62,14 @@ export const DeleteParcelModal: React.FC<DeleteParcelModalProps> = ({
               <View style={[styles.dot, { backgroundColor: theme.yellow, borderColor: theme.border }]} />
               <View style={[styles.dot, { backgroundColor: theme.mint, borderColor: theme.border }]} />
             </View>
-            <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
+            <Text style={[styles.headerTitle, { color: theme.textPrimary }]} numberOfLines={1}>
               {t.deleteModal?.title || 'ELIMINAR ENVÍO'}
             </Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t.deleteModal?.cancelBtn || 'Cerrar'}
               onPress={onClose}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={({ pressed }) => [
                 styles.closeBtn,
                 { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
@@ -82,13 +83,13 @@ export const DeleteParcelModal: React.FC<DeleteParcelModalProps> = ({
           {/* Warning Icon & Danger Banner */}
           <View style={[styles.alertBanner, { backgroundColor: theme.yellow, borderColor: theme.border }]}>
             <View style={[styles.alertIconBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-              <AlertTriangle size={24} color="#000000" strokeWidth={2.5} />
+              <AlertTriangle size={24} color={theme.textPrimary} strokeWidth={2.5} />
             </View>
             <View style={styles.alertTextBox}>
               <Text style={styles.alertTitle}>
                 {t.deleteModal?.heading || '¿CONFIRMAR ELIMINACIÓN?'}
               </Text>
-              <Text style={[styles.alertSubtitle, { color: theme.textSecondary }]}>
+              <Text style={[styles.alertSubtitle, { color: '#1E293B' }]}>
                 {t.deleteModal?.warning || 'Esta acción borrará el paquete de tu historial local de forma permanente.'}
               </Text>
             </View>
@@ -196,6 +197,8 @@ const styles = StyleSheet.create({
     borderColor: '#000000',
   },
   headerTitle: {
+    flex: 1,
+    marginHorizontal: 8,
     fontSize: 14,
     fontWeight: '900',
     color: '#000000',

@@ -3,45 +3,49 @@ import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react-native';
 import { router } from 'expo-router';
-import { Theme } from '../presentation/theme/adaptiveTheme';
+import { Theme } from '../../theme/adaptiveTheme';
+import { useTheme } from '../../theme/ThemeContext';
+import { useI18n } from '../../../infrastructure/i18n';
 
-export default function ErrorBoundary({ error, retry }: { error: Error; retry: () => void }) {
+export default function RouteErrorFallback({ error, retry }: { error: Error; retry: () => void }) {
+  const { theme } = useTheme();
+  const { t } = useI18n();
   const [showDetails, setShowDetails] = useState(false);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <View style={styles.card}>
-          <View style={styles.iconCircle}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.yellow }]}>
+      <View style={[styles.container, { backgroundColor: theme.yellow }]}>
+        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <View style={[styles.iconCircle, { backgroundColor: theme.coral, borderColor: theme.border }]}>
             <AlertTriangle size={36} color="#000000" strokeWidth={2.5} />
           </View>
 
-          <Text style={styles.title}>ERROR EN LA RUTA</Text>
-          <Text style={styles.subtitle}>
-            Se ha producido un error inesperado al cargar esta pantalla en la navegación.
+          <Text style={[styles.title, { color: theme.textPrimary }]}>{t.errors.routeTitle}</Text>
+          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+            {t.errors.routeSubtitle}
           </Text>
 
-          <View style={styles.errorBox}>
-            <Text style={styles.errorMessage} numberOfLines={showDetails ? undefined : 3}>
-              {error?.message || 'Error desconocido'}
+          <View style={[styles.errorBox, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
+            <Text style={styles.errorMessage} numberOfLines={showDetails ? undefined : 3} selectable>
+              {error?.message || t.errors.unknownError}
             </Text>
 
             {error?.stack && (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Alternar detalles técnicos"
+                accessibilityLabel={t.errors.toggleDetailsAria}
                 onPress={() => setShowDetails(!showDetails)}
                 style={styles.detailsToggle}
               >
-                <Text style={styles.detailsToggleText}>
-                  {showDetails ? 'OCULTAR DETALLES' : 'VER DETALLES TÉCNICOS'}
+                <Text style={[styles.detailsToggleText, { color: theme.textPrimary }]}>
+                  {showDetails ? t.errors.hideDetails : t.errors.showDetails}
                 </Text>
               </Pressable>
             )}
 
             {showDetails && error?.stack && (
               <ScrollView style={styles.stackScroll} nestedScrollEnabled>
-                <Text style={styles.stackText}>{error.stack}</Text>
+                <Text style={styles.stackText} selectable>{error.stack}</Text>
               </ScrollView>
             )}
           </View>
@@ -49,22 +53,30 @@ export default function ErrorBoundary({ error, retry }: { error: Error; retry: (
           <View style={styles.buttonRow}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Reintentar"
+              accessibilityLabel={t.errors.retry}
               onPress={retry}
-              style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}
+              style={({ pressed }) => [
+                styles.retryButton,
+                { borderColor: theme.border },
+                pressed && styles.pressed,
+              ]}
             >
               <RefreshCw size={16} color="#000000" strokeWidth={3} />
-              <Text style={styles.retryButtonText}>REINTENTAR</Text>
+              <Text style={styles.retryButtonText}>{t.errors.retry}</Text>
             </Pressable>
 
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Volver al inicio"
+              accessibilityLabel={t.errors.backHomeAria}
               onPress={() => router.replace('/')}
-              style={({ pressed }) => [styles.homeButton, pressed && styles.pressed]}
+              style={({ pressed }) => [
+                styles.homeButton,
+                { borderColor: theme.border },
+                pressed && styles.pressed,
+              ]}
             >
               <Home size={16} color="#FFFFFF" strokeWidth={2.5} />
-              <Text style={styles.homeButtonText}>INICIO</Text>
+              <Text style={styles.homeButtonText}>{t.errors.home}</Text>
             </Pressable>
           </View>
         </View>
@@ -88,6 +100,7 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 420,
+    maxHeight: '90%',
     backgroundColor: '#FFFFFF',
     borderRadius: Theme.radius.md,
     borderWidth: Theme.borders.width,

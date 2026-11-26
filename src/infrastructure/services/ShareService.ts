@@ -78,8 +78,8 @@ export function formatParcelShareSummary(parcel: Parcel, options?: ShareOptions)
   let trackingUrl = '';
   if (parcel.carrier?.trackingUrl) {
     trackingUrl = parcel.carrier.trackingUrl.replace(
-      '%s',
-      encodeURIComponent(parcel.trackingNumber)
+      /%s/g,
+      encodeURIComponent(parcel.trackingNumber || '')
     );
   } else if (parcel.carrier?.website) {
     trackingUrl = parcel.carrier.website;
@@ -108,8 +108,9 @@ export class ShareService {
     try {
       const message = formatParcelShareSummary(parcel, options);
       const title = parcel.customAlias || parcel.trackingNumber;
-      if (ReactNative.Share && typeof ReactNative.Share.share === 'function') {
-        await ReactNative.Share.share({
+      const shareApi = (ReactNative as any).Share || (ReactNative as any).default?.Share;
+      if (shareApi && typeof shareApi.share === 'function') {
+        await shareApi.share({
           message,
           title,
         });

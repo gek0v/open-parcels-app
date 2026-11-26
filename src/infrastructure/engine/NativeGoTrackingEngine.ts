@@ -44,7 +44,13 @@ export class NativeGoTrackingEngine implements ITrackingEngine {
         const parsed = JSON.parse(rawJson);
 
         if (parsed && parsed.error) {
-          throw parseApiError(422, parsed);
+          const status =
+            typeof parsed.http_status === 'number'
+              ? parsed.http_status
+              : parsed.code || parsed.error?.code
+                ? 422
+                : 500;
+          throw parseApiError(status, parsed);
         }
 
         if (parsed && parsed.tracking_number) {

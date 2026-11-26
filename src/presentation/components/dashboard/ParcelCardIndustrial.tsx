@@ -4,6 +4,7 @@ import { Parcel } from '../../../domain/models/parcel';
 import { getLatestEvent } from '../../../domain/entities/events';
 import { Theme } from '../../theme/adaptiveTheme';
 import { useTheme } from '../../theme/ThemeContext';
+import { useI18n } from '../../../infrastructure/i18n';
 import { StatusBadge } from '../common/StatusBadge';
 import { ProgressBar } from '../common/ProgressBar';
 import { Tag, Edit2, Share2 } from 'lucide-react-native';
@@ -23,6 +24,7 @@ export const ParcelCardIndustrial: React.FC<ParcelCardIndustrialProps> = ({
   onShare,
 }) => {
   const { theme } = useTheme();
+  const { t } = useI18n();
   const latestEvent = getLatestEvent(parcel.events);
 
   const handleCardPress = async () => {
@@ -61,9 +63,9 @@ export const ParcelCardIndustrial: React.FC<ParcelCardIndustrialProps> = ({
     >
       {/* Top Hazard / Shipping Stripe */}
       <View style={[styles.hazardStripe, { backgroundColor: theme.yellow, borderBottomColor: theme.border }]}>
-        <Text style={styles.hazardText}>{'/// AIR & GROUND LOGISTICS MATRIX ///'}</Text>
+        <Text style={styles.hazardText} numberOfLines={1}>{'/// AIR & GROUND LOGISTICS MATRIX ///'}</Text>
         <Text style={styles.destinationStamp}>
-          DEST: {parcel.destination?.code || 'ES'}
+          {t.card.destFallback}: {parcel.destination?.code || 'ES'}
         </Text>
       </View>
 
@@ -72,7 +74,9 @@ export const ParcelCardIndustrial: React.FC<ParcelCardIndustrialProps> = ({
         <View style={styles.stampRow}>
           <View style={[styles.carrierStampBox, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
             <Tag size={12} color={theme.textPrimary} />
-            <Text style={[styles.carrierStampText, { color: theme.textPrimary }]}>{parcel.carrier.name.toUpperCase()}</Text>
+            <Text style={[styles.carrierStampText, { color: theme.textPrimary }]} numberOfLines={1}>
+              {parcel.carrier.name.toUpperCase()}
+            </Text>
           </View>
 
           <StatusBadge status={parcel.status} size="small" />
@@ -87,7 +91,7 @@ export const ParcelCardIndustrial: React.FC<ParcelCardIndustrialProps> = ({
             {onShare && (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Compartir datos del envío"
+                accessibilityLabel={t.card.shareAria}
                 onPress={handleSharePress}
                 style={[styles.renameBtn, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}
                 hitSlop={{ top: 12, bottom: 12, left: 6, right: 6 }}
@@ -98,7 +102,7 @@ export const ParcelCardIndustrial: React.FC<ParcelCardIndustrialProps> = ({
             {onRename && (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Renombrar alias del envío"
+                accessibilityLabel={t.card.renameAria}
                 onPress={handleRenamePress}
                 style={[styles.renameBtn, { backgroundColor: theme.yellow, borderColor: theme.border }]}
                 hitSlop={{ top: 12, bottom: 12, left: 6, right: 6 }}
@@ -117,7 +121,7 @@ export const ParcelCardIndustrial: React.FC<ParcelCardIndustrialProps> = ({
           </View>
           <View style={[styles.daysCircle, { backgroundColor: theme.yellow, borderColor: theme.border }]}>
             <Text style={styles.daysNumber}>{parcel.daysInTransit}</Text>
-            <Text style={styles.daysUnit}>DÍAS</Text>
+            <Text style={styles.daysUnit}>{t.card.daysUnit}</Text>
           </View>
         </View>
 
@@ -164,6 +168,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
   },
   hazardText: {
+    flexShrink: 1,
+    marginRight: 8,
     fontSize: 9,
     fontWeight: '900',
     color: '#000000',
@@ -195,19 +201,24 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: Theme.radius.xs,
     borderWidth: 1,
+    flexShrink: 1,
+    marginRight: 8,
   },
   carrierStampText: {
     fontSize: 10,
     fontWeight: '900',
+    flexShrink: 1,
   },
   aliasRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 8,
+    minWidth: 0,
   },
   alias: {
     flex: 1,
+    minWidth: 0,
     fontSize: 17,
     fontWeight: '900',
     letterSpacing: -0.3,
@@ -216,6 +227,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    marginLeft: 8,
   },
   renameBtn: {
     minWidth: 36,
@@ -225,7 +237,6 @@ const styles = StyleSheet.create({
     padding: 5,
     borderRadius: Theme.radius.xs,
     borderWidth: 1.5,
-    marginLeft: 8,
   },
   waybillBox: {
     flexDirection: 'row',

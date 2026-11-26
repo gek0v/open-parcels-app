@@ -4,6 +4,7 @@ import { Parcel } from '../../../domain/models/parcel';
 import { getLatestEvent } from '../../../domain/entities/events';
 import { Theme } from '../../theme/adaptiveTheme';
 import { useTheme } from '../../theme/ThemeContext';
+import { useI18n } from '../../../infrastructure/i18n';
 import { StatusBadge } from '../common/StatusBadge';
 import { ProgressBar } from '../common/ProgressBar';
 import { ArrowRight, Clock, Edit2, MapPin, Barcode, Share2 } from 'lucide-react-native';
@@ -23,6 +24,7 @@ export const ParcelCardBento: React.FC<ParcelCardBentoProps> = ({
   onShare,
 }) => {
   const { theme } = useTheme();
+  const { t } = useI18n();
   const latestEvent = getLatestEvent(parcel.events);
   const isChained = !!(parcel.additionalCarriers && parcel.additionalCarriers.length > 0);
 
@@ -70,14 +72,14 @@ export const ParcelCardBento: React.FC<ParcelCardBentoProps> = ({
           </View>
           <View style={[styles.serviceTag, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
             <Barcode size={13} color={theme.textPrimary} strokeWidth={2.2} />
-            <Text style={[styles.serviceTagText, { color: theme.textSecondary }]}>EXPEDICIÓN</Text>
+            <Text style={[styles.serviceTagText, { color: theme.textSecondary }]}>{t.card.shipmentTag}</Text>
           </View>
         </View>
 
         <View style={[styles.routePill, { backgroundColor: theme.yellow, borderColor: theme.border }]}>
           <MapPin size={10} color="#000000" strokeWidth={2.5} />
           <Text style={styles.routePillText}>
-            {parcel.origin?.code || 'ORIG'} ➔ {parcel.destination?.code || 'DEST'}
+            {parcel.origin?.code || t.card.originFallback} ➔ {parcel.destination?.code || t.card.destFallback}
           </Text>
         </View>
       </View>
@@ -111,7 +113,7 @@ export const ParcelCardBento: React.FC<ParcelCardBentoProps> = ({
             {onShare && (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Compartir datos del envío"
+                accessibilityLabel={t.card.shareAria}
                 onPress={handleSharePress}
                 style={({ pressed }) => [
                   styles.renameBtn,
@@ -126,7 +128,7 @@ export const ParcelCardBento: React.FC<ParcelCardBentoProps> = ({
             {onRename && (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Renombrar alias del envío"
+                accessibilityLabel={t.card.renameAria}
                 onPress={handleRenamePress}
                 style={({ pressed }) => [
                   styles.renameBtn,
@@ -251,11 +253,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '900',
     textTransform: 'uppercase',
+    flexShrink: 1,
   },
   chainedRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginLeft: 4,
+    flexShrink: 1,
   },
   chainArrow: {
     marginHorizontal: 2,
@@ -264,6 +268,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     textTransform: 'uppercase',
+    flexShrink: 1,
   },
   titleSection: {
     marginBottom: 8,
@@ -272,9 +277,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    minWidth: 0,
   },
   alias: {
     flex: 1,
+    minWidth: 0,
     fontSize: 17,
     fontWeight: '900',
     letterSpacing: -0.3,
@@ -283,6 +290,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    marginLeft: 8,
   },
   renameBtn: {
     minWidth: 36,
@@ -292,7 +300,6 @@ const styles = StyleSheet.create({
     padding: 6,
     borderRadius: Theme.radius.xs,
     borderWidth: 1.5,
-    marginLeft: 8,
     ...Theme.shadows.sm,
   },
   btnPressed: {

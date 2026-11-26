@@ -1,4 +1,4 @@
-import { describe, expect, it, mock, beforeEach } from 'bun:test';
+import { describe, expect, it, mock, beforeEach, afterEach } from 'bun:test';
 import { isNewerVersion } from '../src/domain/validators/version';
 import type { UpdateInfo } from '../src/infrastructure/services/UpdateService';
 
@@ -203,6 +203,135 @@ describe('UpdateService Version Comparator', () => {
     expect(isNewerVersion('v1.0.0', '1.0.0')).toBe(false);
     expect(isNewerVersion('1.0.1', '1.0.0')).toBe(false);
     expect(isNewerVersion('2.0.0', '1.9.9')).toBe(false);
+  });
+
+  it('handles prereleases, build metadata, whitespace, and non-version tags safely', () => {
+    expect(isNewerVersion('1.5.5', ' V1.5.6 ')).toBe(true);
+    expect(isNewerVersion('1.5.5', 'v1.5.5-beta.1')).toBe(false);
+    expect(isNewerVersion('1.5.5-beta.1', '1.5.5')).toBe(true);
+    expect(isNewerVersion('1.5.5-beta.1', '1.5.5-beta.2')).toBe(true);
+    expect(isNewerVersion('1.5.5', '1.5.5+build.42')).toBe(false);
+    expect(isNewerVersion('1.5.5', '')).toBe(false);
+    expect(isNewerVersion('1.5.5', 'nightly')).toBe(false);
+  });
+});
+
+describe('UpdateService CheckForUpdate & Throttling', () => {
+  let service: InstanceType<typeof UpdateService>;
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    service = new UpdateService();
+    mockFiles = {};
+    mockStorage = {};
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it('does not record throttle timestamp when network request fails or returns non-ok', async () => {
+    globalThis.fetch = (async () => {
+      throw new Error('Network offline');
+    }) as any;
+
+    const first = await service.checkForUpdate(false);
+    expect(first).toBeNull();
+    expect(mockStorage['@open_parcels:last_update_check']).toBeUndefined();
+
+    // Next attempt immediately succeeds without being throttled
+    globalThis.fetch = (async () =>
+      new Response(
+        JSON.stringify({
+          tag_name: 'v9.9.9',
+          name: 'Release 9.9.9',
+          body: 'Fixes',
+          published_at: '2026-11-20T00:00:00Z',
+          html_url: 'https://github.com/gek0v/open-parcels-app/releases/tag/v9.9.9',
+          assets: [
+            {
+              name: 'open-parcels-v9.9.9.apk',
+              browser_download_url:
+                'https://github.com/gek0v/open-parcels-app/releases/download/v9.9.9/open-parcels-v9.9.9.apk',
+              size: 52428800,
+            },
+          ],
+        }),
+        { status: 200 }
+      )) as any;
+
+    const second = await service.checkForUpdate(false);
+    expect(second).not.toBeNull();
+    expect(second?.version).toBe('9.9.9');
+    expect(second?.hasApkAsset).toBe(true);
+    expect(mockStorage['@open_parcels:last_update_check']).toBeDefined();
+  });
+
+  it('falls back to /releases list when /releases/latest returns 404', async () => {
+    const requestedUrls: string[] = [];
+    globalThis.fetch = (async (url: string) => {
+      requestedUrls.push(url);
+      if (url.endsWith('/releases/latest')) {
+        return new Response('Not Found', { status: 404 });
+      }
+      return new Response(
+        JSON.stringify([
+          { draft: true, tag_name: 'v99.0.0' },
+          {
+            draft: false,
+            prerelease: false,
+            tag_name: 'v8.1.0',
+            name: 'v8.1.0',
+            body: 'Fallback release',
+            html_url: 'https://github.com/gek0v/open-parcels-app/releases/tag/v8.1.0',
+            assets: [],
+          },
+        ]),
+        { status: 200 }
+      );
+    }) as any;
+
+    const info = await service.checkForUpdate(true);
+    expect(requestedUrls.length).toBe(2);
+    expect(info?.version).toBe('8.1.0');
+    expect(info?.hasApkAsset).toBe(false);
+  });
+
+  it('normalizes ignored version regardless of leading v and respects force=true', async () => {
+    globalThis.fetch = (async () =>
+      new Response(
+        JSON.stringify({
+          tag_name: 'v9.0.0',
+          html_url: 'https://github.com/gek0v/open-parcels-app/releases/tag/v9.0.0',
+          assets: [],
+        }),
+        { status: 200 }
+      )) as any;
+
+    await service.ignoreVersion('v9.0.0');
+    expect(await service.checkForUpdate(false)).toBeNull();
+    expect((await service.checkForUpdate(true))?.version).toBe('9.0.0');
+  });
+
+  it('re-downloads when cached APK is undersized/corrupted', async () => {
+    const uri = service.getApkFileUri('1.3.0');
+    mockFiles[uri] = { exists: true, size: 1024 }; // Corrupt 1KB file
+
+    const updateInfo: UpdateInfo = {
+      version: '1.3.0',
+      title: 'v1.3.0',
+      changelog: 'Test',
+      publishedAt: '2026-11-11',
+      apkDownloadUrl:
+        'https://github.com/gek0v/open-parcels-app/releases/download/v1.3.0/open-parcels-v1.3.0.apk',
+      apkSizeMb: 68,
+      htmlUrl: 'https://github.com/gek0v/open-parcels-app/releases/tag/v1.3.0',
+      hasApkAsset: true,
+    };
+
+    const dest = await service.downloadApk(updateInfo);
+    expect(dest).toBe(uri);
+    expect(createDownloadResumableCalls.length).toBe(1);
   });
 });
 

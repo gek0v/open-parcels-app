@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -11,9 +11,11 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Theme } from '../../theme/adaptiveTheme';
+import { useTheme } from '../../theme/ThemeContext';
 import {
   UpdateInfo,
   CURRENT_APP_VERSION,
+  GITHUB_REPO,
   updateService,
   DownloadProgress,
   DownloadCancelledError,
@@ -51,7 +53,14 @@ export const UpdateAvailableModal: React.FC<UpdateAvailableModalProps> = ({
   updateInfo,
   onClose,
 }) => {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const { theme } = useTheme();
+  const cleanCurrentVersion = CURRENT_APP_VERSION.replace(/^v/i, '');
+  const cleanRemoteVersion = updateInfo.version.replace(/^v/i, '');
+
+  const isMountedRef = useRef(true);
+
+  const [trackedKey, setTrackedKey] = useState(`${visible}:${cleanRemoteVersion}`);
   const [status, setStatus] = useState<UpdateModalStatus>('idle');
   const [progress, setProgress] = useState<DownloadProgress>({
     progress: 0,
@@ -64,33 +73,90 @@ export const UpdateAvailableModal: React.FC<UpdateAvailableModalProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [needsPermissionSettings, setNeedsPermissionSettings] = useState(false);
 
+  const currentKey = `${visible}:${cleanRemoteVersion}`;
+  if (trackedKey !== currentKey) {
+    const prevVersionSuffix = `:${cleanRemoteVersion}`;
+    const versionChanged = !trackedKey.endsWith(prevVersionSuffix);
+    setTrackedKey(currentKey);
+    setErrorMessage(null);
+    setNeedsPermissionSettings(false);
+    setProgress({
+      progress: 0,
+      percent: 0,
+      bytesWritten: 0,
+      totalBytesExpectedToWrite: updateInfo.apkSizeMb
+        ? Math.round(updateInfo.apkSizeMb * 1024 * 1024)
+        : 0,
+    });
+    if (!visible || versionChanged) {
+      setStatus((prev) => {
+        if (!versionChanged && (prev === 'downloading' || prev === 'preparing')) {
+          return prev;
+        }
+        return 'idle';
+      });
+    }
+  }
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   // Check if APK is already downloaded locally
   useEffect(() => {
-    let isMounted = true;
-    if (visible) {
+    let active = true;
+    if (visible && Platform.OS === 'android') {
       updateService
-        .isApkDownloaded(updateInfo.version, updateInfo.apkSizeMb)
+        .isApkDownloaded(cleanRemoteVersion, updateInfo.apkSizeMb)
         .then((alreadyDownloaded) => {
-          if (isMounted) {
+          if (active && isMountedRef.current) {
             setStatus((prev) => {
               if (prev === 'downloading' || prev === 'preparing') {
                 return prev;
               }
-              return alreadyDownloaded && Platform.OS === 'android'
-                ? 'ready_to_install'
-                : 'idle';
+              return alreadyDownloaded ? 'ready_to_install' : 'idle';
             });
           }
-        });
+        })
+        .catch(() => {});
     }
+
     return () => {
-      isMounted = false;
+      active = false;
     };
-  }, [visible, updateInfo.version, updateInfo.apkSizeMb]);
+  }, [visible, cleanRemoteVersion, updateInfo.apkSizeMb]);
 
   const formatMb = (bytes: number): string => {
     if (!bytes || bytes <= 0) return '0.0';
     return (bytes / (1024 * 1024)).toFixed(1);
+  };
+
+  const handleInstallNow = async (fileUriOverride?: string) => {
+    if (!isMountedRef.current) return;
+    setStatus('preparing');
+    setErrorMessage(null);
+    setNeedsPermissionSettings(false);
+
+    const installResult = await updateService.installApk(
+      fileUriOverride || cleanRemoteVersion
+    );
+    if (!isMountedRef.current) return;
+
+    if (installResult.success) {
+      setNeedsPermissionSettings(Boolean(installResult.cancelled));
+      setStatus('ready_to_install');
+    } else {
+      setStatus('error');
+      setNeedsPermissionSettings(Boolean(installResult.needsPermissionSettings));
+      setErrorMessage(
+        installResult.needsPermissionSettings
+          ? t.updateModal.permissionError
+          : installResult.error || t.updateModal.installError
+      );
+    }
   };
 
   const handleStartUpdate = async () => {
@@ -103,7 +169,7 @@ export const UpdateAvailableModal: React.FC<UpdateAvailableModalProps> = ({
 
     // Check if already downloaded on Android
     const alreadyDownloaded = await updateService.isApkDownloaded(
-      updateInfo.version,
+      cleanRemoteVersion,
       updateInfo.apkSizeMb
     );
     if (alreadyDownloaded) {
@@ -125,24 +191,15 @@ export const UpdateAvailableModal: React.FC<UpdateAvailableModalProps> = ({
 
     try {
       const destinationUri = await updateService.downloadApk(updateInfo, (p) => {
-        setProgress(p);
+        if (isMountedRef.current) {
+          setProgress(p);
+        }
       });
 
-      setStatus('preparing');
-      const installResult = await updateService.installApk(destinationUri);
-
-      if (installResult.success) {
-        setStatus('ready_to_install');
-      } else {
-        setStatus('error');
-        setNeedsPermissionSettings(Boolean(installResult.needsPermissionSettings));
-        setErrorMessage(
-          installResult.needsPermissionSettings
-            ? t.updateModal.permissionError
-            : installResult.error || t.updateModal.installError
-        );
-      }
+      if (!isMountedRef.current) return;
+      await handleInstallNow(destinationUri);
     } catch (err: any) {
+      if (!isMountedRef.current) return;
       if (err instanceof DownloadCancelledError || err?.message === 'DOWNLOAD_CANCELLED') {
         setStatus('idle');
       } else if (err?.message === 'NO_APK_ASSET') {
@@ -159,25 +216,8 @@ export const UpdateAvailableModal: React.FC<UpdateAvailableModalProps> = ({
 
   const handleCancelDownload = async () => {
     await updateService.cancelDownload();
-    setStatus('idle');
-  };
-
-  const handleInstallNow = async () => {
-    setStatus('preparing');
-    setErrorMessage(null);
-    setNeedsPermissionSettings(false);
-
-    const installResult = await updateService.installApk(updateInfo.version);
-    if (installResult.success) {
-      setStatus('ready_to_install');
-    } else {
-      setStatus('error');
-      setNeedsPermissionSettings(Boolean(installResult.needsPermissionSettings));
-      setErrorMessage(
-        installResult.needsPermissionSettings
-          ? t.updateModal.permissionError
-          : installResult.error || t.updateModal.installError
-      );
+    if (isMountedRef.current) {
+      setStatus('idle');
     }
   };
 
@@ -192,10 +232,28 @@ export const UpdateAvailableModal: React.FC<UpdateAvailableModalProps> = ({
   const handleClose = async () => {
     if (status === 'downloading') {
       await updateService.cancelDownload();
-      setStatus('idle');
+      if (isMountedRef.current) {
+        setStatus('idle');
+      }
     }
     onClose();
   };
+
+  const changelogContent =
+    updateInfo.changelog?.trim() ||
+    updateInfo.title?.trim() ||
+    (lang === 'en'
+      ? 'Stability improvements and bug fixes.'
+      : 'Mejoras generales de estabilidad y corrección de errores.');
+
+  const apkPillLabel =
+    status === 'ready_to_install'
+      ? t.updateModal.readyToInstall
+      : updateInfo.hasApkAsset === false || Platform.OS !== 'android'
+      ? 'GITHUB RELEASE'
+      : updateInfo.apkSizeMb
+      ? `${t.updateModal.apkOfficial} (${updateInfo.apkSizeMb} MB)`
+      : t.updateModal.apkInstallable;
 
   return (
     <Modal
@@ -204,7 +262,7 @@ export const UpdateAvailableModal: React.FC<UpdateAvailableModalProps> = ({
       animationType="fade"
       statusBarTranslucent
       hardwareAccelerated
-      onRequestClose={handleClose}
+      onRequestClose={status === 'preparing' ? undefined : handleClose}
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -215,40 +273,63 @@ export const UpdateAvailableModal: React.FC<UpdateAvailableModalProps> = ({
           onPress={status === 'downloading' || status === 'preparing' ? undefined : handleClose}
         />
 
-        <View style={styles.dialogCard} accessibilityViewIsModal>
+        <View
+          style={[
+            styles.dialogCard,
+            { backgroundColor: theme.surface, borderColor: theme.border },
+          ]}
+          accessibilityViewIsModal
+        >
           {/* Retro Window Header */}
-          <View style={styles.header}>
+          <View style={[styles.header, { borderBottomColor: theme.border }]}>
             <View style={styles.dotsRow}>
-              <View style={[styles.dot, { backgroundColor: Theme.colors.coral }]} />
-              <View style={[styles.dot, { backgroundColor: Theme.colors.yellow }]} />
-              <View style={[styles.dot, { backgroundColor: Theme.colors.mint }]} />
+              <View style={[styles.dot, { backgroundColor: theme.coral, borderColor: theme.border }]} />
+              <View style={[styles.dot, { backgroundColor: theme.yellow, borderColor: theme.border }]} />
+              <View style={[styles.dot, { backgroundColor: theme.mint, borderColor: theme.border }]} />
             </View>
-            <Text style={styles.headerTitle}>{t.updateModal.title}</Text>
+            <Text style={[styles.headerTitle, { color: theme.textPrimary }]} numberOfLines={1}>
+              {t.updateModal.title}
+            </Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t.updateModal.closeAria}
+              disabled={status === 'preparing'}
               onPress={handleClose}
-              style={({ pressed }) => [styles.closeBtn, pressed && styles.pressed]}
+              style={({ pressed }) => [
+                styles.closeBtn,
+                { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+                status === 'preparing' && styles.disabledBtn,
+                pressed && styles.pressed,
+              ]}
             >
-              <X size={16} color="#000000" strokeWidth={3} />
+              <X size={16} color={theme.textPrimary} strokeWidth={3} />
             </Pressable>
           </View>
 
           {/* Version Comparison Hero Banner */}
-          <View style={styles.versionBanner}>
+          <View
+            style={[
+              styles.versionBanner,
+              { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+            ]}
+          >
             <View style={styles.versionBox}>
-              <Text style={styles.versionLabel}>{t.updateModal.current}</Text>
-              <Text style={styles.versionValue}>v{CURRENT_APP_VERSION}</Text>
+              <Text style={[styles.versionLabel, { color: theme.textTertiary }]}>
+                {t.updateModal.current}
+              </Text>
+              <Text style={[styles.versionValue, { color: theme.textSecondary }]}>
+                v{cleanCurrentVersion}
+              </Text>
             </View>
 
-            <ArrowRight size={20} color="#000000" strokeWidth={3} style={styles.arrowIcon} />
+            <ArrowRight size={20} color={theme.textPrimary} strokeWidth={3} style={styles.arrowIcon} />
 
-            <View style={[styles.versionBox, styles.newVersionBox]}>
+            <View style={[styles.versionBox, styles.newVersionBox, { backgroundColor: theme.yellow }]}>
               <View style={styles.newBadge}>
                 <Sparkles size={10} color="#000000" strokeWidth={3} />
                 <Text style={styles.newBadgeText}>{t.updateModal.newBadge}</Text>
               </View>
-              <Text style={styles.newVersionValue}>v{updateInfo.version}</Text>
+              <Text style={styles.newVersionValue}>v{cleanRemoteVersion}</Text>
             </View>
           </View>
 
@@ -257,19 +338,16 @@ export const UpdateAvailableModal: React.FC<UpdateAvailableModalProps> = ({
             <View
               style={[
                 styles.apkPill,
-                status === 'ready_to_install' && { backgroundColor: Theme.colors.mint },
+                { backgroundColor: theme.yellow },
+                status === 'ready_to_install' && { backgroundColor: theme.mint },
               ]}
             >
               <Package size={13} color="#000000" strokeWidth={2.5} />
-              <Text style={styles.apkPillText}>
-                {status === 'ready_to_install'
-                  ? t.updateModal.readyToInstall
-                  : updateInfo.apkSizeMb
-                  ? `${t.updateModal.apkOfficial} (${updateInfo.apkSizeMb} MB)`
-                  : t.updateModal.apkInstallable}
-              </Text>
+              <Text style={styles.apkPillText}>{apkPillLabel}</Text>
             </View>
-            <Text style={styles.repoText}>github.com/gek0v</Text>
+            <Text style={[styles.repoText, { color: theme.textTertiary }]} numberOfLines={1}>
+              github.com/{GITHUB_REPO.split('/')[0]}
+            </Text>
           </View>
 
           {/* Dynamic Body State */}
@@ -277,10 +355,19 @@ export const UpdateAvailableModal: React.FC<UpdateAvailableModalProps> = ({
           {/* 1. IDLE STATE: Show Changelog */}
           {status === 'idle' && (
             <>
-              <View style={styles.changelogContainer}>
-                <Text style={styles.changelogLabel}>{t.updateModal.changelogTitle}</Text>
+              <View
+                style={[
+                  styles.changelogContainer,
+                  { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+                ]}
+              >
+                <Text style={[styles.changelogLabel, { color: theme.textPrimary }]}>
+                  {t.updateModal.changelogTitle}
+                </Text>
                 <ScrollView style={styles.changelogScroll} showsVerticalScrollIndicator>
-                  <Text style={styles.changelogText}>{updateInfo.changelog.trim()}</Text>
+                  <Text style={[styles.changelogText, { color: theme.textSecondary }]}>
+                    {changelogContent}
+                  </Text>
                 </ScrollView>
               </View>
 
@@ -289,16 +376,26 @@ export const UpdateAvailableModal: React.FC<UpdateAvailableModalProps> = ({
                   accessibilityRole="button"
                   accessibilityLabel={t.updateModal.laterBtn}
                   onPress={handleClose}
-                  style={({ pressed }) => [styles.cancelBtn, pressed && styles.pressed]}
+                  style={({ pressed }) => [
+                    styles.cancelBtn,
+                    { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+                    pressed && styles.pressed,
+                  ]}
                 >
-                  <Text style={styles.cancelText}>{t.updateModal.laterBtn}</Text>
+                  <Text style={[styles.cancelText, { color: theme.textPrimary }]}>
+                    {t.updateModal.laterBtn}
+                  </Text>
                 </Pressable>
 
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={t.updateModal.updateBtn}
                   onPress={handleStartUpdate}
-                  style={({ pressed }) => [styles.downloadBtn, pressed && styles.pressed]}
+                  style={({ pressed }) => [
+                    styles.downloadBtn,
+                    { backgroundColor: theme.primary },
+                    pressed && styles.pressed,
+                  ]}
                 >
                   <Download size={16} color="#FFFFFF" strokeWidth={3} style={styles.downloadIcon} />
                   <Text style={styles.downloadText}>{t.updateModal.updateBtn}</Text>
@@ -309,14 +406,19 @@ export const UpdateAvailableModal: React.FC<UpdateAvailableModalProps> = ({
 
           {/* 2. DOWNLOADING STATE: In-App Progress Bar */}
           {status === 'downloading' && (
-            <View style={styles.progressContainer}>
+            <View
+              style={[
+                styles.progressContainer,
+                { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+              ]}
+            >
               <View style={styles.progressHeaderRow}>
-                <View style={styles.statusBadge}>
+                <View style={[styles.statusBadge, { backgroundColor: theme.primary }]}>
                   <Download size={13} color="#FFFFFF" strokeWidth={3} />
                   <Text style={styles.statusBadgeText}>{t.updateModal.downloading}</Text>
                 </View>
 
-                <View style={styles.percentPill}>
+                <View style={[styles.percentPill, { backgroundColor: theme.yellow }]}>
                   <Text style={styles.percentText}>{progress.percent}%</Text>
                 </View>
               </View>
@@ -328,7 +430,7 @@ export const UpdateAvailableModal: React.FC<UpdateAvailableModalProps> = ({
 
               {/* MB / Total Readout */}
               <View style={styles.progressBytesRow}>
-                <Text style={styles.bytesText}>
+                <Text style={[styles.bytesText, { color: theme.textSecondary }]}>
                   {formatMb(progress.bytesWritten)}
                   {progress.totalBytesExpectedToWrite > 0 &&
                     ` / ${formatMb(progress.totalBytesExpectedToWrite)}`}{' '}
@@ -342,10 +444,16 @@ export const UpdateAvailableModal: React.FC<UpdateAvailableModalProps> = ({
                   accessibilityRole="button"
                   accessibilityLabel={t.updateModal.cancelDownloadBtn}
                   onPress={handleCancelDownload}
-                  style={({ pressed }) => [styles.cancelBtn, pressed && styles.pressed]}
+                  style={({ pressed }) => [
+                    styles.cancelBtn,
+                    { backgroundColor: theme.surface, borderColor: theme.border },
+                    pressed && styles.pressed,
+                  ]}
                 >
-                  <X size={15} color="#000000" strokeWidth={3} style={styles.cancelIcon} />
-                  <Text style={styles.cancelText}>{t.updateModal.cancelDownloadBtn}</Text>
+                  <X size={15} color={theme.textPrimary} strokeWidth={3} style={styles.cancelIcon} />
+                  <Text style={[styles.cancelText, { color: theme.textPrimary }]}>
+                    {t.updateModal.cancelDownloadBtn}
+                  </Text>
                 </Pressable>
               </View>
             </View>
@@ -353,14 +461,19 @@ export const UpdateAvailableModal: React.FC<UpdateAvailableModalProps> = ({
 
           {/* 3. PREPARING STATE: Installer Handoff */}
           {status === 'preparing' && (
-            <View style={styles.progressContainer}>
+            <View
+              style={[
+                styles.progressContainer,
+                { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+              ]}
+            >
               <View style={styles.progressHeaderRow}>
-                <View style={[styles.statusBadge, { backgroundColor: Theme.colors.purple }]}>
+                <View style={[styles.statusBadge, { backgroundColor: theme.purple }]}>
                   <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 6 }} />
                   <Text style={styles.statusBadgeText}>{t.updateModal.preparing}</Text>
                 </View>
 
-                <View style={styles.percentPill}>
+                <View style={[styles.percentPill, { backgroundColor: theme.yellow }]}>
                   <Text style={styles.percentText}>100%</Text>
                 </View>
               </View>
@@ -369,7 +482,7 @@ export const UpdateAvailableModal: React.FC<UpdateAvailableModalProps> = ({
                 <ProgressBar progress={100} status="delivered" height={16} />
               </View>
 
-              <Text style={styles.preparingHelpText}>
+              <Text style={[styles.preparingHelpText, { color: theme.textSecondary }]}>
                 {t.updateModal.preparingHelp}
               </Text>
             </View>
@@ -391,21 +504,48 @@ export const UpdateAvailableModal: React.FC<UpdateAvailableModalProps> = ({
                   accessibilityRole="button"
                   accessibilityLabel={t.updateModal.laterBtn}
                   onPress={handleClose}
-                  style={({ pressed }) => [styles.cancelBtn, pressed && styles.pressed]}
+                  style={({ pressed }) => [
+                    styles.cancelBtn,
+                    { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+                    pressed && styles.pressed,
+                  ]}
                 >
-                  <Text style={styles.cancelText}>{t.updateModal.laterBtn}</Text>
+                  <Text style={[styles.cancelText, { color: theme.textPrimary }]}>
+                    {t.updateModal.laterBtn}
+                  </Text>
                 </Pressable>
 
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={t.updateModal.installNowBtn}
-                  onPress={handleInstallNow}
-                  style={({ pressed }) => [styles.installBtn, pressed && styles.pressed]}
+                  onPress={() => handleInstallNow()}
+                  style={({ pressed }) => [
+                    styles.installBtn,
+                    { backgroundColor: theme.mint },
+                    pressed && styles.pressed,
+                  ]}
                 >
                   <CheckCircle2 size={16} color="#000000" strokeWidth={3} style={styles.downloadIcon} />
                   <Text style={styles.installBtnText}>{t.updateModal.installNowBtn}</Text>
                 </Pressable>
               </View>
+
+              {needsPermissionSettings && (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t.updateModal.openSettingsBtn}
+                  onPress={handleOpenSettings}
+                  style={({ pressed }) => [
+                    styles.settingsBtn,
+                    styles.readySettingsBtn,
+                    { backgroundColor: theme.yellow },
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Settings size={15} color="#000000" strokeWidth={2.5} style={styles.cancelIcon} />
+                  <Text style={styles.settingsBtnText}>{t.updateModal.openSettingsBtn}</Text>
+                </Pressable>
+              )}
             </>
           )}
 
@@ -426,7 +566,11 @@ export const UpdateAvailableModal: React.FC<UpdateAvailableModalProps> = ({
                     accessibilityRole="button"
                     accessibilityLabel={t.updateModal.openSettingsBtn}
                     onPress={handleOpenSettings}
-                    style={({ pressed }) => [styles.settingsBtn, pressed && styles.pressed]}
+                    style={({ pressed }) => [
+                      styles.settingsBtn,
+                      { backgroundColor: theme.yellow },
+                      pressed && styles.pressed,
+                    ]}
                   >
                     <Settings size={15} color="#000000" strokeWidth={2.5} style={styles.cancelIcon} />
                     <Text style={styles.settingsBtnText}>{t.updateModal.openSettingsBtn}</Text>
@@ -437,7 +581,11 @@ export const UpdateAvailableModal: React.FC<UpdateAvailableModalProps> = ({
                   accessibilityRole="button"
                   accessibilityLabel={t.updateModal.retryBtn}
                   onPress={handleStartUpdate}
-                  style={({ pressed }) => [styles.retryBtn, pressed && styles.pressed]}
+                  style={({ pressed }) => [
+                    styles.retryBtn,
+                    { backgroundColor: theme.primary },
+                    pressed && styles.pressed,
+                  ]}
                 >
                   <RefreshCw size={15} color="#FFFFFF" strokeWidth={3} style={styles.downloadIcon} />
                   <Text style={styles.retryBtnText}>{t.updateModal.retryBtn}</Text>
@@ -451,8 +599,10 @@ export const UpdateAvailableModal: React.FC<UpdateAvailableModalProps> = ({
                 onPress={handleBrowserFallback}
                 style={({ pressed }) => [styles.fallbackRow, pressed && styles.pressed]}
               >
-                <ExternalLink size={12} color="#475569" strokeWidth={2.5} />
-                <Text style={styles.fallbackText}>{t.updateModal.browserFallback}</Text>
+                <ExternalLink size={12} color={theme.textTertiary} strokeWidth={2.5} />
+                <Text style={[styles.fallbackText, { color: theme.textTertiary }]}>
+                  {t.updateModal.browserFallback}
+                </Text>
               </Pressable>
             </View>
           )}
@@ -480,6 +630,7 @@ const styles = StyleSheet.create({
   dialogCard: {
     width: '100%',
     maxWidth: 420,
+    maxHeight: '90%',
     backgroundColor: '#FFFFFF',
     borderRadius: Theme.radius.md,
     padding: 18,
@@ -495,6 +646,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     borderBottomWidth: 2,
     borderBottomColor: '#000000',
+    gap: 8,
   },
   dotsRow: {
     flexDirection: 'row',
@@ -508,6 +660,8 @@ const styles = StyleSheet.create({
     borderColor: '#000000',
   },
   headerTitle: {
+    flex: 1,
+    textAlign: 'center',
     fontSize: 13,
     fontWeight: '900',
     color: '#000000',
@@ -522,6 +676,9 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#000000',
     backgroundColor: Theme.colors.surfaceSubtle,
+  },
+  disabledBtn: {
+    opacity: 0.4,
   },
   versionBanner: {
     flexDirection: 'row',
@@ -585,6 +742,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12,
+    gap: 8,
   },
   apkPill: {
     flexDirection: 'row',
@@ -843,6 +1001,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#000000',
     ...Theme.shadows.sm,
+  },
+  readySettingsBtn: {
+    flex: 0,
+    marginTop: 10,
   },
   settingsBtnText: {
     fontSize: 11,

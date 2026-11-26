@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -27,6 +27,7 @@ import * as Haptics from 'expo-haptics';
 
 interface NewParcelModalProps {
   visible: boolean;
+  asScreen?: boolean;
   initialTrackingNumber?: string;
   initialCarrierSlug?: string;
   onClose: () => void;
@@ -35,6 +36,7 @@ interface NewParcelModalProps {
 
 export const NewParcelModal: React.FC<NewParcelModalProps> = ({
   visible,
+  asScreen = false,
   initialTrackingNumber,
   initialCarrierSlug,
   onClose,
@@ -51,10 +53,36 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isCatalogModalVisible, setIsCatalogModalVisible] = useState(false);
-  const [isManuallySelected, setIsManuallySelected] = useState(false);
+  const [isManuallySelected, setIsManuallySelected] = useState(Boolean(initialCarrierSlug));
 
+  const isManuallySelectedRef = useRef(Boolean(initialCarrierSlug));
+  useEffect(() => {
+    isManuallySelectedRef.current = isManuallySelected;
+  }, [isManuallySelected]);
+
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const [prevVisible, setPrevVisible] = useState(visible);
   const [prevInitialNumber, setPrevInitialNumber] = useState(initialTrackingNumber);
   const [prevInitialSlug, setPrevInitialSlug] = useState(initialCarrierSlug);
+
+  if (visible !== prevVisible) {
+    setPrevVisible(visible);
+    if (visible && !asScreen) {
+      setTrackingNumber(initialTrackingNumber || '');
+      setSelectedCarrierSlug(initialCarrierSlug);
+      setIsManuallySelected(Boolean(initialCarrierSlug));
+      setErrorMessage(null);
+    } else if (!visible) {
+      setIsCatalogModalVisible(false);
+    }
+  }
 
   if (initialTrackingNumber !== prevInitialNumber) {
     setPrevInitialNumber(initialTrackingNumber);
@@ -64,9 +92,14 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
   if (initialCarrierSlug !== prevInitialSlug) {
     setPrevInitialSlug(initialCarrierSlug);
     setSelectedCarrierSlug(initialCarrierSlug);
+    setIsManuallySelected(Boolean(initialCarrierSlug));
   }
 
   useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
     let active = true;
     const clean = trackingNumber.trim();
 
@@ -74,35 +107,35 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
     const timer = setTimeout(async () => {
       if (!active) return;
 
-      if (clean.length === 0) {
-        setCandidates([]);
-        if (!isManuallySelected) {
-          setSelectedCarrierSlug(undefined);
-        }
-        return;
-      }
-
       if (clean.length < 4) {
         setCandidates([]);
-        if (!isManuallySelected) {
+        if (!isManuallySelectedRef.current && !initialCarrierSlug) {
           setSelectedCarrierSlug(undefined);
         }
         return;
       }
 
-      const results = await trackingEngineManager.current.detect(clean);
-      if (!active) return;
+      try {
+        const results = await trackingEngineManager.current.detect(clean);
+        if (!active) return;
 
-      setCandidates(results);
-      if (!isManuallySelected) {
-        setSelectedCarrierSlug((previous) => {
-          if (results.length === 0) return undefined;
-          // Keep initial or previously selected carrier if still in candidate list
-          const stillAvailable = results.some((r) => r.carrier.slug === previous);
-          if (stillAvailable) return previous;
-          const liveCandidate = results.find((r) => r.carrier.hasLiveTracking);
-          return (liveCandidate || results[0]).carrier.slug;
-        });
+        setCandidates(results);
+        if (!isManuallySelectedRef.current) {
+          setSelectedCarrierSlug((previous) => {
+            if (results.length === 0) return previous && initialCarrierSlug ? previous : undefined;
+            // Keep initial or previously selected carrier if still in candidate list
+            const prevNormalized = previous ? findCarrierBySlug(previous).slug : undefined;
+            const stillAvailable = prevNormalized
+              ? results.some((r) => r.carrier.slug === prevNormalized)
+              : false;
+            if (stillAvailable) return prevNormalized;
+            const liveCandidate = results.find((r) => r.carrier.hasLiveTracking);
+            return (liveCandidate || results[0]).carrier.slug;
+          });
+        }
+      } catch {
+        if (!active) return;
+        setCandidates([]);
       }
     }, 180);
 
@@ -110,82 +143,41 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
       active = false;
       clearTimeout(timer);
     };
-  }, [trackingNumber, isManuallySelected]);
+  }, [trackingNumber, visible, initialCarrierSlug]);
 
-  const currentSelectedCarrier: Carrier | undefined = selectedCarrierSlug
-    ? findCarrierBySlug(selectedCarrierSlug)
+  const normalizedSelectedSlug = selectedCarrierSlug
+    ? findCarrierBySlug(selectedCarrierSlug).slug
     : undefined;
 
-  const currentSelectedCandidate = candidates.find(
-    (c) => c.carrier.slug === selectedCarrierSlug
-  );
+  const currentSelectedCandidate = normalizedSelectedSlug
+    ? candidates.find((c) => c.carrier.slug === normalizedSelectedSlug)
+    : undefined;
+
+  const currentSelectedCarrier: Carrier | undefined = normalizedSelectedSlug
+    ? currentSelectedCandidate?.carrier || findCarrierBySlug(normalizedSelectedSlug)
+    : undefined;
+
   const requiresPostalCode = currentSelectedCarrier?.requiresPostalCode ?? false;
   const canSubmit = !!trackingNumber.trim() && !isLoading;
 
   const handleSelectCarrier = (slug: string) => {
-    setSelectedCarrierSlug(slug);
+    const canonical = findCarrierBySlug(slug).slug;
+    isManuallySelectedRef.current = true;
+    setSelectedCarrierSlug(canonical);
     setIsManuallySelected(true);
     setErrorMessage(null);
   };
 
   const handleSelectCarrierFromCatalog = (carrier: Carrier) => {
-    setSelectedCarrierSlug(carrier.slug);
+    const canonical = carrier.slug;
+    isManuallySelectedRef.current = true;
+    setSelectedCarrierSlug(canonical);
     setIsManuallySelected(true);
     setErrorMessage(null);
   };
 
-  const handleTrackAndSave = async () => {
-    const cleanNumber = trackingNumber.trim();
-    if (!cleanNumber) {
-      setErrorMessage(t.newParcelModal.trackingPlaceholder || 'Introduce un número de seguimiento válido.');
-      return;
-    }
-
-    if (requiresPostalCode && !postalCode.trim()) {
-      const carrierName = currentSelectedCarrier?.name || 'este transportista';
-      setErrorMessage(`${t.newParcelModal.postalCodeHint || 'Este transportista exige código postal.'} (${carrierName})`);
-      return;
-    }
-
-    setIsLoading(true);
-    setErrorMessage(null);
-
-    try {
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch {}
-
-    try {
-      const parcel = await trackingEngineManager.current.track({
-        trackingNumber: cleanNumber,
-        carrierHint: selectedCarrierSlug,
-        postalCode: postalCode.trim() || undefined,
-        lang: lang || 'es',
-      });
-
-      if (customAlias.trim()) {
-        parcel.customAlias = customAlias.trim();
-      }
-
-      await parcelRepository.save(parcel);
-
-      try {
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } catch {}
-
-      onParcelCreated(parcel);
-      resetForm();
-      onClose();
-    } catch (err: any) {
-      try {
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      } catch {}
-      setErrorMessage(err.message || 'Error al rastrear el envío.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const resetForm = () => {
+    isManuallySelectedRef.current = false;
     setTrackingNumber('');
     setCustomAlias('');
     setPostalCode('');
@@ -196,257 +188,343 @@ export const NewParcelModal: React.FC<NewParcelModalProps> = ({
     setIsCatalogModalVisible(false);
   };
 
-  const handleClose = async () => {
+  const handleTrackAndSave = async () => {
+    const cleanNumber = trackingNumber.trim();
+    if (!cleanNumber) {
+      setErrorMessage(
+        t.newParcelModal.trackingPlaceholder ||
+          (lang === 'en' ? 'Enter a valid tracking number.' : 'Introduce un número de seguimiento válido.')
+      );
+      return;
+    }
+
+    if (requiresPostalCode && !postalCode.trim()) {
+      const carrierName =
+        currentSelectedCarrier?.name ||
+        (lang === 'en' ? 'this courier' : 'este transportista');
+      setErrorMessage(
+        `${t.newParcelModal.postalCodeHint || (lang === 'en' ? 'This courier requires a postal code.' : 'Este transportista exige código postal.')} (${carrierName})`
+      );
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+
     try {
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch {}
+      const parcel = await trackingEngineManager.current.track({
+        trackingNumber: cleanNumber,
+        carrierHint: normalizedSelectedSlug,
+        postalCode: requiresPostalCode && postalCode.trim() ? postalCode.trim() : undefined,
+        lang: lang || 'es',
+      });
+
+      if (customAlias.trim()) {
+        parcel.customAlias = customAlias.trim();
+      }
+
+      await parcelRepository.save(parcel);
+
+      if (!isMountedRef.current) return;
+
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+
+      resetForm();
+      onParcelCreated(parcel);
+      if (!asScreen) {
+        onClose();
+      }
+    } catch (err: any) {
+      if (!isMountedRef.current) return;
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      setErrorMessage(
+        err?.message ||
+          (lang === 'en' ? 'Failed to track shipment.' : 'Error al rastrear el envío.')
+      );
+    } finally {
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const handleClose = () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     resetForm();
     onClose();
   };
 
-  return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={[styles.keyboardContainer, { backgroundColor: Theme.isWeb ? theme.surfaceSubtle : theme.canvas }]}
-      >
-        <View style={[styles.container, { backgroundColor: theme.canvas, borderColor: theme.border }]}>
-          {/* Header */}
+  const content = (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={[styles.keyboardContainer, { backgroundColor: Theme.isWeb ? theme.surfaceSubtle : theme.canvas }]}
+    >
+      <View style={[styles.container, { backgroundColor: theme.canvas, borderColor: theme.border }]}>
+        {/* Header */}
+        <View
+          style={[
+            styles.header,
+            {
+              backgroundColor: theme.surface,
+              borderBottomColor: theme.border,
+              paddingTop: Math.max(insets.top, 16),
+            },
+          ]}
+        >
+          <View style={styles.headerCopy}>
+            <View style={styles.windowDots}>
+              <View style={[styles.dot, { backgroundColor: theme.coral, borderColor: theme.border }]} />
+              <View style={[styles.dot, { backgroundColor: theme.yellow, borderColor: theme.border }]} />
+              <View style={[styles.dot, { backgroundColor: theme.mint, borderColor: theme.border }]} />
+              <Text style={[styles.headerTitle, { color: theme.textPrimary }]} numberOfLines={1}>
+                {t.newParcelModal.title}
+              </Text>
+            </View>
+            <View style={[styles.engineBadge, { backgroundColor: theme.yellow, borderColor: theme.border }]}>
+              <Cpu size={12} color="#000000" strokeWidth={2.5} />
+              <Text style={styles.engineBadgeText} numberOfLines={1}>
+                {trackingEngineManager.current.engineName.toUpperCase()}
+              </Text>
+            </View>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t.newParcelModal.cancelBtn}
+            onPress={handleClose}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={({ pressed }) => [
+              styles.closeButton,
+              { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+              pressed && styles.pressed,
+            ]}
+          >
+            <X size={20} color={theme.textPrimary} strokeWidth={3} />
+          </Pressable>
+        </View>
+
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom + 24, 32) }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Tracking Number Input */}
+          <View style={styles.fieldGroup}>
+            <Text style={[styles.fieldLabel, { color: theme.textPrimary }]}>
+              {t.newParcelModal.trackingNumberLabel} *
+            </Text>
+            <View style={[styles.inputBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <TextInput
+                accessibilityLabel={t.newParcelModal.trackingNumberLabel}
+                style={[styles.mainInput, { color: theme.textPrimary }]}
+                placeholder={t.newParcelModal.trackingPlaceholder}
+                placeholderTextColor={theme.textTertiary}
+                value={trackingNumber}
+                editable={!isLoading}
+                onChangeText={(text) => {
+                  setTrackingNumber(text);
+                  if (!text.trim()) {
+                    isManuallySelectedRef.current = false;
+                    setIsManuallySelected(false);
+                  }
+                  setErrorMessage(null);
+                }}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                returnKeyType="done"
+              />
+            </View>
+            <Text style={[styles.helperText, { color: theme.textSecondary }]}>
+              {t.newParcelModal.subtitle}
+            </Text>
+          </View>
+
+          {/* Selected Carrier Card & Full Catalog Switcher */}
           <View
             style={[
-              styles.header,
+              styles.selectedCarrierCard,
               {
                 backgroundColor: theme.surface,
-                borderBottomColor: theme.border,
-                paddingTop: Math.max(insets.top, 16),
+                borderColor: theme.border,
               },
             ]}
           >
-            <View style={styles.headerCopy}>
-              <View style={styles.windowDots}>
-                <View style={[styles.dot, { backgroundColor: theme.coral, borderColor: theme.border }]} />
-                <View style={[styles.dot, { backgroundColor: theme.yellow, borderColor: theme.border }]} />
-                <View style={[styles.dot, { backgroundColor: theme.mint, borderColor: theme.border }]} />
-                <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
-                  {t.newParcelModal.title}
+            <View style={styles.selectedCarrierContent}>
+              <View style={styles.selectedCarrierHeader}>
+                <Text style={[styles.selectedCarrierLabel, { color: theme.textSecondary }]}>
+                  {t.newParcelModal.selectedCarrierLabel}:
                 </Text>
+                {currentSelectedCandidate && (
+                  <View style={[styles.recommendedBadge, { backgroundColor: theme.yellow, borderColor: theme.border }]}>
+                    <Sparkles size={10} color="#000000" strokeWidth={3} />
+                    <Text style={styles.recommendedBadgeText}>
+                      {Math.round(currentSelectedCandidate.confidence * 100)}%{' '}
+                      {lang === 'en' ? 'MATCH' : 'RECOMENDADO'}
+                    </Text>
+                  </View>
+                )}
+                {currentSelectedCarrier?.hasLiveTracking && (
+                  <View style={[styles.liveBadgeSmall, { backgroundColor: theme.mint, borderColor: theme.border }]}>
+                    <Zap size={9} color="#000000" strokeWidth={3} />
+                    <Text style={styles.liveBadgeSmallText}>LIVE</Text>
+                  </View>
+                )}
               </View>
-              <View style={[styles.engineBadge, { backgroundColor: theme.yellow, borderColor: theme.border }]}>
-                <Cpu size={12} color="#000000" strokeWidth={2.5} />
-                <Text style={styles.engineBadgeText} numberOfLines={1}>
-                  {trackingEngineManager.current.engineName.toUpperCase()}
+
+              <View style={styles.carrierMainRow}>
+                <View
+                  style={[
+                    styles.carrierColorDot,
+                    { backgroundColor: currentSelectedCarrier?.color || theme.blue },
+                  ]}
+                />
+                <Text
+                  style={[styles.selectedCarrierName, { color: theme.textPrimary }]}
+                  numberOfLines={1}
+                >
+                  {currentSelectedCarrier
+                    ? currentSelectedCarrier.name.toUpperCase()
+                    : lang === 'en'
+                    ? 'NOT SELECTED (AUTO)'
+                    : 'NO SELECCIONADO (AUTO)'}
                 </Text>
               </View>
             </View>
+
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={t.newParcelModal.cancelBtn || 'Cerrar formulario de nuevo envío'}
-              onPress={handleClose}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityState={{ disabled: isLoading }}
+              accessibilityLabel={t.newParcelModal.openCatalogBtn}
+              onPress={() => {
+                if (isLoading) return;
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                setIsCatalogModalVisible(true);
+              }}
+              disabled={isLoading}
               style={({ pressed }) => [
-                styles.closeButton,
-                { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
-                pressed && styles.pressed,
-              ]}
-            >
-              <X size={20} color={theme.textPrimary} strokeWidth={3} />
-            </Pressable>
-          </View>
-
-          <ScrollView
-            style={styles.content}
-            contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom + 24, 32) }]}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            {/* Tracking Number Input */}
-            <View style={styles.fieldGroup}>
-              <Text style={[styles.fieldLabel, { color: theme.textPrimary }]}>
-                {t.newParcelModal.trackingNumberLabel} *
-              </Text>
-              <View style={[styles.inputBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-                <TextInput
-                  accessibilityLabel={t.newParcelModal.trackingNumberLabel}
-                  style={[styles.mainInput, { color: theme.textPrimary }]}
-                  placeholder={t.newParcelModal.trackingPlaceholder || 'Ej: LP00561234567890, 75616714...'}
-                  placeholderTextColor={theme.textTertiary}
-                  value={trackingNumber}
-                  onChangeText={(text) => {
-                    setTrackingNumber(text);
-                    if (!text.trim()) {
-                      setIsManuallySelected(false);
-                    }
-                    setErrorMessage(null);
-                  }}
-                  autoCapitalize="characters"
-                  autoCorrect={false}
-                  returnKeyType="done"
-                />
-              </View>
-              <Text style={[styles.helperText, { color: theme.textSecondary }]}>
-                {t.newParcelModal.subtitle || 'Detectamos el transportista automáticamente al escribir el código.'}
-              </Text>
-            </View>
-
-            {/* Selected Carrier Card & Full Catalog Switcher */}
-            <View
-              style={[
-                styles.selectedCarrierCard,
-                {
-                  backgroundColor: theme.surface,
-                  borderColor: theme.border,
-                },
-              ]}
-            >
-              <View style={styles.selectedCarrierContent}>
-                <View style={styles.selectedCarrierHeader}>
-                  <Text style={[styles.selectedCarrierLabel, { color: theme.textSecondary }]}>
-                    {t.newParcelModal.selectedCarrierLabel}:
-                  </Text>
-                  {currentSelectedCandidate && (
-                    <View style={[styles.recommendedBadge, { backgroundColor: theme.yellow, borderColor: theme.border }]}>
-                      <Sparkles size={10} color="#000000" strokeWidth={3} />
-                      <Text style={styles.recommendedBadgeText}>
-                        {Math.round(currentSelectedCandidate.confidence * 100)}% RECOMENDADO
-                      </Text>
-                    </View>
-                  )}
-                  {currentSelectedCarrier?.hasLiveTracking && (
-                    <View style={[styles.liveBadgeSmall, { backgroundColor: theme.mint, borderColor: theme.border }]}>
-                      <Zap size={9} color="#000000" strokeWidth={3} />
-                      <Text style={styles.liveBadgeSmallText}>LIVE</Text>
-                    </View>
-                  )}
-                </View>
-
-                <View style={styles.carrierMainRow}>
-                  <View
-                    style={[
-                      styles.carrierColorDot,
-                      { backgroundColor: currentSelectedCarrier?.color || theme.blue },
-                    ]}
-                  />
-                  <Text
-                    style={[styles.selectedCarrierName, { color: theme.textPrimary }]}
-                    numberOfLines={1}
-                  >
-                    {currentSelectedCarrier ? currentSelectedCarrier.name.toUpperCase() : 'NO SELECCIONADO (AUTO)'}
-                  </Text>
-                </View>
-              </View>
-
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Cambiar transportista entre todos los del catálogo"
-                onPress={async () => {
-                  try {
-                    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  } catch {}
-                  setIsCatalogModalVisible(true);
-                }}
-                style={({ pressed }) => [
-                  styles.changeCarrierBtn,
-                  { backgroundColor: theme.yellow, borderColor: theme.border },
-                  pressed && styles.pressed,
-                ]}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-              >
-                <ArrowRightLeft size={14} color="#000000" strokeWidth={2.5} style={{ marginRight: 5 }} />
-                <Text style={styles.changeCarrierBtnText}>
-                  {t.newParcelModal.changeCarrierBtn}
-                </Text>
-              </Pressable>
-            </View>
-
-            {/* Carrier Real-Time Auto-Detection Chips */}
-            <CarrierDetectorBar
-              candidates={candidates}
-              selectedCarrierSlug={selectedCarrierSlug}
-              onSelectCarrier={handleSelectCarrier}
-              onOpenCatalog={() => setIsCatalogModalVisible(true)}
-            />
-
-            {/* Carrier Selector Modal (Full Catalog with Recommended Options) */}
-            <CarrierSelectorModal
-              visible={isCatalogModalVisible}
-              onClose={() => setIsCatalogModalVisible(false)}
-              onSelectCarrier={handleSelectCarrierFromCatalog}
-              selectedCarrierSlug={selectedCarrierSlug}
-              candidates={candidates}
-            />
-
-            {/* Conditional Postal Code Input (for InPost / CTT / SEUR / GLS) */}
-            {requiresPostalCode && (
-              <View style={[styles.fieldGroup, styles.conditionalBox, { backgroundColor: theme.yellow, borderColor: theme.border }]}>
-                <View style={styles.conditionalHeader}>
-                  <ShieldAlert size={16} color="#000000" strokeWidth={3} />
-                  <Text style={styles.conditionalTitle} numberOfLines={2}>
-                    {t.newParcelModal.postalCodeLabel} ({currentSelectedCarrier?.name.toUpperCase() || ''})
-                  </Text>
-                </View>
-                <TextInput
-                  accessibilityLabel={t.newParcelModal.postalCodeLabel}
-                  style={[styles.standardInput, { backgroundColor: theme.surface, borderColor: theme.border, color: theme.textPrimary }]}
-                  placeholder={t.newParcelModal.postalCodePlaceholder || 'Ej: 47140, 28001...'}
-                  placeholderTextColor={theme.textTertiary}
-                  value={postalCode}
-                  onChangeText={setPostalCode}
-                  keyboardType="numeric"
-                  maxLength={10}
-                />
-              </View>
-            )}
-
-            {/* Custom Alias Input */}
-            <View style={styles.fieldGroup}>
-              <Text style={[styles.fieldLabel, { color: theme.textPrimary }]}>
-                {t.newParcelModal.aliasLabel}
-              </Text>
-              <TextInput
-                accessibilityLabel={t.newParcelModal.aliasLabel}
-                style={[styles.standardInput, { backgroundColor: theme.surface, borderColor: theme.border, color: theme.textPrimary }]}
-                placeholder={t.newParcelModal.aliasPlaceholder || 'Ej: Zapatillas Nike, Teclado AliExpress...'}
-                placeholderTextColor={theme.textTertiary}
-                value={customAlias}
-                onChangeText={setCustomAlias}
-              />
-            </View>
-
-            {/* Error Message if any */}
-            {errorMessage && (
-              <View style={[styles.errorContainer, { backgroundColor: theme.coral, borderColor: theme.border }]}>
-                <Text style={styles.errorText}>{errorMessage}</Text>
-              </View>
-            )}
-
-            {/* Submit Action Button */}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ disabled: !canSubmit, busy: isLoading }}
-              onPress={handleTrackAndSave}
-              disabled={!canSubmit}
-              style={({ pressed }) => [
-                styles.submitButton,
-                { backgroundColor: theme.blue, borderColor: theme.border },
-                !canSubmit && styles.submitButtonDisabled,
-                pressed && canSubmit && styles.pressed,
+                styles.changeCarrierBtn,
+                { backgroundColor: theme.yellow, borderColor: theme.border },
+                isLoading && styles.disabledControl,
+                pressed && !isLoading && styles.pressed,
               ]}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             >
-              {isLoading ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <>
-                  <Plus size={20} color="#FFFFFF" strokeWidth={3} style={styles.submitIcon} />
-                  <Text style={styles.submitButtonText}>
-                    {t.newParcelModal.startTrackingBtn || 'RASTREAR Y GUARDAR'}
-                  </Text>
-                </>
-              )}
+              <ArrowRightLeft size={14} color="#000000" strokeWidth={2.5} style={{ marginRight: 5 }} />
+              <Text style={styles.changeCarrierBtnText}>
+                {t.newParcelModal.changeCarrierBtn}
+              </Text>
             </Pressable>
-          </ScrollView>
-        </View>
-      </KeyboardAvoidingView>
+          </View>
+
+          {/* Carrier Real-Time Auto-Detection Chips */}
+          <CarrierDetectorBar
+            candidates={candidates}
+            selectedCarrierSlug={normalizedSelectedSlug}
+            onSelectCarrier={handleSelectCarrier}
+            onOpenCatalog={() => setIsCatalogModalVisible(true)}
+            disabled={isLoading}
+          />
+
+          {/* Conditional Postal Code Input (for InPost / CTT / SEUR / GLS) */}
+          {requiresPostalCode && (
+            <View style={[styles.fieldGroup, styles.conditionalBox, { backgroundColor: theme.yellow, borderColor: theme.border }]}>
+              <View style={styles.conditionalHeader}>
+                <ShieldAlert size={16} color="#000000" strokeWidth={3} />
+                <Text style={styles.conditionalTitle} numberOfLines={2}>
+                  {t.newParcelModal.postalCodeLabel} ({currentSelectedCarrier?.name.toUpperCase() || ''})
+                </Text>
+              </View>
+              <TextInput
+                accessibilityLabel={t.newParcelModal.postalCodeLabel}
+                style={[styles.standardInput, { backgroundColor: theme.surface, borderColor: theme.border, color: theme.textPrimary }]}
+                placeholder={t.newParcelModal.postalCodePlaceholder}
+                placeholderTextColor={theme.textTertiary}
+                value={postalCode}
+                editable={!isLoading}
+                onChangeText={(text) => {
+                  setPostalCode(text);
+                  setErrorMessage(null);
+                }}
+                keyboardType="default"
+                autoCapitalize="characters"
+                autoCorrect={false}
+                maxLength={12}
+              />
+            </View>
+          )}
+
+          {/* Custom Alias Input */}
+          <View style={styles.fieldGroup}>
+            <Text style={[styles.fieldLabel, { color: theme.textPrimary }]}>
+              {t.newParcelModal.aliasLabel}
+            </Text>
+            <TextInput
+              accessibilityLabel={t.newParcelModal.aliasLabel}
+              style={[styles.standardInput, { backgroundColor: theme.surface, borderColor: theme.border, color: theme.textPrimary }]}
+              placeholder={t.newParcelModal.aliasPlaceholder}
+              placeholderTextColor={theme.textTertiary}
+              value={customAlias}
+              editable={!isLoading}
+              onChangeText={setCustomAlias}
+            />
+          </View>
+
+          {/* Error Message if any */}
+          {errorMessage && (
+            <View style={[styles.errorContainer, { backgroundColor: theme.coral, borderColor: theme.border }]}>
+              <Text style={styles.errorText}>{errorMessage}</Text>
+            </View>
+          )}
+
+          {/* Submit Action Button */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !canSubmit, busy: isLoading }}
+            onPress={handleTrackAndSave}
+            disabled={!canSubmit}
+            style={({ pressed }) => [
+              styles.submitButton,
+              { backgroundColor: theme.blue, borderColor: theme.border },
+              !canSubmit && styles.submitButtonDisabled,
+              pressed && canSubmit && styles.pressed,
+            ]}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <>
+                <Plus size={20} color="#FFFFFF" strokeWidth={3} style={styles.submitIcon} />
+                <Text style={styles.submitButtonText}>
+                  {t.newParcelModal.startTrackingBtn}
+                </Text>
+              </>
+            )}
+          </Pressable>
+        </ScrollView>
+      </View>
+
+      {/* Carrier Selector Modal (rendered outside ScrollView; inline overlay if parent is already a Modal) */}
+      <CarrierSelectorModal
+        visible={isCatalogModalVisible}
+        onClose={() => setIsCatalogModalVisible(false)}
+        onSelectCarrier={handleSelectCarrierFromCatalog}
+        selectedCarrierSlug={normalizedSelectedSlug}
+        candidates={candidates}
+        useNativeModal={asScreen}
+      />
+    </KeyboardAvoidingView>
+  );
+
+  if (asScreen) {
+    return content;
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
+      {content}
     </Modal>
   );
 };
@@ -492,6 +570,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   headerTitle: {
+    flexShrink: 1,
     fontSize: 18,
     fontWeight: '900',
     marginLeft: 6,
@@ -629,6 +708,9 @@ const styles = StyleSheet.create({
   },
   pressed: {
     ...Theme.pressed,
+  },
+  disabledControl: {
+    opacity: 0.5,
   },
   smallPressed: {
     ...Theme.pressed,

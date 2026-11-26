@@ -1,9 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { DetectedCarrier } from '../../../domain/models/carrier';
-import { CARRIERS_CATALOG } from '../../../domain/validators/detection';
+import { CARRIERS_CATALOG, findCarrierBySlug } from '../../../domain/validators/detection';
 import { Theme } from '../../theme/adaptiveTheme';
 import { useTheme } from '../../theme/ThemeContext';
+import { useI18n } from '../../../infrastructure/i18n';
 import { Sparkles, Check, Layers, ChevronRight, Truck } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 
@@ -12,6 +13,7 @@ interface CarrierDetectorBarProps {
   selectedCarrierSlug?: string;
   onSelectCarrier: (slug: string) => void;
   onOpenCatalog?: () => void;
+  disabled?: boolean;
 }
 
 export const CarrierDetectorBar: React.FC<CarrierDetectorBarProps> = ({
@@ -19,8 +21,26 @@ export const CarrierDetectorBar: React.FC<CarrierDetectorBarProps> = ({
   selectedCarrierSlug,
   onSelectCarrier,
   onOpenCatalog,
+  disabled = false,
 }) => {
   const { theme } = useTheme();
+  const { t, lang } = useI18n();
+  const normalizedSelectedSlug = selectedCarrierSlug
+    ? findCarrierBySlug(selectedCarrierSlug).slug
+    : undefined;
+  const catalogShortLabel = lang === 'en' ? 'CATALOG' : 'CATÁLOGO';
+
+  const handleOpenCatalog = () => {
+    if (disabled || !onOpenCatalog) return;
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    onOpenCatalog();
+  };
+
+  const handleSelect = (slug: string) => {
+    if (disabled) return;
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    onSelectCarrier(slug);
+  };
 
   if (candidates.length === 0) {
     if (!onOpenCatalog) return null;
@@ -29,27 +49,27 @@ export const CarrierDetectorBar: React.FC<CarrierDetectorBarProps> = ({
       <View style={styles.container}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Abrir catálogo completo de transportistas"
-          onPress={async () => {
-            try {
-              await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            } catch {}
-            onOpenCatalog();
-          }}
+          accessibilityState={{ disabled }}
+          accessibilityLabel={t.newParcelModal.openCatalogBtn}
+          onPress={handleOpenCatalog}
+          disabled={disabled}
           style={({ pressed }) => [
             styles.emptyCatalogPrompt,
             { backgroundColor: theme.surface, borderColor: theme.border },
-            pressed && styles.pressed,
+            disabled && styles.disabled,
+            pressed && !disabled && styles.pressed,
           ]}
         >
           <View style={styles.promptLeft}>
             <Truck size={16} color={theme.textPrimary} strokeWidth={2.5} style={{ marginRight: 8 }} />
-            <Text style={[styles.promptText, { color: theme.textPrimary }]}>
-              ELEGIR TRANSPORTISTA DEL CATÁLOGO
+            <Text style={[styles.promptText, { color: theme.textPrimary }]} numberOfLines={1}>
+              {lang === 'en' ? 'CHOOSE COURIER FROM CATALOG' : 'ELEGIR TRANSPORTISTA DEL CATÁLOGO'}
             </Text>
           </View>
           <View style={styles.promptRight}>
-            <Text style={[styles.promptCount, { color: theme.textSecondary }]}>{CARRIERS_CATALOG.length} disp.</Text>
+            <Text style={[styles.promptCount, { color: theme.textSecondary }]}>
+              {CARRIERS_CATALOG.length} {lang === 'en' ? 'avail.' : 'disp.'}
+            </Text>
             <ChevronRight size={16} color={theme.textPrimary} strokeWidth={2.5} />
           </View>
         </Pressable>
@@ -62,31 +82,29 @@ export const CarrierDetectorBar: React.FC<CarrierDetectorBarProps> = ({
       <View style={styles.labelRow}>
         <View style={styles.labelLeft}>
           <Sparkles size={14} color={theme.yellow} strokeWidth={3} style={styles.sparkleIcon} />
-          <Text style={[styles.headerLabel, { color: theme.textPrimary }]}>
-            OPCIONES RECOMENDADAS:
+          <Text style={[styles.headerLabel, { color: theme.textPrimary }]} numberOfLines={1}>
+            {t.newParcelModal.recommendedSection}:
           </Text>
         </View>
 
         {onOpenCatalog && (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Ver catálogo completo de transportistas"
-            onPress={async () => {
-              try {
-                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              } catch {}
-              onOpenCatalog();
-            }}
+            accessibilityState={{ disabled }}
+            accessibilityLabel={t.newParcelModal.openCatalogBtn}
+            onPress={handleOpenCatalog}
+            disabled={disabled}
             style={({ pressed }) => [
               styles.openCatalogHeaderBtn,
               { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
-              pressed && styles.pressed,
+              disabled && styles.disabled,
+              pressed && !disabled && styles.pressed,
             ]}
             hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           >
             <Layers size={12} color={theme.textPrimary} strokeWidth={2.5} style={{ marginRight: 4 }} />
             <Text style={[styles.openCatalogHeaderText, { color: theme.textPrimary }]}>
-              CATÁLOGO
+              {catalogShortLabel}
             </Text>
           </Pressable>
         )}
@@ -98,21 +116,21 @@ export const CarrierDetectorBar: React.FC<CarrierDetectorBarProps> = ({
         contentContainerStyle={styles.scrollList}
       >
         {candidates.map((item) => {
-          const isSelected = selectedCarrierSlug === item.carrier.slug;
+          const isSelected = normalizedSelectedSlug === item.carrier.slug;
           const confidencePercent = Math.round(item.confidence * 100);
 
           return (
             <Pressable
               key={item.carrier.slug}
               accessibilityRole="button"
-              accessibilityState={{ selected: isSelected }}
-              accessibilityLabel={`${item.carrier.name}, ${confidencePercent}% de coincidencia`}
-              onPress={async () => {
-                try {
-                  await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                } catch {}
-                onSelectCarrier(item.carrier.slug);
-              }}
+              accessibilityState={{ selected: isSelected, disabled }}
+              accessibilityLabel={
+                lang === 'en'
+                  ? `${item.carrier.name}, ${confidencePercent}% match`
+                  : `${item.carrier.name}, ${confidencePercent}% de coincidencia`
+              }
+              onPress={() => handleSelect(item.carrier.slug)}
+              disabled={disabled}
               hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
               style={({ pressed }) => [
                 styles.chip,
@@ -121,7 +139,8 @@ export const CarrierDetectorBar: React.FC<CarrierDetectorBarProps> = ({
                   borderColor: theme.border,
                 },
                 isSelected && styles.chipSelected,
-                pressed && styles.pressed,
+                disabled && styles.disabled,
+                pressed && !disabled && styles.pressed,
               ]}
             >
               <Text
@@ -142,7 +161,7 @@ export const CarrierDetectorBar: React.FC<CarrierDetectorBarProps> = ({
                 <Text
                   style={[
                     styles.confidenceText,
-                    isSelected && styles.confidenceTextSelected,
+                    isSelected && { color: theme.yellow },
                   ]}
                 >
                   {confidencePercent}%
@@ -158,23 +177,21 @@ export const CarrierDetectorBar: React.FC<CarrierDetectorBarProps> = ({
         {onOpenCatalog && (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Ver más transportistas del catálogo"
-            onPress={async () => {
-              try {
-                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              } catch {}
-              onOpenCatalog();
-            }}
+            accessibilityState={{ disabled }}
+            accessibilityLabel={t.newParcelModal.openCatalogBtn}
+            onPress={handleOpenCatalog}
+            disabled={disabled}
             hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
             style={({ pressed }) => [
               styles.catalogChip,
               { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
-              pressed && styles.pressed,
+              disabled && styles.disabled,
+              pressed && !disabled && styles.pressed,
             ]}
           >
             <Layers size={14} color={theme.textPrimary} strokeWidth={2.5} style={{ marginRight: 6 }} />
             <Text style={[styles.catalogChipText, { color: theme.textPrimary }]}>
-              + CATÁLOGO ({CARRIERS_CATALOG.length})
+              + {catalogShortLabel} ({CARRIERS_CATALOG.length})
             </Text>
           </Pressable>
         )}
@@ -195,6 +212,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   labelLeft: {
+    flex: 1,
+    minWidth: 0,
+    marginRight: 8,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -202,6 +222,7 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   headerLabel: {
+    flexShrink: 1,
     fontSize: 10,
     fontWeight: '900',
     letterSpacing: 0.6,
@@ -242,6 +263,9 @@ const styles = StyleSheet.create({
   },
   pressed: {
     ...Theme.pressed,
+  },
+  disabled: {
+    opacity: 0.5,
   },
   carrierName: {
     fontSize: 11,
@@ -296,10 +320,14 @@ const styles = StyleSheet.create({
     ...Theme.shadows.sm,
   },
   promptLeft: {
+    flex: 1,
+    minWidth: 0,
+    marginRight: 8,
     flexDirection: 'row',
     alignItems: 'center',
   },
   promptText: {
+    flexShrink: 1,
     fontSize: 11,
     fontWeight: '900',
     letterSpacing: 0.3,

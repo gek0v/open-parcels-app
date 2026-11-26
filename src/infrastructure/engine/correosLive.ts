@@ -11,13 +11,13 @@ import { getLocalizedStatusText } from './mapper';
 export function parseSpanishDateToIso(dateStr: string, timeStr?: string): string {
   const cleanDate = (dateStr || '').trim();
   const cleanTime = (timeStr || '').trim();
-  if (!cleanDate) return new Date().toISOString();
+  if (!cleanDate) return '';
 
-  // Combined e.g. "13/11/2026 14:30:00"
+  // Combined e.g. "13/11/2026 14:30:00" or "13-11-2026 14:30:00"
   const combined = cleanTime ? `${cleanDate} ${cleanTime}` : cleanDate;
 
-  // 1. Parse DD/MM/YYYY [HH:mm[:ss]] (Spanish standard format) FIRST
-  const dmyMatch = combined.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
+  // 1. Parse DD/MM/YYYY or DD-MM-YYYY [HH:mm[:ss]] (Spanish standard format) FIRST
+  const dmyMatch = combined.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
   if (dmyMatch) {
     const [, day, month, year, hours = '0', minutes = '0', seconds = '0'] = dmyMatch;
     const isoString = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}:${seconds.padStart(2, '0')}.000Z`;
@@ -53,14 +53,38 @@ export function normalizeCorreosStatus(
 ): { status: CanonicalStatus; stage: EventStage } {
   const upper = `${statusStr || ''} ${descStr || ''}`.toUpperCase().trim();
 
-  // Delivered check (avoiding false positives like "NO ENTREGADO")
+  // Delivered check (avoiding false positives like "NO ENTREGADO" or "DEVUELTO")
   if (
     !upper.includes('NO ENTREGADO') &&
     !upper.includes('FALLIDO') &&
     !upper.includes('INTENTO') &&
+    !upper.includes('DEVUELTO') &&
     (upper.includes('ENTREGADO') || upper.includes('DELIVERED'))
   ) {
     return { status: 'delivered', stage: 'delivery' };
+  }
+
+  // Return / Exceptions (check before transit/out_for_delivery so "Devuelto desde reparto" isn't misclassified)
+  if (
+    upper.includes('DEVUELTO') ||
+    upper.includes('DEVOLUCION') ||
+    upper.includes('DEVOLUCIÓN') ||
+    upper.includes('EXTRAVIO') ||
+    upper.includes('EXTRAVÍO') ||
+    upper.includes('RETENIDO')
+  ) {
+    return { status: 'exception', stage: 'exception' };
+  }
+
+  // Failed attempts (check before out_for_delivery so "AVISO_LLEGADA + Intento fallido / ausente" classifies accurately)
+  if (
+    upper.includes('INCIDENCIA') ||
+    upper.includes('AUSENTE') ||
+    upper.includes('FALLIDO') ||
+    upper.includes('DIRECCION INCORRECTA') ||
+    upper.includes('NO ENTREGADO')
+  ) {
+    return { status: 'failed_attempt', stage: 'exception' };
   }
 
   // Out for delivery / pickup ready
@@ -105,29 +129,6 @@ export function normalizeCorreosStatus(
     return { status: 'info_received', stage: 'created' };
   }
 
-  // Failed attempts
-  if (
-    upper.includes('INCIDENCIA') ||
-    upper.includes('AUSENTE') ||
-    upper.includes('FALLIDO') ||
-    upper.includes('DIRECCION INCORRECTA') ||
-    upper.includes('NO ENTREGADO')
-  ) {
-    return { status: 'failed_attempt', stage: 'exception' };
-  }
-
-  // Return / Exceptions
-  if (
-    upper.includes('DEVUELTO') ||
-    upper.includes('DEVOLUCION') ||
-    upper.includes('DEVOLUCIÓN') ||
-    upper.includes('EXTRAVIO') ||
-    upper.includes('EXTRAVÍO') ||
-    upper.includes('RETENIDO')
-  ) {
-    return { status: 'exception', stage: 'exception' };
-  }
-
   return { status: 'in_transit', stage: 'transit' };
 }
 
@@ -140,9 +141,26 @@ export function normalizeCorreosExpressStatus(
 
   if (
     !upperDesc.includes('NO ENTREGADO') &&
+    !upperDesc.includes('FALLID') &&
+    !upperDesc.includes('AUSENTE') &&
+    !upperDesc.includes('INCIDENCIA') &&
+    !upperDesc.includes('DEVUELTO') &&
     (upperTipo === 'D' || upperDesc.includes('ENTREGADO') || upperDesc.includes('DELIVERED'))
   ) {
     return { status: 'delivered', stage: 'delivery' };
+  }
+
+  if (upperDesc.includes('DEVUELTO') || upperDesc.includes('DEVOLUCION')) {
+    return { status: 'exception', stage: 'exception' };
+  }
+
+  if (
+    upperDesc.includes('INCIDENCIA') ||
+    upperDesc.includes('AUSENTE') ||
+    upperDesc.includes('FALLIDO') ||
+    upperDesc.includes('NO ENTREGADO')
+  ) {
+    return { status: 'failed_attempt', stage: 'exception' };
   }
 
   if (
@@ -173,19 +191,6 @@ export function normalizeCorreosExpressStatus(
     upperDesc.includes('PREPARACIÓN')
   ) {
     return { status: 'info_received', stage: 'created' };
-  }
-
-  if (
-    upperDesc.includes('INCIDENCIA') ||
-    upperDesc.includes('AUSENTE') ||
-    upperDesc.includes('FALLIDO') ||
-    upperDesc.includes('NO ENTREGADO')
-  ) {
-    return { status: 'failed_attempt', stage: 'exception' };
-  }
-
-  if (upperDesc.includes('DEVUELTO') || upperDesc.includes('DEVOLUCION')) {
-    return { status: 'exception', stage: 'exception' };
   }
 
   return { status: 'in_transit', stage: 'transit' };
@@ -223,7 +228,7 @@ function computeProgressAndDays(
   let daysInTransit = Math.floor(diffHours / 24);
   if (daysInTransit < 1 && diffHours > 0) daysInTransit = 1;
 
-  return { progress, daysInTransit: Math.max(1, daysInTransit) };
+  return { progress, daysInTransit: Math.max(0, daysInTransit) };
 }
 
 /**
@@ -266,7 +271,10 @@ export function parseCorreosSpainPayload(
     if (!ev || typeof ev !== 'object') continue;
     const evStatusStr = String(ev.status || '');
     const evDesc = String(ev.description || evStatusStr || 'Actualización de estado');
-    const evDateIso = parseSpanishDateToIso(String(ev.eventDate || ''));
+    const evDateIso = parseSpanishDateToIso(
+      String(ev.eventDate || ''),
+      String(ev.eventTime || '')
+    );
     const location = String(ev.location || ev.office || '').trim();
     const locWithCountry = location ? (location.toLowerCase().includes('spain') || location.toLowerCase().includes('españa') ? location : `${location}, España`) : undefined;
 

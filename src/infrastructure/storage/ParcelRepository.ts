@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { Parcel } from '../../domain/models/parcel';
 import { sqliteParcelRepository } from './sqlite/SqliteParcelRepository';
 
@@ -7,7 +8,7 @@ const STORAGE_KEY = '@open_parcels:saved_parcels_v1';
 export type ParcelRepositoryListener = () => void;
 
 export class ParcelRepository {
-  private useSqlite = true;
+  private useSqlite = Platform?.OS !== 'web';
   private listeners: Set<ParcelRepositoryListener> = new Set();
 
   subscribe(listener: ParcelRepositoryListener): () => void {
@@ -18,12 +19,47 @@ export class ParcelRepository {
   }
 
   notify(): void {
-    for (const listener of this.listeners) {
+    for (const listener of [...this.listeners]) {
       try {
         listener();
       } catch (err) {
         console.warn('ParcelRepository listener error:', err);
       }
+    }
+  }
+
+  private mergeIntoArray(all: Parcel[], parcel: Parcel): void {
+    const existingIndex = all.findIndex(
+      (p) => p.id === parcel.id || p.trackingNumber === parcel.trackingNumber
+    );
+
+    if (existingIndex >= 0) {
+      const existing = all[existingIndex];
+      const hasIncomingAlias =
+        parcel.customAlias !== undefined && parcel.customAlias !== null && parcel.customAlias.trim() !== '';
+      const hasIncomingNotes =
+        parcel.notes !== undefined && parcel.notes !== null && parcel.notes.trim() !== '';
+
+      if (existing.id && parcel.id !== existing.id) {
+        parcel.id = existing.id;
+      }
+
+      all[existingIndex] = {
+        ...existing,
+        ...parcel,
+        id: existing.id || parcel.id,
+        createdAt: existing.createdAt || parcel.createdAt,
+        customAlias: hasIncomingAlias ? parcel.customAlias : existing.customAlias,
+        notes: hasIncomingNotes ? parcel.notes : existing.notes,
+        isArchived:
+          existing.isArchived && !parcel.isArchived && !(parcel as any).isArchivedExplicit
+            ? true
+            : typeof parcel.isArchived === 'boolean'
+              ? parcel.isArchived
+              : existing.isArchived,
+      };
+    } else {
+      all.unshift(parcel);
     }
   }
 
@@ -75,15 +111,7 @@ export class ParcelRepository {
     }
 
     const all = await this.getAll();
-    const existingIndex = all.findIndex(
-      (p) => p.id === parcel.id || p.trackingNumber === parcel.trackingNumber
-    );
-
-    if (existingIndex >= 0) {
-      all[existingIndex] = { ...all[existingIndex], ...parcel };
-    } else {
-      all.unshift(parcel);
-    }
+    this.mergeIntoArray(all, parcel);
 
     try {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(all));
@@ -109,14 +137,7 @@ export class ParcelRepository {
 
     const all = await this.getAll();
     for (const parcel of parcels) {
-      const existingIndex = all.findIndex(
-        (p) => p.id === parcel.id || p.trackingNumber === parcel.trackingNumber
-      );
-      if (existingIndex >= 0) {
-        all[existingIndex] = { ...all[existingIndex], ...parcel };
-      } else {
-        all.unshift(parcel);
-      }
+      this.mergeIntoArray(all, parcel);
     }
 
     try {

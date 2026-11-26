@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,8 +7,15 @@ import {
   Pressable,
   Alert,
   ActivityIndicator,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  RefreshControl,
 } from 'react-native';
 import { Parcel } from '../../domain/models/parcel';
+import { CANONICAL_STATUS_MAP } from '../../domain/models/status';
+import { findCarrierBySlug } from '../../domain/validators/detection';
 import { Theme } from '../theme/adaptiveTheme';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { ProgressBar } from '../components/common/ProgressBar';
@@ -18,12 +25,15 @@ import { RenameParcelModal } from '../components/common/RenameParcelModal';
 import { DeleteParcelModal } from '../components/common/DeleteParcelModal';
 import { CarrierSelectorModal } from '../components/common/CarrierSelectorModal';
 import { trackingEngineManager } from '../../infrastructure/engine';
+import { isPostalCodeRequiredError } from '../../infrastructure/engine/errors';
+import { getLocalizedStatusText } from '../../infrastructure/engine/mapper';
 import { parcelRepository } from '../../infrastructure/storage/ParcelRepository';
 import { useTheme } from '../theme/ThemeContext';
 import { useI18n } from '../../infrastructure/i18n';
 import { Carrier, DetectedCarrier } from '../../domain/models/carrier';
 import { openSafeWebUrl } from '../../infrastructure/utils/url';
 import * as Haptics from 'expo-haptics';
+import * as Clipboard from 'expo-clipboard';
 import {
   ArrowLeft,
   ExternalLink,
@@ -36,6 +46,9 @@ import {
   RefreshCw,
   Copy,
   ArrowRightLeft,
+  Check,
+  X,
+  MapPin,
 } from 'lucide-react-native';
 import { ShareService } from '../../infrastructure/services/ShareService';
 
@@ -48,6 +61,12 @@ interface ParcelDetailScreenProps {
   onParcelUpdated?: (updated: Parcel) => void;
 }
 
+interface PostalPromptState {
+  parcel: Parcel;
+  carrier: Carrier;
+  triggerRefresh: boolean;
+}
+
 export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
   parcel,
   onBack,
@@ -58,11 +77,212 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
 }) => {
   const { theme } = useTheme();
   const { t, lang } = useI18n();
+  const isEn = lang === 'en';
   const [renameModalVisible, setRenameModalVisible] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [carrierModalVisible, setCarrierModalVisible] = useState(false);
   const [carrierCandidates, setCarrierCandidates] = useState<DetectedCarrier[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [postalPrompt, setPostalPrompt] = useState<PostalPromptState | null>(null);
+  const [postalInput, setPostalInput] = useState('');
+  const [postalError, setPostalError] = useState<string | null>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const openPostalModal = (
+    targetParcel: Parcel,
+    targetCarrier: Carrier,
+    triggerRefresh: boolean
+  ) => {
+    setPostalInput(targetParcel.postalCode || '');
+    setPostalError(null);
+    setPostalPrompt({
+      parcel: targetParcel,
+      carrier: targetCarrier,
+      triggerRefresh,
+    });
+  };
+
+  const resolveCarrierTrackingUrl = (targetParcel: Parcel): string | undefined => {
+    const catalogCarrier = findCarrierBySlug(targetParcel.carrier.slug);
+    const template = targetParcel.carrier.trackingUrl || catalogCarrier.trackingUrl;
+    if (template) {
+      return template.includes('%s')
+        ? template.replace('%s', encodeURIComponent(targetParcel.trackingNumber))
+        : template;
+    }
+    return targetParcel.carrier.website || catalogCarrier.website;
+  };
+
+  const handleOpenCarrierWeb = async (targetParcel: Parcel = parcel) => {
+    const catalogCarrier = findCarrierBySlug(targetParcel.carrier.slug);
+    const primaryUrl = resolveCarrierTrackingUrl(targetParcel);
+    const fallbackUrl =
+      targetParcel.carrier.website || catalogCarrier.website || 'https://openparcels.com';
+    const success = await openSafeWebUrl(primaryUrl, fallbackUrl);
+    if (!success && isMountedRef.current) {
+      Alert.alert(
+        isEn ? 'Unable to open browser' : 'No se pudo abrir el navegador'
+      );
+    }
+  };
+
+  const performTrackAndSave = async (
+    baseParcel: Parcel,
+    targetCarrier: Carrier,
+    options: { isCarrierChange: boolean }
+  ) => {
+    const catalogCarrier = findCarrierBySlug(targetCarrier.slug);
+    const requiresPostal = !!(
+      targetCarrier.requiresPostalCode || catalogCarrier.requiresPostalCode
+    );
+    const supportsLive = !!(
+      targetCarrier.hasLiveTracking ||
+      catalogCarrier.hasLiveTracking ||
+      trackingEngineManager.isNativeGoActive
+    );
+
+    if (requiresPostal && !baseParcel.postalCode?.trim()) {
+      openPostalModal(baseParcel, targetCarrier, true);
+      return;
+    }
+
+    if (!supportsLive) {
+      if (!options.isCarrierChange && isMountedRef.current) {
+        Alert.alert(
+          isEn ? 'Live tracking unavailable' : 'Seguimiento en vivo no disponible',
+          isEn
+            ? `${targetCarrier.name} does not support automatic live updates yet. You can check the official tracking page.`
+            : `${targetCarrier.name} aún no dispone de actualización automática en vivo. Puedes consultar el seguimiento en su web oficial.`,
+          [
+            { text: isEn ? 'Close' : 'Cerrar', style: 'cancel' },
+            {
+              text: isEn ? 'Open official site' : 'Abrir web oficial',
+              onPress: () => {
+                void handleOpenCarrierWeb(baseParcel);
+              },
+            },
+          ]
+        );
+      }
+      return;
+    }
+
+    setIsRefreshing(true);
+    try {
+      const refreshed = await trackingEngineManager.current.track({
+        trackingNumber: baseParcel.trackingNumber,
+        carrierHint: targetCarrier.slug,
+        postalCode: baseParcel.postalCode,
+        destinationCountry: baseParcel.destination?.code,
+        allowSimulated: false,
+        forceRefresh: true,
+        lang: lang || 'es',
+      });
+
+      if (!refreshed || refreshed.isLiveData === false || refreshed.error) {
+        throw new Error(
+          refreshed?.error ||
+            (isEn
+              ? 'No live tracking data received from the carrier.'
+              : 'No se recibieron datos en vivo del transportista.')
+        );
+      }
+
+      const mergedCarrier: Carrier = {
+        ...catalogCarrier,
+        ...targetCarrier,
+        ...refreshed.carrier,
+        slug: refreshed.carrier?.slug || targetCarrier.slug,
+        name: refreshed.carrier?.name || targetCarrier.name,
+        website: refreshed.carrier?.website || targetCarrier.website || catalogCarrier.website,
+        trackingUrl:
+          refreshed.carrier?.trackingUrl ||
+          targetCarrier.trackingUrl ||
+          catalogCarrier.trackingUrl,
+        requiresPostalCode:
+          refreshed.carrier?.requiresPostalCode ??
+          targetCarrier.requiresPostalCode ??
+          catalogCarrier.requiresPostalCode,
+        hasLiveTracking:
+          refreshed.carrier?.hasLiveTracking ??
+          targetCarrier.hasLiveTracking ??
+          catalogCarrier.hasLiveTracking,
+      };
+
+      const merged: Parcel = {
+        ...refreshed,
+        id: baseParcel.id,
+        trackingNumber: baseParcel.trackingNumber,
+        carrier: mergedCarrier,
+        customAlias: baseParcel.customAlias,
+        notes: baseParcel.notes,
+        isArchived: baseParcel.isArchived,
+        createdAt: baseParcel.createdAt,
+        postalCode: baseParcel.postalCode || refreshed.postalCode,
+        origin: refreshed.origin || baseParcel.origin,
+        destination: refreshed.destination || baseParcel.destination,
+        updatedAt: new Date().toISOString(),
+      };
+
+      await parcelRepository.save(merged);
+      if (isMountedRef.current) {
+        onParcelUpdated?.(merged);
+        try {
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch {}
+      }
+    } catch (err: any) {
+      const errMsg = typeof err?.message === 'string' ? err.message : '';
+      if (
+        isPostalCodeRequiredError(err) ||
+        errMsg.toLowerCase().includes('código postal') ||
+        errMsg.toLowerCase().includes('postal code')
+      ) {
+        if (isMountedRef.current) {
+          openPostalModal(baseParcel, targetCarrier, true);
+        }
+        return;
+      }
+
+      if (isMountedRef.current) {
+        try {
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        } catch {}
+        Alert.alert(
+          options.isCarrierChange
+            ? isEn
+              ? 'Carrier updated'
+              : 'Transportista actualizado'
+            : isEn
+            ? 'Update error'
+            : 'Error al actualizar',
+          options.isCarrierChange
+            ? isEn
+              ? `Changed to ${targetCarrier.name}, but live tracking could not be fetched: ${
+                  errMsg || 'Unknown error'
+                }`
+              : `Se cambió a ${targetCarrier.name}, pero no se pudo consultar el seguimiento en vivo: ${
+                  errMsg || 'Error de conexión'
+                }`
+            : errMsg ||
+                (isEn
+                  ? 'Could not fetch current tracking status from the carrier.'
+                  : 'No se pudo consultar el estado actual del transportista.')
+        );
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setIsRefreshing(false);
+      }
+    }
+  };
 
   const handleOpenCarrierSelector = async () => {
     try {
@@ -71,133 +291,188 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
 
     try {
       const candidates = await trackingEngineManager.current.detect(parcel.trackingNumber);
-      setCarrierCandidates(candidates);
+      if (isMountedRef.current) {
+        setCarrierCandidates(candidates);
+      }
     } catch {
-      setCarrierCandidates([]);
+      if (isMountedRef.current) {
+        setCarrierCandidates([]);
+      }
     }
-    setCarrierModalVisible(true);
+    if (isMountedRef.current) {
+      setCarrierModalVisible(true);
+    }
   };
 
   const handleChangeCarrier = async (newCarrier: Carrier) => {
     setCarrierModalVisible(false);
-    if (newCarrier.slug === parcel.carrier.slug) return;
+    const catalogCarrier = findCarrierBySlug(newCarrier.slug);
+    const resolvedCarrier: Carrier = { ...catalogCarrier, ...newCarrier };
+
+    if (resolvedCarrier.slug === parcel.carrier.slug) {
+      if (resolvedCarrier.requiresPostalCode && !parcel.postalCode?.trim()) {
+        openPostalModal(parcel, resolvedCarrier, true);
+      }
+      return;
+    }
 
     try {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {}
 
+    const nowIso = new Date().toISOString();
     const updated: Parcel = {
       ...parcel,
-      carrier: newCarrier,
+      carrier: resolvedCarrier,
+      additionalCarriers: undefined,
+      lastMileCarrier: undefined,
+      lastMileTrackingNumber: undefined,
+      flightLegs: undefined,
+      status: 'pending',
+      statusText: getLocalizedStatusText('pending', lang || 'es'),
+      progress: CANONICAL_STATUS_MAP.pending.baseProgress,
+      origin: resolvedCarrier.country
+        ? {
+            code: resolvedCarrier.country,
+            name: resolvedCarrier.countryName || resolvedCarrier.country,
+          }
+        : undefined,
+      estimatedDelivery: undefined,
+      deliveredAt: null,
+      daysInTransit: 0,
+      weight: undefined,
+      serviceType: undefined,
+      fromCache: false,
+      isLiveData: false,
+      events: [],
+      error: undefined,
+      updatedAt: nowIso,
+    };
+
+    try {
+      await parcelRepository.save(updated);
+      if (isMountedRef.current) {
+        onParcelUpdated?.(updated);
+      }
+    } catch (saveErr: any) {
+      if (isMountedRef.current) {
+        Alert.alert(
+          isEn ? 'Save error' : 'Error al guardar',
+          saveErr?.message ||
+            (isEn ? 'Could not save carrier change.' : 'No se pudo guardar el cambio de transportista.')
+        );
+      }
+      return;
+    }
+
+    await performTrackAndSave(updated, resolvedCarrier, { isCarrierChange: true });
+  };
+
+  const handleSubmitPostalCode = async () => {
+    if (!postalPrompt) return;
+    const cleanPostal = postalInput.trim();
+    if (!cleanPostal) {
+      setPostalError(
+        t.newParcelModal?.postalCodeHint ||
+          (isEn
+            ? 'Please enter a valid destination postal code.'
+            : 'Introduce un código postal de destino válido.')
+      );
+      return;
+    }
+
+    const { parcel: targetParcel, carrier: targetCarrier, triggerRefresh } = postalPrompt;
+    const updated: Parcel = {
+      ...targetParcel,
+      postalCode: cleanPostal,
       updatedAt: new Date().toISOString(),
     };
 
-    await parcelRepository.save(updated);
-    if (onParcelUpdated) {
-      onParcelUpdated(updated);
-    }
-
-    if (newCarrier.requiresPostalCode && !updated.postalCode) {
-      Alert.alert(
-        t.newParcelModal?.postalCodeLabel || 'Código Postal Requerido',
-        `${t.newParcelModal?.postalCodeHint || 'Este transportista exige código postal.'} (${newCarrier.name})`
-      );
-    }
-
-    setIsRefreshing(true);
     try {
-      const refreshed = await trackingEngineManager.current.track({
-        trackingNumber: updated.trackingNumber,
-        carrierHint: newCarrier.slug,
-        postalCode: updated.postalCode,
-        lang: lang || 'es',
-      });
-      if (updated.customAlias) {
-        refreshed.customAlias = updated.customAlias;
-      }
-      refreshed.id = updated.id;
-      refreshed.isArchived = updated.isArchived;
-      await parcelRepository.save(refreshed);
-      if (onParcelUpdated) {
-        onParcelUpdated(refreshed);
+      await parcelRepository.save(updated);
+      if (isMountedRef.current) {
+        onParcelUpdated?.(updated);
+        setPostalPrompt(null);
+        setPostalError(null);
       }
     } catch (err: any) {
-      if (err?.code === 'POSTAL_CODE_REQUIRED' || err?.message?.includes('código postal')) {
-        Alert.alert(
-          t.newParcelModal?.postalCodeLabel || 'Código Postal Requerido',
-          err.message || `${t.newParcelModal?.postalCodeHint || 'Este transportista exige código postal.'} (${newCarrier.name})`
+      if (isMountedRef.current) {
+        setPostalError(
+          err?.message ||
+            (isEn ? 'Failed to save postal code.' : 'No se pudo guardar el código postal.')
         );
       }
-      // Retain manual carrier selection even if live API fetch errors
-    } finally {
-      setIsRefreshing(false);
+      return;
+    }
+
+    if (triggerRefresh) {
+      await performTrackAndSave(updated, targetCarrier, { isCarrierChange: false });
     }
   };
 
   const handleFetchUpdate = async () => {
-    setIsRefreshing(true);
-    try {
-      const updated = await trackingEngineManager.current.track({
-        trackingNumber: parcel.trackingNumber,
-        carrierHint: parcel.carrier.slug,
-        postalCode: parcel.postalCode,
-        destinationCountry: parcel.destination?.code,
-        allowSimulated: parcel.isLiveData ? false : undefined,
-        lang: lang || 'es',
-      });
-
-      if (parcel.isLiveData && updated.isLiveData === false) {
-        throw new Error('No se recibieron datos en vivo del transportista.');
-      }
-
-      // Preserve local metadata
-      updated.id = parcel.id;
-      updated.customAlias = parcel.customAlias;
-      updated.notes = parcel.notes;
-      updated.isArchived = parcel.isArchived;
-      updated.createdAt = parcel.createdAt;
-      updated.postalCode = parcel.postalCode || updated.postalCode;
-      updated.origin = updated.origin || parcel.origin;
-      updated.destination = updated.destination || parcel.destination;
-      updated.updatedAt = new Date().toISOString();
-
-      await parcelRepository.save(updated);
-      if (onParcelUpdated) {
-        onParcelUpdated(updated);
-      }
-    } catch (err: any) {
-      Alert.alert(
-        'Error al actualizar',
-        err.message || 'No se pudo consultar el estado actual del transportista.'
-      );
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
-  const handleOpenCarrierWeb = async () => {
-    const success = await openSafeWebUrl(
-      parcel.carrier.website,
-      'https://openparcels.com'
-    );
-    if (!success) {
-      Alert.alert('No se pudo abrir el navegador');
-    }
+    await performTrackAndSave(parcel, parcel.carrier, { isCarrierChange: false });
   };
 
   const handleShare = async () => {
     try {
-      await ShareService.shareParcel(parcel);
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
+    const ok = await ShareService.shareParcel(parcel, { lang });
+    if (!ok && isMountedRef.current) {
+      Alert.alert(
+        isEn ? 'Share failed' : 'Error al compartir',
+        isEn
+          ? 'Could not open the share dialog on this device.'
+          : 'No se pudo abrir el menú de compartir en este dispositivo.'
+      );
+    }
   };
 
   const handleCopySummary = async () => {
     try {
-      const ok = await ShareService.copyParcelSummary(parcel);
-      if (ok) {
-        Alert.alert('Copiado', '¡Resumen estructurado copiado al portapapeles!');
-      }
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
+    const ok = await ShareService.copyParcelSummary(parcel, { lang });
+    if (isMountedRef.current) {
+      if (ok) {
+        Alert.alert(
+          isEn ? 'Copied' : 'Copiado',
+          t.share?.copiedToast || '¡Resumen estructurado copiado al portapapeles!'
+        );
+      } else {
+        Alert.alert(
+          isEn ? 'Copy failed' : 'Error al copiar',
+          isEn
+            ? 'Could not copy summary to clipboard.'
+            : 'No se pudo copiar el resumen al portapapeles.'
+        );
+      }
+    }
+  };
+
+  const handleCopyTrackingNumber = async (code: string) => {
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    try {
+      await Clipboard.setStringAsync(code);
+      if (isMountedRef.current) {
+        Alert.alert(
+          isEn ? 'Copied' : 'Copiado',
+          t.detail.copiedToast || '¡Número de seguimiento copiado al portapapeles!'
+        );
+      }
+    } catch {
+      if (isMountedRef.current) {
+        Alert.alert(
+          isEn ? 'Copy failed' : 'Error al copiar',
+          isEn
+            ? 'Could not copy tracking number.'
+            : 'No se pudo copiar el número de seguimiento.'
+        );
+      }
+    }
   };
 
   const confirmDelete = () => {
@@ -207,15 +482,27 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
   const formatUpdatedAt = (isoStr: string) => {
     try {
       const d = new Date(isoStr);
+      if (isNaN(d.getTime())) return isoStr;
+      const locale = isEn ? 'en-US' : 'es-ES';
       return (
-        d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) +
+        d.toLocaleDateString(locale, { day: '2-digit', month: 'short' }) +
         ' · ' +
-        d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+        d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
       );
     } catch {
       return isoStr;
     }
   };
+
+  const catalogCarrier = findCarrierBySlug(parcel.carrier.slug);
+  const showPostalCodeBox = !!(
+    parcel.postalCode ||
+    parcel.carrier.requiresPostalCode ||
+    catalogCarrier.requiresPostalCode
+  );
+  const isPostalMissing =
+    !!(parcel.carrier.requiresPostalCode || catalogCarrier.requiresPostalCode) &&
+    !parcel.postalCode?.trim();
 
   return (
     <View style={[styles.container, { backgroundColor: theme.canvas }]}>
@@ -223,7 +510,7 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
       <View style={[styles.navBar, { backgroundColor: theme.canvas }]}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Volver al listado"
+          accessibilityLabel={t.detail.back}
           onPress={onBack}
           style={({ pressed }) => [
             styles.navButton,
@@ -237,7 +524,7 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Cambiar transportista"
+          accessibilityLabel={t.detail.changeCarrier}
           onPress={handleOpenCarrierSelector}
           style={({ pressed }) => [styles.navTitleBox, pressed && styles.smallPressed]}
           hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
@@ -249,14 +536,19 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
             <Text style={[styles.navSubtitle, { color: theme.textTertiary }]} numberOfLines={1}>
               {parcel.carrier.name.toUpperCase()}
             </Text>
-            <ArrowRightLeft size={11} color={theme.textTertiary} strokeWidth={2.5} style={{ marginLeft: 5 }} />
+            <ArrowRightLeft
+              size={11}
+              color={theme.textTertiary}
+              strokeWidth={2.5}
+              style={{ marginLeft: 5 }}
+            />
           </View>
         </Pressable>
 
         <View style={styles.navActions}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Actualizar estado"
+            accessibilityLabel={t.detail.fetchUpdateBtn}
             onPress={handleFetchUpdate}
             disabled={isRefreshing}
             style={({ pressed }) => [
@@ -265,43 +557,43 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
               { backgroundColor: theme.status.in_transit, borderColor: theme.border },
               pressed && !isRefreshing && styles.pressed,
             ]}
-            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
           >
             {isRefreshing ? (
               <ActivityIndicator size="small" color="#000000" />
             ) : (
-              <RefreshCw size={16} color="#000000" strokeWidth={3} />
+              <RefreshCw size={15} color="#000000" strokeWidth={3} />
             )}
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Editar alias"
+            accessibilityLabel={t.detail.editAlias}
             onPress={() => setRenameModalVisible(true)}
             style={({ pressed }) => [
               styles.navButton,
               { backgroundColor: theme.surface, borderColor: theme.border },
               pressed && styles.pressed,
             ]}
-            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
           >
-            <Edit2 size={16} color={theme.textPrimary} strokeWidth={2.5} />
+            <Edit2 size={15} color={theme.textPrimary} strokeWidth={2.5} />
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Compartir envío"
+            accessibilityLabel={t.share?.shareAria || t.detail.shareSummaryBtn}
             onPress={handleShare}
             style={({ pressed }) => [
               styles.navButton,
               { backgroundColor: theme.surface, borderColor: theme.border },
               pressed && styles.pressed,
             ]}
-            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
           >
-            <Share2 size={16} color={theme.textPrimary} strokeWidth={2.5} />
+            <Share2 size={15} color={theme.textPrimary} strokeWidth={2.5} />
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={parcel.isArchived ? 'Desarchivar envío' : 'Archivar envío'}
+            accessibilityLabel={parcel.isArchived ? t.detail.unarchive : t.detail.archive}
             onPress={() => onToggleArchive(parcel.id)}
             style={({ pressed }) => [
               styles.navButton,
@@ -309,9 +601,13 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
               parcel.isArchived && { backgroundColor: theme.yellow },
               pressed && styles.pressed,
             ]}
-            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
           >
-            <Archive size={16} color={theme.textPrimary} strokeWidth={2.5} />
+            <Archive
+              size={15}
+              color={parcel.isArchived ? '#000000' : theme.textPrimary}
+              strokeWidth={2.5}
+            />
           </Pressable>
         </View>
       </View>
@@ -320,38 +616,69 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleFetchUpdate}
+            tintColor={theme.primary}
+            colors={[theme.primary]}
+          />
+        }
       >
         {/* Main Status & Progress Hero Card */}
         <View style={[styles.heroCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <View style={styles.statusHeaderGroup}>
             <StatusBadge status={parcel.status} size="medium" />
-            <View style={[styles.transitBadge, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
+            <View
+              style={[
+                styles.transitBadge,
+                { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+              ]}
+            >
               <Clock size={12} color={theme.textPrimary} strokeWidth={2.5} style={styles.clockIcon} />
-              <Text style={[styles.transitText, { color: theme.textPrimary }]}>{parcel.daysInTransit} DÍAS EN TRÁNSITO</Text>
+              <Text style={[styles.transitText, { color: theme.textPrimary }]}>
+                {parcel.daysInTransit} {t.detail.daysInTransit}
+              </Text>
             </View>
           </View>
 
-          <Text style={[styles.statusDescription, { color: theme.textPrimary }]}>{parcel.statusText}</Text>
+          <Text style={[styles.statusDescription, { color: theme.textPrimary }]}>
+            {parcel.statusText}
+          </Text>
 
           {/* Large Progress Bar with Numerical Percentage */}
           <View style={styles.progressSection}>
             <View style={styles.progressHeader}>
-              <Text style={[styles.progressLabel, { color: theme.textTertiary }]}>PROGRESO DEL ENVÍO</Text>
-              <View style={[styles.progressPercentBadge, { backgroundColor: theme.yellow, borderColor: theme.border }]}>
-                <Text style={[styles.progressPercent, { color: '#000000' }]}>{parcel.progress}%</Text>
+              <Text style={[styles.progressLabel, { color: theme.textTertiary }]}>
+                {isEn ? 'SHIPMENT PROGRESS' : 'PROGRESO DEL ENVÍO'}
+              </Text>
+              <View
+                style={[
+                  styles.progressPercentBadge,
+                  { backgroundColor: theme.yellow, borderColor: theme.border },
+                ]}
+              >
+                <Text style={styles.progressPercent}>{parcel.progress}%</Text>
               </View>
             </View>
             <ProgressBar progress={parcel.progress} status={parcel.status} height={14} />
           </View>
 
-          {/* Monospaced Tracking Number and Postal Code */}
-          <View style={[styles.metaBox, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
+          {/* Alias Box */}
+          <View
+            style={[
+              styles.metaBox,
+              { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+            ]}
+          >
             <View style={styles.metaItem}>
               <View style={styles.metaLabelRow}>
-                <Text style={[styles.metaLabel, { color: theme.textTertiary }]}>ALIAS DEL PAQUETE</Text>
+                <Text style={[styles.metaLabel, { color: theme.textTertiary }]}>
+                  {t.renameModal?.label || (isEn ? 'PACKAGE ALIAS' : 'ALIAS DEL PAQUETE')}
+                </Text>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Editar alias del paquete"
+                  accessibilityLabel={t.detail.editAlias}
                   onPress={() => setRenameModalVisible(true)}
                   style={({ pressed }) => [
                     styles.inlineRenameButton,
@@ -361,57 +688,144 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
                   hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                 >
                   <Edit2 size={11} color="#000000" strokeWidth={2.5} />
-                  <Text style={[styles.inlineRenameText, { color: '#000000' }]}>EDITAR</Text>
+                  <Text style={styles.inlineRenameText}>{t.detail.editAlias}</Text>
                 </Pressable>
               </View>
               <Text style={[styles.metaAliasText, { color: theme.textPrimary }]} numberOfLines={1}>
-                {parcel.customAlias || 'Sin alias personalizado'}
+                {parcel.customAlias ||
+                  (isEn ? 'No custom alias' : 'Sin alias personalizado')}
               </Text>
             </View>
           </View>
 
-          <View style={[styles.metaBox, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
-            <View style={styles.metaItem}>
-              <Text style={[styles.metaLabel, { color: theme.textTertiary }]}>Nº SEGUIMIENTO / ALBARÁN</Text>
-              <Text style={[styles.metaValueMono, { color: theme.textPrimary }]} numberOfLines={1}>
+          {/* Monospaced Tracking Number and Postal Code */}
+          <View
+            style={[
+              styles.metaBox,
+              { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+            ]}
+          >
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t.detail.copyAria}
+              onPress={() => handleCopyTrackingNumber(parcel.trackingNumber)}
+              style={({ pressed }) => [styles.metaItem, pressed && styles.smallPressed]}
+            >
+              <View style={styles.metaLabelRow}>
+                <Text style={[styles.metaLabel, { color: theme.textTertiary }]}>
+                  {t.newParcelModal?.trackingNumberLabel || 'Nº SEGUIMIENTO'}
+                </Text>
+                <Copy size={12} color={theme.textTertiary} strokeWidth={2.5} />
+              </View>
+              <Text
+                style={[styles.metaValueMono, { color: theme.textPrimary }]}
+                numberOfLines={1}
+                selectable
+              >
                 {parcel.trackingNumber}
               </Text>
-            </View>
-            {parcel.postalCode && (
-              <View style={[styles.metaItem, styles.postalItem, { borderLeftColor: theme.border }]}>
-                <Text style={[styles.metaLabel, { color: theme.textTertiary }]}>C.P. DESTINO</Text>
-                <Text style={[styles.metaValue, { color: theme.textPrimary }]}>{parcel.postalCode}</Text>
-              </View>
+            </Pressable>
+
+            {showPostalCodeBox && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={isEn ? 'Edit postal code' : 'Editar código postal'}
+                onPress={() => openPostalModal(parcel, parcel.carrier, true)}
+                style={({ pressed }) => [
+                  styles.metaItem,
+                  styles.postalItem,
+                  { borderLeftColor: theme.border },
+                  pressed && styles.smallPressed,
+                ]}
+              >
+                <View style={styles.metaLabelRow}>
+                  <Text style={[styles.metaLabel, { color: theme.textTertiary }]}>
+                    {isEn ? 'POSTAL CODE' : 'C.P. DESTINO'}
+                  </Text>
+                  <Edit2 size={11} color={theme.textTertiary} strokeWidth={2.5} />
+                </View>
+                <Text
+                  style={[
+                    styles.metaValue,
+                    { color: isPostalMissing ? theme.coral : theme.textPrimary },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {parcel.postalCode || (isEn ? 'Add C.P.' : 'Añadir C.P.')}
+                </Text>
+              </Pressable>
             )}
           </View>
 
-          {(!!parcel.serviceType || !!parcel.weight || !!parcel.lastMileTrackingNumber) && (
-            <View style={[styles.metaBox, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
+          {(!!parcel.serviceType || !!parcel.weight) && (
+            <View
+              style={[
+                styles.metaBox,
+                { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+              ]}
+            >
               {!!parcel.serviceType && (
                 <View style={styles.metaItem}>
-                  <Text style={[styles.metaLabel, { color: theme.textTertiary }]}>SERVICIO</Text>
-                  <Text style={[styles.metaValue, { color: theme.textPrimary }]} numberOfLines={1}>{parcel.serviceType}</Text>
+                  <Text style={[styles.metaLabel, { color: theme.textTertiary }]}>
+                    {isEn ? 'SERVICE' : 'SERVICIO'}
+                  </Text>
+                  <Text style={[styles.metaValue, { color: theme.textPrimary }]} numberOfLines={1}>
+                    {parcel.serviceType}
+                  </Text>
                 </View>
               )}
               {!!parcel.weight && (
-                <View style={[styles.metaItem, styles.postalItem, { borderLeftColor: theme.border }]}>
-                  <Text style={[styles.metaLabel, { color: theme.textTertiary }]}>PESO</Text>
-                  <Text style={[styles.metaValue, { color: theme.textPrimary }]}>{parcel.weight}</Text>
-                </View>
-              )}
-              {!!parcel.lastMileTrackingNumber && !parcel.weight && (
-                <View style={[styles.metaItem, styles.postalItem, { borderLeftColor: theme.border }]}>
-                  <Text style={[styles.metaLabel, { color: theme.textTertiary }]}>ÚLTIMA MILLA</Text>
-                  <Text style={[styles.metaValueMono, { color: theme.textPrimary }]} numberOfLines={1}>{parcel.lastMileTrackingNumber}</Text>
+                <View
+                  style={[
+                    styles.metaItem,
+                    !!parcel.serviceType && styles.postalItem,
+                    !!parcel.serviceType && { borderLeftColor: theme.border },
+                  ]}
+                >
+                  <Text style={[styles.metaLabel, { color: theme.textTertiary }]}>
+                    {isEn ? 'WEIGHT' : 'PESO'}
+                  </Text>
+                  <Text style={[styles.metaValue, { color: theme.textPrimary }]} numberOfLines={1}>
+                    {parcel.weight}
+                  </Text>
                 </View>
               )}
             </View>
           )}
 
+          {!!parcel.lastMileTrackingNumber && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t.detail.copyAria}
+              onPress={() => handleCopyTrackingNumber(parcel.lastMileTrackingNumber!)}
+              style={({ pressed }) => [
+                styles.metaBox,
+                { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+                pressed && styles.smallPressed,
+              ]}
+            >
+              <View style={styles.metaItem}>
+                <View style={styles.metaLabelRow}>
+                  <Text style={[styles.metaLabel, { color: theme.textTertiary }]}>
+                    {isEn ? 'LAST-MILE TRACKING' : 'SEGUIMIENTO ÚLTIMA MILLA'}
+                  </Text>
+                  <Copy size={12} color={theme.textTertiary} strokeWidth={2.5} />
+                </View>
+                <Text
+                  style={[styles.metaValueMono, { color: theme.textPrimary }]}
+                  numberOfLines={1}
+                  selectable
+                >
+                  {parcel.lastMileTrackingNumber}
+                </Text>
+              </View>
+            </Pressable>
+          )}
+
           <View style={styles.updateRow}>
             <Calendar size={12} color={theme.textTertiary} strokeWidth={2.5} />
             <Text style={[styles.updateText, { color: theme.textTertiary }]}>
-              Última actualización: {formatUpdatedAt(parcel.updatedAt)}
+              {isEn ? 'Last updated:' : 'Última actualización:'} {formatUpdatedAt(parcel.updatedAt)}
             </Text>
           </View>
 
@@ -433,8 +847,12 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
             ) : (
               <RefreshCw size={15} color="#000000" strokeWidth={3} style={styles.refreshIcon} />
             )}
-            <Text style={[styles.refreshHeroText, { color: theme.textPrimary }]}>
-              {isRefreshing ? 'CONSULTANDO AL TRANSPORTISTA...' : 'ACTUALIZAR ESTADO DEL PEDIDO'}
+            <Text style={styles.refreshHeroText}>
+              {isRefreshing
+                ? t.detail.fetching
+                : isEn
+                ? 'REFRESH SHIPMENT STATUS'
+                : 'ACTUALIZAR ESTADO DEL PEDIDO'}
             </Text>
           </Pressable>
         </View>
@@ -446,7 +864,7 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
         <View style={styles.shareButtonsRow}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Compartir resumen del envío"
+            accessibilityLabel={t.share?.shareSummary || t.detail.shareSummaryBtn}
             onPress={handleShare}
             style={({ pressed }) => [
               styles.shareActionButton,
@@ -455,12 +873,14 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
             ]}
           >
             <Share2 size={15} color="#000000" strokeWidth={2.5} />
-            <Text style={styles.shareActionText}>COMPARTIR</Text>
+            <Text style={styles.shareActionText}>
+              {t.share?.shareBtn || t.detail.shareSummaryBtn}
+            </Text>
           </Pressable>
 
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Copiar resumen del envío al portapapeles"
+            accessibilityLabel={t.share?.copySummary || t.detail.copySummaryBtn}
             onPress={handleCopySummary}
             style={({ pressed }) => [
               styles.shareActionButton,
@@ -469,15 +889,17 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
             ]}
           >
             <Copy size={15} color={theme.textPrimary} strokeWidth={2.5} />
-            <Text style={[styles.shareActionText, { color: theme.textPrimary }]}>COPIAR RESUMEN</Text>
+            <Text style={[styles.shareActionText, { color: theme.textPrimary }]}>
+              {t.share?.copyBtn || t.detail.copySummaryBtn}
+            </Text>
           </Pressable>
         </View>
 
         {/* Carrier Official Website Action Button */}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Abrir seguimiento oficial en ${parcel.carrier.name}`}
-          onPress={handleOpenCarrierWeb}
+          accessibilityLabel={`${t.detail.officialSite} (${parcel.carrier.name})`}
+          onPress={() => handleOpenCarrierWeb(parcel)}
           style={({ pressed }) => [
             styles.carrierLinkButton,
             { backgroundColor: theme.surface, borderColor: theme.border },
@@ -485,7 +907,7 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
           ]}
         >
           <Text style={[styles.carrierLinkText, { color: theme.textPrimary }]} numberOfLines={1}>
-            SEGUIMIENTO OFICIAL EN {parcel.carrier.name.toUpperCase()}
+            {t.detail.officialSite} ({parcel.carrier.name.toUpperCase()})
           </Text>
           <ExternalLink size={16} color={theme.textPrimary} strokeWidth={3} />
         </Pressable>
@@ -493,7 +915,7 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
         {/* Change Carrier Action Button */}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Cambiar transportista actual (${parcel.carrier.name})`}
+          accessibilityLabel={`${t.detail.changeCarrier} (${parcel.carrier.name})`}
           onPress={handleOpenCarrierSelector}
           style={({ pressed }) => [
             styles.changeCarrierButton,
@@ -513,7 +935,7 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
         {/* Delete Shipment Action */}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Eliminar paquete"
+          accessibilityLabel={t.detail.delete}
           onPress={confirmDelete}
           style={({ pressed }) => [
             styles.deleteButton,
@@ -521,8 +943,10 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
             pressed && styles.pressed,
           ]}
         >
-          <Trash2 size={16} color={theme.textPrimary} strokeWidth={2.5} style={styles.deleteIcon} />
-          <Text style={[styles.deleteButtonText, { color: theme.textPrimary }]}>ELIMINAR PAQUETE</Text>
+          <Trash2 size={16} color="#000000" strokeWidth={2.5} style={styles.deleteIcon} />
+          <Text style={styles.deleteButtonText}>
+            {isEn ? 'DELETE SHIPMENT' : 'ELIMINAR PAQUETE'}
+          </Text>
         </Pressable>
       </ScrollView>
 
@@ -548,10 +972,137 @@ export const ParcelDetailScreen: React.FC<ParcelDetailScreenProps> = ({
           onConfirmDelete={() => {
             setDeleteModalVisible(false);
             onDelete(parcel.id);
-            onBack();
           }}
         />
       )}
+
+      {/* Postal Code Input Modal for carriers requiring C.P. */}
+      <Modal
+        visible={!!postalPrompt}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        hardwareAccelerated
+        onRequestClose={() => setPostalPrompt(null)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.postalBackdrop}
+        >
+          <Pressable
+            style={styles.postalDismissOverlay}
+            onPress={() => setPostalPrompt(null)}
+          />
+          <View
+            style={[
+              styles.postalDialogCard,
+              { backgroundColor: theme.canvas, borderColor: theme.border },
+            ]}
+            accessibilityViewIsModal
+          >
+            <View style={[styles.postalHeader, { borderBottomColor: theme.border }]}>
+              <View style={styles.postalDotsRow}>
+                <View style={[styles.postalDot, { backgroundColor: theme.coral, borderColor: theme.border }]} />
+                <View style={[styles.postalDot, { backgroundColor: theme.yellow, borderColor: theme.border }]} />
+                <View style={[styles.postalDot, { backgroundColor: theme.mint, borderColor: theme.border }]} />
+              </View>
+              <View style={styles.postalTitleBox}>
+                <Text style={[styles.postalTitle, { color: theme.textPrimary }]} numberOfLines={1}>
+                  {t.newParcelModal?.postalCodeLabel ||
+                    (isEn ? 'POSTAL CODE (REQUIRED)' : 'CÓDIGO POSTAL (OBLIGATORIO)')}
+                </Text>
+                {postalPrompt && (
+                  <Text style={[styles.postalSubtitle, { color: theme.textTertiary }]} numberOfLines={1}>
+                    {postalPrompt.carrier.name.toUpperCase()}
+                  </Text>
+                )}
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t.newParcelModal?.cancelBtn || 'Cancelar'}
+                onPress={() => setPostalPrompt(null)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={({ pressed }) => [
+                  styles.postalCloseBtn,
+                  { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+                  pressed && styles.smallPressed,
+                ]}
+              >
+                <X size={16} color={theme.textPrimary} strokeWidth={3} />
+              </Pressable>
+            </View>
+
+            <Text style={[styles.postalHint, { color: theme.textSecondary }]}>
+              {t.newParcelModal?.postalCodeHint ||
+                (isEn
+                  ? 'This courier requires the destination postal code to fetch live tracking.'
+                  : 'Este transportista exige el código postal de entrega para consultar el seguimiento.')}
+            </Text>
+
+            <View
+              style={[
+                styles.postalInputBox,
+                { backgroundColor: theme.surface, borderColor: theme.border },
+              ]}
+            >
+              <MapPin size={16} color={theme.textTertiary} strokeWidth={2.5} style={{ marginRight: 8 }} />
+              <TextInput
+                accessibilityLabel={t.newParcelModal?.postalCodeLabel || 'Código Postal'}
+                style={[styles.postalInput, { color: theme.textPrimary }]}
+                value={postalInput}
+                onChangeText={(val) => {
+                  setPostalInput(val);
+                  if (postalError) setPostalError(null);
+                }}
+                placeholder={t.newParcelModal?.postalCodePlaceholder || 'ej. 28001'}
+                placeholderTextColor={theme.textTertiary}
+                autoFocus
+                autoCapitalize="characters"
+                autoCorrect={false}
+                returnKeyType="done"
+                onSubmitEditing={handleSubmitPostalCode}
+              />
+            </View>
+
+            {!!postalError && (
+              <Text style={[styles.postalErrorText, { color: theme.coral }]}>{postalError}</Text>
+            )}
+
+            <View style={styles.postalButtonRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t.newParcelModal?.cancelBtn || 'Cancelar'}
+                onPress={() => setPostalPrompt(null)}
+                style={({ pressed }) => [
+                  styles.postalCancelBtn,
+                  { backgroundColor: theme.surface, borderColor: theme.border },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={[styles.postalCancelText, { color: theme.textPrimary }]}>
+                  {t.newParcelModal?.cancelBtn || 'CANCELAR'}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t.renameModal?.saveBtn || 'Guardar'}
+                onPress={handleSubmitPostalCode}
+                style={({ pressed }) => [
+                  styles.postalSaveBtn,
+                  { backgroundColor: theme.yellow, borderColor: theme.border },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Check size={16} color="#000000" strokeWidth={3} style={{ marginRight: 6 }} />
+                <Text style={styles.postalSaveText}>
+                  {isEn ? 'SAVE & TRACK' : 'GUARDAR Y CONSULTAR'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* Carrier Selector Modal (Full Catalog with Recommended Options) */}
       <CarrierSelectorModal
@@ -581,8 +1132,8 @@ const styles = StyleSheet.create({
     backgroundColor: Theme.colors.background,
   },
   navButton: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: Theme.radius.sm,
@@ -591,19 +1142,16 @@ const styles = StyleSheet.create({
     borderColor: '#000000',
     ...Theme.shadows.sm,
   },
-  navButtonActive: {
-    backgroundColor: Theme.colors.yellow,
-  },
   refreshNavButton: {
     backgroundColor: Theme.colors.status.in_transit,
   },
   navTitleBox: {
     flex: 1,
-    marginHorizontal: 10,
+    marginHorizontal: 8,
     minWidth: 0,
   },
   navTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '900',
     color: '#000000',
     letterSpacing: -0.3,
@@ -613,11 +1161,12 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: Theme.colors.textTertiary,
     letterSpacing: 0.6,
+    flexShrink: 1,
   },
   navActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   scroll: {
     flex: 1,
@@ -715,7 +1264,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   postalItem: {
-    flex: 0.55,
+    flex: 0.6,
     borderLeftWidth: 2,
     borderLeftColor: '#000000',
     paddingLeft: 12,
@@ -759,6 +1308,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: Theme.colors.textTertiary,
     letterSpacing: 0.6,
+    flexShrink: 1,
   },
   metaValueMono: {
     fontSize: 14,
@@ -830,12 +1380,7 @@ const styles = StyleSheet.create({
     borderRadius: Theme.radius.sm,
     borderWidth: 2,
     borderColor: '#000000',
-    shadowColor: '#000000',
-    shadowOffset: { width: 2.5, height: 2.5 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 3,
-    ...(Theme.isWeb ? ({ boxShadow: '2.5px 2.5px 0px #000000' } as any) : {}),
+    ...Theme.shadows.sm,
   },
   shareActionText: {
     fontSize: 11,
@@ -847,7 +1392,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Theme.colors.yellow,
+    backgroundColor: Theme.colors.surface,
     minHeight: 48,
     paddingVertical: 14,
     paddingHorizontal: 16,
@@ -912,6 +1457,127 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 0.5,
+  },
+  postalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  postalDismissOverlay: {
+    ...StyleSheet.absoluteFill,
+  },
+  postalDialogCard: {
+    width: '100%',
+    maxWidth: 420,
+    borderRadius: Theme.radius.md,
+    padding: 20,
+    borderWidth: Theme.borders.width,
+    ...Theme.shadows.lg,
+  },
+  postalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom: 12,
+    marginBottom: 12,
+    borderBottomWidth: 2,
+  },
+  postalDotsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginRight: 10,
+  },
+  postalDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 1.5,
+  },
+  postalTitleBox: {
+    flex: 1,
+    minWidth: 0,
+  },
+  postalTitle: {
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+  postalSubtitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    marginTop: 2,
+  },
+  postalCloseBtn: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: Theme.radius.xs,
+    borderWidth: 2,
+    ...Theme.shadows.sm,
+  },
+  postalHint: {
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 17,
+    marginBottom: 12,
+  },
+  postalInputBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: Theme.radius.sm,
+    borderWidth: 2,
+    paddingHorizontal: 12,
+    height: 48,
+    marginBottom: 8,
+    ...Theme.shadows.sm,
+  },
+  postalInput: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '800',
+    paddingVertical: 0,
+  },
+  postalErrorText: {
+    fontSize: 11,
+    fontWeight: '800',
+    marginBottom: 10,
+  },
+  postalButtonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 8,
+  },
+  postalCancelBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: Theme.radius.sm,
+    borderWidth: 2,
+    ...Theme.shadows.sm,
+  },
+  postalCancelText: {
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.4,
+  },
+  postalSaveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: Theme.radius.sm,
+    borderWidth: 2,
+    ...Theme.shadows.sm,
+  },
+  postalSaveText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: 0.4,
   },
   pressed: {
     ...Theme.pressed,

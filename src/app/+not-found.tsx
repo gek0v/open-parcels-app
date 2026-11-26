@@ -4,35 +4,44 @@ import { Link, Stack } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Compass, Home } from 'lucide-react-native';
 import { Theme } from '../presentation/theme/adaptiveTheme';
+import { useTheme } from '../presentation/theme/ThemeContext';
+import { useI18n } from '../infrastructure/i18n';
 
 export default function NotFoundScreen() {
+  const { theme } = useTheme();
+  const { t } = useI18n();
+
   return (
     <>
       <Stack.Screen options={{ title: 'Oops! 404', headerShown: false }} />
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.container}>
-          <View style={styles.card}>
-            <View style={styles.iconCircle}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.yellow }]}>
+        <View style={[styles.container, { backgroundColor: theme.yellow }]}>
+          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <View style={[styles.iconCircle, { backgroundColor: theme.yellow, borderColor: theme.border }]}>
               <Compass size={40} color="#000000" strokeWidth={2.5} />
             </View>
 
             <View style={styles.codePill}>
-              <Text style={styles.codePillText}>ERROR 404</Text>
+              <Text style={styles.codePillText}>{t.errors.notFoundCode}</Text>
             </View>
 
-            <Text style={styles.title}>PÁGINA NO ENCONTRADA</Text>
-            <Text style={styles.subtitle}>
-              La ruta o pantalla que estás buscando no existe o ha sido movida.
+            <Text style={[styles.title, { color: theme.textPrimary }]}>{t.errors.notFoundTitle}</Text>
+            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+              {t.errors.notFoundSubtitle}
             </Text>
 
             <Link href="/" asChild>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Volver a la pantalla principal"
-                style={({ pressed }) => [styles.homeButton, pressed && styles.pressed]}
+                accessibilityLabel={t.errors.backHomeAria}
+                style={({ pressed }) => [
+                  styles.homeButton,
+                  { borderColor: theme.border },
+                  pressed && styles.pressed,
+                ]}
               >
                 <Home size={16} color="#000000" strokeWidth={2.5} />
-                <Text style={styles.homeButtonText}>VOLVER AL INICIO</Text>
+                <Text style={styles.homeButtonText}>{t.errors.backHome}</Text>
               </Pressable>
             </Link>
           </View>

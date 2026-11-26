@@ -42,12 +42,19 @@ export const RenameParcelModal: React.FC<RenameParcelModalProps> = ({
   }
 
   const handleSave = () => {
-    onSave(alias);
+    onSave(alias.trim());
     onClose();
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      hardwareAccelerated
+      onRequestClose={onClose}
+    >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.backdrop}
@@ -69,7 +76,7 @@ export const RenameParcelModal: React.FC<RenameParcelModalProps> = ({
               <View style={[styles.dot, { backgroundColor: theme.mint, borderColor: theme.border }]} />
             </View>
             <View style={styles.titleBox}>
-              <Text style={[styles.title, { color: theme.textPrimary }]}>
+              <Text style={[styles.title, { color: theme.textPrimary }]} numberOfLines={1}>
                 {t.renameModal?.title || 'RENOMBRAR ENVÍO'}
               </Text>
               <Text style={[styles.subtitle, { color: theme.textTertiary }]} numberOfLines={1}>
@@ -80,6 +87,7 @@ export const RenameParcelModal: React.FC<RenameParcelModalProps> = ({
               accessibilityRole="button"
               accessibilityLabel={t.renameModal?.cancelBtn || 'Cerrar'}
               onPress={onClose}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={({ pressed }) => [
                 styles.closeBtn,
                 { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
@@ -143,8 +151,10 @@ export const RenameParcelModal: React.FC<RenameParcelModalProps> = ({
                 pressed && styles.pressed,
               ]}
             >
-              <Check size={16} color="#FFFFFF" strokeWidth={3} style={styles.checkIcon} />
-              <Text style={styles.saveText}>{t.renameModal?.saveBtn || 'GUARDAR'}</Text>
+              <Check size={16} color={theme.textInverse} strokeWidth={3} style={styles.checkIcon} />
+              <Text style={[styles.saveText, { color: theme.textInverse }]}>
+                {t.renameModal?.saveBtn || 'GUARDAR'}
+              </Text>
             </Pressable>
           </View>
         </View>

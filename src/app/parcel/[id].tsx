@@ -1,23 +1,34 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Parcel } from '../../domain/models/parcel';
 import { parcelRepository } from '../../infrastructure/storage/ParcelRepository';
 import { ParcelDetailScreen } from '../../presentation/screens/ParcelDetailScreen';
 import { Theme } from '../../presentation/theme/adaptiveTheme';
+import { useTheme } from '../../presentation/theme/ThemeContext';
 import { useI18n } from '../../infrastructure/i18n';
 import { ArrowLeft, AlertCircle } from 'lucide-react-native';
 
 export default function ParcelDetailRoute() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const { t } = useI18n();
+  const { id } = useLocalSearchParams<{ id: string | string[] }>();
+  const parcelId = Array.isArray(id) ? id[0] : id;
+  const { theme } = useTheme();
+  const { t, lang } = useI18n();
   const [parcel, setParcel] = useState<Parcel | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const navigateBack = useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/');
+    }
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
-    if (!id) {
+    if (!parcelId) {
       const timer = setTimeout(() => {
         if (isMounted) setIsLoading(false);
       }, 0);
@@ -27,55 +38,85 @@ export default function ParcelDetailRoute() {
       };
     }
 
-    parcelRepository
-      .getById(id)
-      .then((found) => {
+    const loadParcel = async (showLoading: boolean) => {
+      if (showLoading && isMounted) {
+        setIsLoading(true);
+      }
+      try {
+        const found = await parcelRepository.getById(parcelId);
         if (isMounted) {
           setParcel(found);
           setIsLoading(false);
         }
-      })
-      .catch((error) => {
+      } catch (error) {
         console.warn('[ParcelDetailRoute] Failed to load parcel:', error);
         if (isMounted) {
-          setParcel(null);
+          if (showLoading) {
+            setParcel(null);
+          }
           setIsLoading(false);
         }
-      });
+      }
+    };
+
+    void loadParcel(true);
+
+    const unsubscribe = parcelRepository.subscribe(() => {
+      void loadParcel(false);
+    });
 
     return () => {
       isMounted = false;
+      unsubscribe();
     };
-  }, [id]);
+  }, [parcelId]);
 
-  const handleToggleArchive = async (parcelId: string) => {
+  const handleToggleArchive = async (targetId: string) => {
     try {
-      const updated = await parcelRepository.toggleArchive(parcelId);
+      const updated = await parcelRepository.toggleArchive(targetId);
       if (updated) {
         setParcel({ ...updated });
       }
     } catch (err) {
       console.error('[ParcelDetailRoute] toggleArchive error:', err);
+      Alert.alert(
+        lang === 'en' ? 'Action failed' : 'Error',
+        lang === 'en'
+          ? 'Could not update archive status.'
+          : 'No se pudo actualizar el estado de archivo.'
+      );
     }
   };
 
-  const handleDeleteParcel = async (parcelId: string) => {
+  const handleDeleteParcel = async (targetId: string) => {
     try {
-      await parcelRepository.delete(parcelId);
-      router.replace('/');
+      await parcelRepository.delete(targetId);
+      navigateBack();
     } catch (err) {
       console.error('[ParcelDetailRoute] delete error:', err);
+      Alert.alert(
+        lang === 'en' ? 'Delete failed' : 'Error al eliminar',
+        lang === 'en'
+          ? 'Could not delete the parcel.'
+          : 'No se pudo eliminar el paquete.'
+      );
     }
   };
 
-  const handleUpdateAlias = async (parcelId: string, newAlias: string) => {
+  const handleUpdateAlias = async (targetId: string, newAlias: string) => {
     try {
-      const updated = await parcelRepository.updateAlias(parcelId, newAlias);
+      const updated = await parcelRepository.updateAlias(targetId, newAlias);
       if (updated) {
         setParcel({ ...updated });
       }
     } catch (err) {
       console.error('[ParcelDetailRoute] updateAlias error:', err);
+      Alert.alert(
+        lang === 'en' ? 'Rename failed' : 'Error al renombrar',
+        lang === 'en'
+          ? 'Could not update the parcel alias.'
+          : 'No se pudo actualizar el alias del paquete.'
+      );
     }
   };
 
@@ -85,25 +126,35 @@ export default function ParcelDetailRoute() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.centerContainer}>
-        <Text style={styles.loadingText}>CARGANDO INFORMACIÓN...</Text>
+      <SafeAreaView style={[styles.centerContainer, { backgroundColor: theme.canvas }]}>
+        <Text style={[styles.loadingText, { color: theme.textPrimary }]}>
+          {lang === 'en' ? 'LOADING DETAILS...' : 'CARGANDO INFORMACIÓN...'}
+        </Text>
       </SafeAreaView>
     );
   }
 
   if (!parcel) {
     return (
-      <SafeAreaView style={styles.centerContainer}>
-        <View style={styles.errorBox}>
-          <AlertCircle size={32} color="#000000" strokeWidth={2.5} />
-          <Text style={styles.errorTitle}>ENVÍO NO ENCONTRADO</Text>
-          <Text style={styles.errorSubtitle}>
-            No se ha encontrado ningún paquete con identificador #{id}.
+      <SafeAreaView style={[styles.centerContainer, { backgroundColor: theme.canvas }]}>
+        <View style={[styles.errorBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <AlertCircle size={32} color={theme.textPrimary} strokeWidth={2.5} />
+          <Text style={[styles.errorTitle, { color: theme.textPrimary }]}>
+            {lang === 'en' ? 'SHIPMENT NOT FOUND' : 'ENVÍO NO ENCONTRADO'}
+          </Text>
+          <Text style={[styles.errorSubtitle, { color: theme.textSecondary }]}>
+            {lang === 'en'
+              ? `No parcel found with ID #${parcelId || '-'}.`
+              : `No se ha encontrado ningún paquete con identificador #${parcelId || '-'}.`}
           </Text>
           <Pressable
             accessibilityRole="button"
-            onPress={() => router.back()}
-            style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
+            onPress={navigateBack}
+            style={({ pressed }) => [
+              styles.backBtn,
+              { backgroundColor: theme.coral, borderColor: theme.border },
+              pressed && styles.pressed,
+            ]}
           >
             <ArrowLeft size={16} color="#FFFFFF" strokeWidth={3} />
             <Text style={styles.backBtnText}>{t.detail.back}</Text>
@@ -114,10 +165,13 @@ export default function ParcelDetailRoute() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: theme.canvas }]}
+      edges={['top', 'bottom', 'left', 'right']}
+    >
       <ParcelDetailScreen
         parcel={parcel}
-        onBack={() => router.back()}
+        onBack={navigateBack}
         onToggleArchive={handleToggleArchive}
         onDelete={handleDeleteParcel}
         onUpdateAlias={handleUpdateAlias}
@@ -163,6 +217,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 6,
     letterSpacing: 0.5,
+    textAlign: 'center',
   },
   errorSubtitle: {
     fontSize: 12,

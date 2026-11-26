@@ -14,7 +14,7 @@ export class SqliteParcelRepository {
       );
 
       const eventRows = await db.getAllAsync<any>(
-        'SELECT * FROM tracking_events ORDER BY date ASC;'
+        'SELECT * FROM tracking_events ORDER BY date DESC;'
       );
 
       // Group events by parcel_id
@@ -38,7 +38,7 @@ export class SqliteParcelRepository {
       return parcelRows.map((row) => this.mapRowToParcel(row, eventsByParcel.get(row.id) || []));
     } catch (err) {
       console.warn('Error reading parcels from SQLite:', err);
-      return [];
+      throw err;
     }
   }
 
@@ -53,7 +53,7 @@ export class SqliteParcelRepository {
       if (!row) return null;
 
       const eventRows = await db.getAllAsync<any>(
-        'SELECT * FROM tracking_events WHERE parcel_id = ? ORDER BY date ASC;',
+        'SELECT * FROM tracking_events WHERE parcel_id = ? ORDER BY date DESC;',
         [id]
       );
 
@@ -72,11 +72,16 @@ export class SqliteParcelRepository {
       return this.mapRowToParcel(row, events);
     } catch (err) {
       console.warn('Error getById from SQLite:', err);
-      return null;
+      throw err;
     }
   }
 
   async persistParcel(db: any, parcel: Parcel): Promise<void> {
+    const nowIso = new Date().toISOString();
+    if (!parcel.id) {
+      parcel.id = 'p-' + Math.random().toString(36).substring(2, 9);
+    }
+
     // Query if a parcel with the same tracking_number already exists
     const existing = await db.getFirstAsync(
       'SELECT id, created_at, notes, is_archived, custom_alias FROM parcels WHERE tracking_number = ? LIMIT 1;',
@@ -84,9 +89,9 @@ export class SqliteParcelRepository {
     );
 
     if (existing) {
-      // Preserve existing id, createdAt, notes, isArchived, and customAlias
+      // Preserve existing id, createdAt, notes, and customAlias
       // unless incoming parcel explicitly supplies them.
-      if (!parcel.id || parcel.id !== existing.id) {
+      if (existing.id && parcel.id !== existing.id) {
         parcel.id = existing.id;
       }
       if (existing.created_at) {
@@ -109,6 +114,15 @@ export class SqliteParcelRepository {
       }
     }
 
+    const safeStatus = parcel.status || 'pending';
+    const safeStatusText = parcel.statusText || safeStatus;
+    const safeProgress = typeof parcel.progress === 'number' ? parcel.progress : 0;
+    const safeDays = typeof parcel.daysInTransit === 'number' ? parcel.daysInTransit : 0;
+    const safeCreatedAt = parcel.createdAt || nowIso;
+    const safeUpdatedAt = parcel.updatedAt || nowIso;
+    const safeCarrierSlug = parcel.carrier?.slug || 'unknown';
+    const safeCarrierName = parcel.carrier?.name || safeCarrierSlug.toUpperCase();
+
     await db.runAsync(
       `INSERT OR REPLACE INTO parcels (
         id, tracking_number, custom_alias, carrier_slug, carrier_name, carrier_website, carrier_color,
@@ -122,21 +136,21 @@ export class SqliteParcelRepository {
         parcel.id,
         parcel.trackingNumber,
         parcel.customAlias || null,
-        parcel.carrier.slug,
-        parcel.carrier.name,
-        parcel.carrier.website || null,
-        parcel.carrier.color || null,
-        parcel.carrier.requiresPostalCode ? 1 : 0,
-        parcel.status,
-        parcel.statusText,
-        parcel.progress,
+        safeCarrierSlug,
+        safeCarrierName,
+        parcel.carrier?.website || null,
+        parcel.carrier?.color || null,
+        parcel.carrier?.requiresPostalCode ? 1 : 0,
+        safeStatus,
+        safeStatusText,
+        safeProgress,
         parcel.origin?.code || null,
         parcel.origin?.name || null,
         parcel.destination?.code || null,
         parcel.destination?.name || null,
         parcel.postalCode || null,
         parcel.deliveredAt || null,
-        parcel.daysInTransit,
+        safeDays,
         parcel.isArchived ? 1 : 0,
         parcel.additionalCarriers ? JSON.stringify(parcel.additionalCarriers) : null,
         parcel.lastMileCarrier ? JSON.stringify(parcel.lastMileCarrier) : null,
@@ -148,8 +162,8 @@ export class SqliteParcelRepository {
         parcel.fromCache ? 1 : 0,
         parcel.isLiveData ? 1 : 0,
         parcel.notes || null,
-        parcel.createdAt,
-        parcel.updatedAt,
+        safeCreatedAt,
+        safeUpdatedAt,
       ]
     );
 
@@ -159,7 +173,8 @@ export class SqliteParcelRepository {
     if (Array.isArray(parcel.events)) {
       for (let i = 0; i < parcel.events.length; i++) {
         const ev = parcel.events[i];
-        const eventId = `${parcel.id}_ev_${i}_${ev.date}`;
+        const evDate = ev.date || safeUpdatedAt;
+        const eventId = `${parcel.id}_ev_${i}_${evDate}`;
         await db.runAsync(
           `INSERT INTO tracking_events (
             id, parcel_id, date, status, stage, description, location, carrier_slug, carrier_name, event_code
@@ -167,13 +182,13 @@ export class SqliteParcelRepository {
           [
             eventId,
             parcel.id,
-            ev.date,
-            ev.status,
-            ev.stage,
-            ev.description,
+            evDate,
+            ev.status || safeStatus,
+            ev.stage || 'transit',
+            ev.description || '',
             ev.location || null,
-            ev.carrierSlug,
-            ev.carrierName || null,
+            ev.carrierSlug || safeCarrierSlug,
+            ev.carrierName || safeCarrierName,
             ev.eventCode || null,
           ]
         );
@@ -200,7 +215,10 @@ export class SqliteParcelRepository {
 
   async delete(id: string): Promise<void> {
     const db = await getDatabase();
-    await db.runAsync('DELETE FROM parcels WHERE id = ?;', [id]);
+    await db.withTransactionAsync(async () => {
+      await db.runAsync('DELETE FROM tracking_events WHERE parcel_id = ?;', [id]);
+      await db.runAsync('DELETE FROM parcels WHERE id = ?;', [id]);
+    });
   }
 
   async updateAlias(id: string, newAlias: string): Promise<Parcel | null> {
@@ -237,7 +255,7 @@ export class SqliteParcelRepository {
       customAlias: row.custom_alias || undefined,
       carrier: {
         ...baseCarrier,
-        slug: row.carrier_slug,
+        slug: baseCarrier.slug || row.carrier_slug,
         name: row.carrier_name || baseCarrier.name,
         website: row.carrier_website || baseCarrier.website,
         color: row.carrier_color || baseCarrier.color,

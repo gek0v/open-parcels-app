@@ -53,7 +53,7 @@ export const BentoStatsWidget: React.FC<BentoStatsWidgetProps> = ({
         {/* Tile 1: Active & In Delivery summary */}
         <View
           accessible={true}
-          accessibilityLabel={`${t.stats.active}: ${activeCount} envíos`}
+          accessibilityLabel={`${t.stats.active}: ${activeCount} ${t.dashboard.itemsCountAria}`}
           style={[styles.activeTile, { backgroundColor: theme.yellow, borderColor: theme.border }]}
         >
           <View style={styles.tileHeader}>
@@ -62,7 +62,7 @@ export const BentoStatsWidget: React.FC<BentoStatsWidgetProps> = ({
           </View>
           <Text style={styles.hugeNumber}>{activeCount}</Text>
           <View style={styles.subPill}>
-            <Text style={[styles.subPillText, { color: theme.yellow }]}>
+            <Text style={[styles.subPillText, { color: theme.yellow }]} numberOfLines={1}>
               {outForDeliveryCount > 0
                 ? `⚡ ${outForDeliveryCount} ${t.status.out_for_delivery.toUpperCase()}`
                 : (activeCount > 0 ? t.stats.activeSub : t.stats.noneActive)}
@@ -73,7 +73,7 @@ export const BentoStatsWidget: React.FC<BentoStatsWidgetProps> = ({
         {/* Tile 2: Delivered */}
         <View
           accessible={true}
-          accessibilityLabel={`${t.stats.delivered}: ${deliveredCount} completados`}
+          accessibilityLabel={`${t.stats.delivered}: ${deliveredCount} ${t.dashboard.completedCountAria}`}
           style={[styles.statTile, { backgroundColor: theme.surface, borderColor: theme.border }]}
         >
           <View style={styles.tileHeaderSmall}>
@@ -168,6 +168,7 @@ const styles = StyleSheet.create({
   },
   subPill: {
     alignSelf: 'flex-start',
+    maxWidth: '100%',
     backgroundColor: '#000000',
     paddingHorizontal: 5,
     paddingVertical: 2,

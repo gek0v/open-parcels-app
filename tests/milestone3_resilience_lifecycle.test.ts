@@ -125,7 +125,7 @@ mock.module('lucide-react-native', () => ({
 }));
 
 const { ErrorBoundary } = await import('../src/presentation/components/common/ErrorBoundary');
-const { default: ErrorScreen } = await import('../src/app/+error');
+const { default: ErrorScreen } = await import('../src/presentation/components/common/RouteErrorFallback');
 const { default: NotFoundScreen } = await import('../src/app/+not-found');
 const { syncStaticTheme } = await import('../src/presentation/theme/ThemeContext');
 const { GoldenPalettes } = await import('../src/presentation/theme/palettes');

@@ -15,9 +15,27 @@ export function normalizeGLSSpainStatus(
   if (
     !upper.includes('NO ENTREGADO') &&
     !upper.includes('NOT DELIVERED') &&
+    !upper.includes('UNDELIVERED') &&
+    !upper.includes('FALLID') &&
+    !upper.includes('INTENTO') &&
+    !upper.includes('DEVUELTO') &&
     (upper.includes('DELIVERED') || upper.includes('ENTREGADO'))
   ) {
     return { status: 'delivered', stage: 'delivery' };
+  }
+
+  if (upper.includes('EXCEPTION') || upper.includes('DEVUELTO') || upper.includes('DEVOLUCION')) {
+    return { status: 'exception', stage: 'exception' };
+  }
+
+  if (
+    upper.includes('FAILED') ||
+    upper.includes('AUSENTE') ||
+    upper.includes('FALLID') ||
+    upper.includes('INCIDENCIA') ||
+    upper.includes('NO ENTREGADO')
+  ) {
+    return { status: 'failed_attempt', stage: 'exception' };
   }
 
   if (
@@ -51,19 +69,6 @@ export function normalizeGLSSpainStatus(
     return { status: 'info_received', stage: 'created' };
   }
 
-  if (
-    upper.includes('FAILED') ||
-    upper.includes('AUSENTE') ||
-    upper.includes('FALLID') ||
-    upper.includes('INCIDENCIA')
-  ) {
-    return { status: 'failed_attempt', stage: 'exception' };
-  }
-
-  if (upper.includes('EXCEPTION') || upper.includes('DEVUELTO')) {
-    return { status: 'exception', stage: 'exception' };
-  }
-
   return { status: 'in_transit', stage: 'transit' };
 }
 
@@ -75,9 +80,25 @@ export function normalizeSEURStatus(
 
   if (
     !upper.includes('NO ENTREGADO') &&
+    !upper.includes('FALLID') &&
+    !upper.includes('INTENTO') &&
+    !upper.includes('DEVUELTO') &&
     (upper.includes('ENTREGADO') || upper.includes('DELIVERED'))
   ) {
     return { status: 'delivered', stage: 'delivery' };
+  }
+
+  if (upper.includes('DEVUELTO') || upper.includes('DEVOLUCION') || upper.includes('DEVOLUCIÓN')) {
+    return { status: 'exception', stage: 'exception' };
+  }
+
+  if (
+    upper.includes('INCIDENCIA') ||
+    upper.includes('AUSENTE') ||
+    upper.includes('FALLIDO') ||
+    upper.includes('NO ENTREGADO')
+  ) {
+    return { status: 'failed_attempt', stage: 'exception' };
   }
 
   if (
@@ -107,19 +128,6 @@ export function normalizeSEURStatus(
     upper.includes('DOCUMENTADO')
   ) {
     return { status: 'info_received', stage: 'created' };
-  }
-
-  if (
-    upper.includes('INCIDENCIA') ||
-    upper.includes('AUSENTE') ||
-    upper.includes('FALLIDO') ||
-    upper.includes('NO ENTREGADO')
-  ) {
-    return { status: 'failed_attempt', stage: 'exception' };
-  }
-
-  if (upper.includes('DEVUELTO') || upper.includes('DEVOLUCION')) {
-    return { status: 'exception', stage: 'exception' };
   }
 
   return { status: 'in_transit', stage: 'transit' };
@@ -157,7 +165,7 @@ function computeProgressAndDays(
   let daysInTransit = Math.floor(diffHours / 24);
   if (daysInTransit < 1 && diffHours > 0) daysInTransit = 1;
 
-  return { progress, daysInTransit: Math.max(1, daysInTransit) };
+  return { progress, daysInTransit: Math.max(0, daysInTransit) };
 }
 
 /**
@@ -194,7 +202,13 @@ export function parseGLSSpainPayload(
     const statusVal = String(item.status || '');
     const dateIso = parseSpanishDateToIso(String(item.date || ''));
     const location = String(item.location || '').trim();
-    const locWithCountry = location ? `${location}, España` : undefined;
+    const originCountry = payload.origin?.country || 'ES';
+    const locLower = location.toLowerCase();
+    const locWithCountry = location
+      ? locLower.includes('spain') || locLower.includes('españa') || originCountry !== 'ES'
+        ? location
+        : `${location}, España`
+      : undefined;
 
     const norm = normalizeGLSSpainStatus(statusVal, desc);
     events.push({
@@ -237,16 +251,20 @@ export function parseGLSSpainPayload(
     }
   }
 
+  const originCode = payload.origin?.country || 'ES';
   const originCity = payload.origin?.city || '';
+  const originCountryName = originCode === 'ES' ? 'España' : originCode;
   const origin: CountryRef = {
-    code: payload.origin?.country || 'ES',
-    name: originCity ? `${originCity}, España` : 'España',
+    code: originCode,
+    name: originCity ? `${originCity}, ${originCountryName}` : originCountryName,
   };
 
+  const destCode = payload.destination?.country || 'ES';
   const destCity = payload.destination?.city || '';
+  const destCountryName = destCode === 'ES' ? 'España' : destCode;
   const destination: CountryRef = {
-    code: payload.destination?.country || 'ES',
-    name: destCity ? `${destCity}, España` : 'España',
+    code: destCode,
+    name: destCity ? `${destCity}, ${destCountryName}` : destCountryName,
   };
 
   const { progress, daysInTransit } = computeProgressAndDays(status, events, deliveredAt);
@@ -313,9 +331,14 @@ export function parseSEURPayload(
     if (!ev || typeof ev !== 'object') continue;
     const desc = String(ev.descripcion || ev.estado || 'Actualización SEUR');
     const estadoVal = String(ev.estado || '');
-    const dateIso = parseSpanishDateToIso(String(ev.fecha || ''));
+    const dateIso = parseSpanishDateToIso(String(ev.fecha || ''), String(ev.hora || ''));
     const location = String(ev.centro || '').trim();
-    const locWithCountry = location ? `${location}, España` : undefined;
+    const locLower = location.toLowerCase();
+    const locWithCountry = location
+      ? locLower.includes('spain') || locLower.includes('españa')
+        ? location
+        : `${location}, España`
+      : undefined;
 
     const norm = normalizeSEURStatus(estadoVal, desc);
     events.push({

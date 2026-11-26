@@ -47,7 +47,7 @@ export const SegmentedFilter: React.FC<SegmentedFilterProps> = ({
             key={tab.key}
             accessibilityRole="button"
             accessibilityState={{ selected: isActive }}
-            accessibilityLabel={`${tab.label}, ${tab.count} envíos`}
+            accessibilityLabel={`${tab.label}, ${tab.count} ${t.dashboard.itemsCountAria}`}
             onPress={() => onTabChange(tab.key)}
             style={({ pressed }) => [
               styles.tab,
@@ -78,7 +78,7 @@ export const SegmentedFilter: React.FC<SegmentedFilterProps> = ({
                 style={[
                   styles.countBadge,
                   {
-                    backgroundColor: isActive ? '#000000' : theme.surfaceDark,
+                    backgroundColor: isActive ? '#000000' : theme.textPrimary,
                   },
                 ]}
               >
@@ -133,7 +133,8 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
   tabLabel: {
-    fontSize: 11,
+    flexShrink: 1,
+    fontSize: 10.5,
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 0.3,

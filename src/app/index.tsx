@@ -17,10 +17,21 @@ export default function IndexScreen() {
   };
 
   const handleOpenNewParcel = (initialData?: { trackingNumber?: string; carrierSlug?: string }) => {
-    router.push({
-      pathname: '/new-parcel',
-      params: initialData,
-    });
+    const params: Record<string, string> = {};
+    if (initialData?.trackingNumber) {
+      params.trackingNumber = initialData.trackingNumber;
+    }
+    if (initialData?.carrierSlug) {
+      params.carrierSlug = initialData.carrierSlug;
+    }
+    if (Object.keys(params).length > 0) {
+      router.push({
+        pathname: '/new-parcel',
+        params,
+      });
+    } else {
+      router.push('/new-parcel');
+    }
   };
 
   return (

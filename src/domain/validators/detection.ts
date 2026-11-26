@@ -377,6 +377,266 @@ export const CARRIERS_CATALOG: Carrier[] = [
     region: 'global',
     color: '#1B365D',
   },
+  {
+    slug: 'envialia',
+    name: 'Envialia',
+    country: 'ES',
+    countryName: 'Spain',
+    type: 'express',
+    website: 'https://envialia.com',
+    region: 'es',
+    color: '#E30613',
+  },
+  {
+    slug: 'celeritas',
+    name: 'Celeritas Transporte',
+    country: 'ES',
+    countryName: 'Spain',
+    type: 'logistics',
+    website: 'https://celeritastransporte.com',
+    region: 'es',
+    color: '#0055A5',
+  },
+  {
+    slug: 'sending-es',
+    name: 'Sending',
+    country: 'ES',
+    countryName: 'Spain',
+    type: 'express',
+    website: 'https://sending.es',
+    region: 'es',
+    color: '#003B71',
+  },
+  {
+    slug: 'redur-spain',
+    name: 'Redur Spain',
+    country: 'ES',
+    countryName: 'Spain',
+    type: 'logistics',
+    website: 'https://redur.es',
+    region: 'es',
+    color: '#D91C24',
+  },
+  {
+    slug: 'asendia-es',
+    name: 'Asendia Spain',
+    country: 'ES',
+    countryName: 'Spain',
+    type: 'cross_border',
+    website: 'https://asendia.es',
+    region: 'es',
+    color: '#0096D6',
+  },
+  {
+    slug: '4px',
+    name: '4PX Express',
+    country: 'CN',
+    countryName: 'China',
+    type: 'cross_border',
+    website: 'https://4px.com',
+    region: 'china',
+    color: '#F37021',
+  },
+  {
+    slug: 'china-post',
+    name: 'China Post',
+    country: 'CN',
+    countryName: 'China',
+    type: 'postal',
+    website: 'https://chinapost.com.cn',
+    region: 'china',
+    color: '#007A3D',
+  },
+  {
+    slug: 'hongkong-post',
+    name: 'Hong Kong Post',
+    country: 'HK',
+    countryName: 'Hong Kong',
+    type: 'postal',
+    website: 'https://hongkongpost.hk',
+    region: 'china',
+    color: '#006847',
+  },
+  {
+    slug: 'sf-express',
+    name: 'SF Express',
+    country: 'CN',
+    countryName: 'China',
+    type: 'express',
+    website: 'https://sf-express.com',
+    region: 'china',
+    color: '#111111',
+  },
+  {
+    slug: 'yanwen',
+    name: 'Yanwen Logistics',
+    country: 'CN',
+    countryName: 'China',
+    type: 'cross_border',
+    website: 'https://yw56.com.cn',
+    region: 'china',
+    color: '#005BAC',
+  },
+  {
+    slug: 'sytrack',
+    name: 'SunYou - Sytrack',
+    country: 'CN',
+    countryName: 'China',
+    type: 'cross_border',
+    website: 'https://sypost.net',
+    region: 'china',
+    color: '#E60012',
+  },
+  {
+    slug: 'cne-express',
+    name: 'CNE Express',
+    country: 'CN',
+    countryName: 'China',
+    type: 'cross_border',
+    website: 'https://cne.com',
+    region: 'china',
+    color: '#0055A5',
+  },
+  {
+    slug: 'postnl',
+    name: 'PostNL',
+    country: 'NL',
+    countryName: 'Netherlands',
+    type: 'postal',
+    website: 'https://postnl.nl',
+    region: 'eu',
+    color: '#EC6408',
+  },
+  {
+    slug: 'deutsche-post',
+    name: 'Deutsche Post / DHL Paket',
+    country: 'DE',
+    countryName: 'Germany',
+    type: 'postal',
+    website: 'https://deutschepost.de',
+    region: 'eu',
+    color: '#FFCC00',
+  },
+  {
+    slug: 'dpd-uk',
+    name: 'DPD UK',
+    country: 'GB',
+    countryName: 'United Kingdom',
+    type: 'express',
+    website: 'https://dpd.co.uk',
+    region: 'eu',
+    color: '#DC0032',
+  },
+  {
+    slug: 'myhermes-uk',
+    name: 'Evri',
+    country: 'GB',
+    countryName: 'United Kingdom',
+    type: 'express',
+    website: 'https://evri.com',
+    region: 'eu',
+    color: '#0078D7',
+  },
+  {
+    slug: 'chronopost-france',
+    name: 'Chronopost France',
+    country: 'FR',
+    countryName: 'France',
+    type: 'express',
+    website: 'https://chronopost.fr',
+    region: 'eu',
+    color: '#003DA5',
+  },
+  {
+    slug: 'poste-italiane',
+    name: 'Poste Italiane',
+    country: 'IT',
+    countryName: 'Italy',
+    type: 'postal',
+    website: 'https://poste.it',
+    region: 'eu',
+    color: '#FFCC00',
+  },
+  {
+    slug: 'brt-bartolini',
+    name: 'BRT Bartolini',
+    country: 'IT',
+    countryName: 'Italy',
+    type: 'express',
+    website: 'https://brt.it',
+    region: 'eu',
+    color: '#D50032',
+  },
+  {
+    slug: 'gls-italy',
+    name: 'GLS Italy',
+    country: 'IT',
+    countryName: 'Italy',
+    type: 'express',
+    website: 'https://gls-italy.com',
+    region: 'eu',
+    color: '#002663',
+  },
+  {
+    slug: 'amazon-it',
+    name: 'Amazon Logistics',
+    country: 'IT',
+    countryName: 'Italy',
+    type: 'logistics',
+    website: 'https://track.amazon.it',
+    region: 'eu',
+    color: '#FF9900',
+  },
+  {
+    slug: 'portugal-post',
+    name: 'Portugal Post - CTT',
+    country: 'PT',
+    countryName: 'Portugal',
+    type: 'postal',
+    website: 'https://ctt.pt',
+    region: 'eu',
+    color: '#E2001A',
+  },
+  {
+    slug: 'canada-post',
+    name: 'Canada Post',
+    country: 'CA',
+    countryName: 'Canada',
+    type: 'postal',
+    website: 'https://canadapost-postescanada.ca',
+    region: 'global',
+    color: '#E31837',
+  },
+  {
+    slug: 'australia-post',
+    name: 'Australia Post',
+    country: 'AU',
+    countryName: 'Australia',
+    type: 'postal',
+    website: 'https://auspost.com.au',
+    region: 'global',
+    color: '#DC1928',
+  },
+  {
+    slug: 'japan-post',
+    name: 'Japan Post',
+    country: 'JP',
+    countryName: 'Japan',
+    type: 'postal',
+    website: 'https://post.japanpost.jp',
+    region: 'global',
+    color: '#CC0000',
+  },
+  {
+    slug: 'upu-s10',
+    name: 'Universal Postal Union (UPU S10)',
+    country: 'GLOBAL',
+    countryName: 'International',
+    type: 'postal',
+    website: 'https://upu.int',
+    region: 'global',
+    color: '#0055A5',
+  },
 ];
 
 const CARRIER_ALIASES: Record<string, string> = {
@@ -2467,11 +2727,13 @@ export function detectCandidateCarriers(
   const cleanIsDigits = isDigitsOnly(clean);
   const destUpper = (countryHint || '').trim().toUpperCase();
 
-  const scoredCandidates: {
-    result: DetectedCarrier;
-    priority: number;
-  }[] = [];
-  const seenCarrier = new Set<string>();
+  const bestByCarrier = new Map<
+    string,
+    {
+      result: DetectedCarrier;
+      priority: number;
+    }
+  >();
 
   for (const rule of COMPILED_RULES) {
     // Fast pre-filter: length bounds
@@ -2507,26 +2769,37 @@ export function detectCandidateCarriers(
       }
     }
 
-    if (seenCarrier.has(rule.carrierSlug)) {
+    const roundedConf = Math.round(conf * 1000) / 1000;
+    const existing = bestByCarrier.get(rule.carrierSlug);
+    if (
+      existing &&
+      (existing.result.confidence > roundedConf ||
+        (existing.result.confidence === roundedConf && existing.priority >= rule.priority))
+    ) {
       continue;
     }
-    seenCarrier.add(rule.carrierSlug);
 
     const carrierObj = findCarrierBySlug(rule.carrierSlug);
     // Enrich with rule metadata if not in static catalog
-    if (!carrierObj.country && rule.country) carrierObj.country = rule.country;
+    if (!carrierObj.country) {
+      if (rule.carrierName) carrierObj.name = rule.carrierName;
+      if (rule.country) carrierObj.country = rule.country;
+      if (rule.country === 'ES') carrierObj.region = 'es';
+    }
     if (!carrierObj.countryName && rule.countryName) carrierObj.countryName = rule.countryName;
 
-    scoredCandidates.push({
+    bestByCarrier.set(rule.carrierSlug, {
       result: {
         carrier: carrierObj,
-        confidence: Math.round(conf * 1000) / 1000,
+        confidence: roundedConf,
         matchedRule: rule.description,
         reason: 'Matched pattern: ' + rule.description,
       },
       priority: rule.priority,
     });
   }
+
+  const scoredCandidates = Array.from(bestByCarrier.values());
 
   // Sort candidates by confidence descending with priority tie-breaker
   scoredCandidates.sort((a, b) => {

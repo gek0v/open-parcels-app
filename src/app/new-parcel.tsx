@@ -9,6 +9,11 @@ export default function NewParcelRoute() {
   const params = useLocalSearchParams<{ trackingNumber?: string; carrierSlug?: string }>();
   const { theme } = useTheme();
 
+  const initialTrackingNumber =
+    typeof params.trackingNumber === 'string' ? params.trackingNumber : undefined;
+  const initialCarrierSlug =
+    typeof params.carrierSlug === 'string' ? params.carrierSlug : undefined;
+
   const handleParcelCreated = (newParcel: Parcel) => {
     router.replace({
       pathname: '/parcel/[id]',
@@ -17,15 +22,20 @@ export default function NewParcelRoute() {
   };
 
   const handleClose = () => {
-    router.back();
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/');
+    }
   };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.canvas }]}>
       <NewParcelModal
         visible={true}
-        initialTrackingNumber={params.trackingNumber}
-        initialCarrierSlug={params.carrierSlug}
+        asScreen={true}
+        initialTrackingNumber={initialTrackingNumber}
+        initialCarrierSlug={initialCarrierSlug}
         onClose={handleClose}
         onParcelCreated={handleParcelCreated}
       />

@@ -8,9 +8,11 @@ import { getLocalizedStatusText } from './mapper';
 function decodeHtmlEntities(str: string): string {
   return str
     .replace(/&quot;/g, '"')
+    .replace(/&#34;/g, '"')
     .replace(/&amp;/g, '&')
     .replace(/&#39;/g, "'")
     .replace(/&#x27;/gi, "'")
+    .replace(/&apos;/g, "'")
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>');
 }
@@ -131,6 +133,21 @@ export function normalizeInPostEventStatus(
   }
 
   if (
+    c.includes('devuelto') ||
+    c.includes('exception') ||
+    c.includes('error')
+  ) {
+    return { status: 'exception', stage: 'exception' };
+  }
+
+  if (
+    c.includes('incidencia') ||
+    c.includes('fallido')
+  ) {
+    return { status: 'failed_attempt', stage: 'exception' };
+  }
+
+  if (
     c.includes('disponible') ||
     c.includes('punto pack') ||
     c.includes('locker') ||
@@ -174,16 +191,6 @@ export function normalizeInPostEventStatus(
     c.includes('centro logistico')
   ) {
     return { status: 'in_transit', stage: 'transit' };
-  }
-
-  if (
-    c.includes('incidencia') ||
-    c.includes('fallido') ||
-    c.includes('exception') ||
-    c.includes('devuelto') ||
-    c.includes('error')
-  ) {
-    return { status: 'exception', stage: 'exception' };
   }
 
   return { status: 'info_received', stage: 'created' };
@@ -345,11 +352,13 @@ export function parseInPostHtmlToParcel(
       ? 100
       : status === 'out_for_delivery'
         ? 85
-        : status === 'in_transit'
-          ? 35
-          : status === 'exception'
-            ? 60
-            : 15;
+        : status === 'failed_attempt'
+          ? 70
+          : status === 'in_transit'
+            ? 35
+            : status === 'exception'
+              ? 60
+              : 15;
 
   const nowIso = new Date().toISOString();
   return {
@@ -502,11 +511,13 @@ export function parseInPostShipXPayloadToParcel(
       ? 100
       : status === 'out_for_delivery'
         ? 85
-        : status === 'in_transit'
-          ? 35
-          : status === 'exception'
-            ? 60
-            : 15;
+        : status === 'failed_attempt'
+          ? 70
+          : status === 'in_transit'
+            ? 35
+            : status === 'exception'
+              ? 60
+              : 15;
 
   let origin: CountryRef = { code: 'IT', name: 'Italy' };
   if (res.origin && typeof res.origin === 'object') {
@@ -720,6 +731,8 @@ export async function fetchInPostLive(
 
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 10000);
+  const shipxCtrl = new AbortController();
+  const shipxTimer = setTimeout(() => shipxCtrl.abort(), 4000);
   try {
     const [htmlRes, shipxRes] = await Promise.allSettled([
       fetch(url, {
@@ -734,7 +747,7 @@ export async function fetchInPostLive(
       }),
       fetch(shipxUrl, {
         method: 'GET',
-        signal: ctrl.signal,
+        signal: shipxCtrl.signal,
         headers: {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -789,5 +802,6 @@ export async function fetchInPostLive(
     );
   } finally {
     clearTimeout(timer);
+    clearTimeout(shipxTimer);
   }
 }

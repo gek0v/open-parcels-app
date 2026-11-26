@@ -20,10 +20,29 @@ export const en: TranslationKey = {
   // Engine Chips & Top Bar
   engine: {
     local: 'EMBEDDED GO',
+    localBadge: 'LOCAL',
     rest: 'REST :8080',
     toggleAria: 'Toggle tracking engine',
+    langAria: 'Switch language',
     updateBtn: 'UPDATE',
     checking: 'CHECKING...',
+    upToDate: 'UP TO DATE',
+    updateCheckAria: 'Check for app updates',
+  },
+
+  // Dashboard Controls & Feedback
+  dashboard: {
+    newParcelAria: 'New shipment',
+    refreshError: 'Could not refresh %d shipment(s). Check your connection or postal code.',
+    refreshSuccess: 'Shipments updated',
+    sortUpdatedAria: 'Sort by most recent',
+    sortDaysAria: 'Sort by days in transit',
+    sortCarrierAria: 'Sort by carrier',
+    styleBentoAria: 'Bento card style',
+    styleIndustrialAria: 'Industrial card style',
+    styleRetroAria: 'Retro OS card style',
+    itemsCountAria: 'shipments',
+    completedCountAria: 'completed',
   },
 
   // Bento Stats
@@ -88,7 +107,20 @@ export const en: TranslationKey = {
     noArchived: 'NO ARCHIVED PARCELS',
     subNoResults: 'Try searching with a different parcel code, alias or carrier name.',
     subActive: 'Tap "+" or "TRACK FIRST SHIPMENT" to track your shipment by entering the tracking number.',
+    subDelivered: 'Delivered shipments will appear here.',
+    subArchived: 'Archived shipments are kept here for reference.',
     trackFirstBtn: 'TRACK FIRST SHIPMENT',
+  },
+
+  // Parcel Cards
+  card: {
+    shipmentTag: 'SHIPMENT',
+    originFallback: 'ORIG',
+    destFallback: 'DEST',
+    daysUnit: 'DAYS',
+    shareAria: 'Share shipment details',
+    renameAria: 'Rename shipment alias',
+    daysInTransitAria: '%d days in transit',
   },
 
   // Detail Screen
@@ -197,6 +229,8 @@ export const en: TranslationKey = {
     title: 'BACKUP & RESTORE',
     subtitle: 'Private on-device JSON parcel management',
     btnLabel: 'BACKUP',
+    btnAria: 'Backup & restore',
+    closeAria: 'Close backup modal',
     exportCardTitle: 'EXPORT BACKUP (JSON)',
     exportCardDesc: 'Save a versioned JSON file containing all your shipments, milestones, and aliases.',
     exportBtn: 'EXPORT TO JSON FILE',
@@ -210,6 +244,45 @@ export const en: TranslationKey = {
     importErrorTitle: 'Restore Error',
     importInvalid: 'Selected file does not have a valid Open Parcels structure.',
     close: 'CLOSE',
+  },
+
+  // Themes Modal
+  themes: {
+    btnLabel: 'THEMES',
+    btnAria: 'App themes and appearance',
+    modalTitle: 'THEMES & APPEARANCE',
+    closeAria: 'Close themes modal',
+    formulaSubtitle: 'Golden Ratio (φ ≈ 1.618)',
+    formulaDesc: 'Change the entire app look in real time',
+    activeAria: 'Currently active theme',
+    applyAria: 'Apply theme',
+    appliedBtn: 'CURRENTLY APPLIED THEME',
+    applyBtn: 'APPLY THIS THEME TO APP',
+    previewHeader: 'LIVE PREVIEW (UI SIMULATOR)',
+    previewDelivered: 'DELIVERED',
+    previewTitle: 'Custom Mechanical Keyboard',
+    previewCheckpoint: 'Delivered to main mailbox • Madrid',
+    previewDetails: 'DETAILS',
+    previewUrgent: 'URGENT',
+    swatchesHeader: 'COLOR SWATCHES & HSV METRICS',
+    doneBtn: 'DONE',
+  },
+
+  // Route Error & Not Found
+  errors: {
+    routeTitle: 'ROUTE ERROR',
+    routeSubtitle: 'An unexpected error occurred while loading this screen.',
+    unknownError: 'Unknown error',
+    toggleDetailsAria: 'Toggle technical details',
+    hideDetails: 'HIDE DETAILS',
+    showDetails: 'SHOW TECHNICAL DETAILS',
+    retry: 'RETRY',
+    home: 'HOME',
+    notFoundCode: 'ERROR 404',
+    notFoundTitle: 'PAGE NOT FOUND',
+    notFoundSubtitle: 'The route or screen you are looking for does not exist or has been moved.',
+    backHome: 'BACK TO HOME',
+    backHomeAria: 'Return to home screen',
   },
 
   // Share

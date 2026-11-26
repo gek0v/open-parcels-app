@@ -90,7 +90,7 @@ export const ClipboardDetectedBanner: React.FC<ClipboardDetectedBannerProps> = (
       style={[
         styles.bannerWrapper,
         {
-          bottom: 92,
+          bottom: 100,
           transform: [{ translateY: slideAnim }],
           opacity: opacityAnim,
         },
@@ -106,7 +106,7 @@ export const ClipboardDetectedBanner: React.FC<ClipboardDetectedBannerProps> = (
         ]}
       >
         {/* Top Header Tag */}
-        <View style={[styles.headerRow, { borderBottomColor: theme.border }]}>
+        <View style={[styles.headerRow, { backgroundColor: theme.surfaceSubtle, borderBottomColor: theme.border }]}>
           <View style={styles.headerLeft}>
             <View style={[styles.clipboardBadge, { backgroundColor: theme.yellow, borderColor: theme.border }]}>
               <Clipboard size={13} color="#000000" strokeWidth={2.5} />
@@ -165,7 +165,7 @@ export const ClipboardDetectedBanner: React.FC<ClipboardDetectedBannerProps> = (
               ]}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Plus size={16} color="#000000" strokeWidth={3} />
+              <Plus size={16} color="#FFFFFF" strokeWidth={3} />
               <Text style={styles.addBtnText}>{t.clipboardBanner.addBtn}</Text>
             </Pressable>
           </View>
@@ -295,7 +295,7 @@ const styles = StyleSheet.create({
   addBtnText: {
     fontSize: 12,
     fontWeight: '900',
-    color: '#000000',
+    color: '#FFFFFF',
     letterSpacing: 0.5,
   },
   pressed: {

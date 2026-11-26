@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Modal,
   View,
@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Pressable,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Download, Upload, X, Database, CheckCircle, AlertTriangle } from 'lucide-react-native';
@@ -20,6 +21,14 @@ interface BackupModalProps {
   onRestoreSuccess: () => void;
 }
 
+const safeHaptic = async (fn: () => Promise<void>) => {
+  try {
+    await fn();
+  } catch {
+    // Haptics unavailable on web or unsupported devices
+  }
+};
+
 export const BackupModal: React.FC<BackupModalProps> = ({
   visible,
   onClose,
@@ -28,73 +37,104 @@ export const BackupModal: React.FC<BackupModalProps> = ({
   const { t } = useI18n();
   const { theme } = useTheme();
 
+  const [prevVisible, setPrevVisible] = useState(visible);
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<{
     type: 'success' | 'error';
     text: string;
   } | null>(null);
+  const isMountedRef = useRef(true);
+
+  if (visible !== prevVisible) {
+    setPrevVisible(visible);
+    if (visible) {
+      setFeedbackMessage(null);
+    }
+  }
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const handleExport = async () => {
+    if (isExporting || isImporting) return;
     setFeedbackMessage(null);
     setIsExporting(true);
     try {
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await safeHaptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium));
       const res = await BackupService.exportBackup();
+      if (!isMountedRef.current) return;
       if (res.success) {
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        await safeHaptic(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success));
         const msg = t.backup.exportSuccess.replace('%d', String(res.parcelCount));
         setFeedbackMessage({ type: 'success', text: msg });
+      } else {
+        await safeHaptic(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error));
+        setFeedbackMessage({ type: 'error', text: t.backup.exportError });
       }
     } catch (err: any) {
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      if (!isMountedRef.current) return;
+      await safeHaptic(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error));
       setFeedbackMessage({
         type: 'error',
         text: err?.message || t.backup.exportError,
       });
     } finally {
-      setIsExporting(false);
+      if (isMountedRef.current) {
+        setIsExporting(false);
+      }
     }
   };
 
   const handleImport = async () => {
+    if (isExporting || isImporting) return;
     setFeedbackMessage(null);
     setIsImporting(true);
     try {
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await safeHaptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium));
       const res = await BackupService.importBackupFromDocumentPicker();
+      if (!isMountedRef.current) return;
 
       if (res.cancelled) {
-        setIsImporting(false);
         return;
       }
 
       if (res.success) {
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        await safeHaptic(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success));
         const msg = t.backup.importSuccessDesc
           .replace('%d', String(res.importedCount))
           .replace('%d', String(res.updatedCount));
         setFeedbackMessage({ type: 'success', text: msg });
         onRestoreSuccess();
       } else {
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        await safeHaptic(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error));
         setFeedbackMessage({
           type: 'error',
           text: res.error || t.backup.importInvalid,
         });
       }
     } catch (err: any) {
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      if (!isMountedRef.current) return;
+      await safeHaptic(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error));
       setFeedbackMessage({
         type: 'error',
         text: err?.message || t.backup.importInvalid,
       });
     } finally {
-      setIsImporting(false);
+      if (isMountedRef.current) {
+        setIsImporting(false);
+      }
     }
   };
 
+  const isBusy = isExporting || isImporting;
+
   const handleClose = () => {
+    if (isBusy) return;
     setFeedbackMessage(null);
     onClose();
   };
@@ -103,11 +143,18 @@ export const BackupModal: React.FC<BackupModalProps> = ({
     <Modal
       visible={visible}
       transparent
+      statusBarTranslucent
       animationType="fade"
       onRequestClose={handleClose}
     >
       <View style={styles.backdrop}>
+        <Pressable
+          style={styles.dismissOverlay}
+          onPress={isBusy ? undefined : handleClose}
+        />
+
         <View
+          accessibilityViewIsModal
           style={[
             styles.modalCard,
             { backgroundColor: theme.surface, borderColor: theme.border },
@@ -136,8 +183,9 @@ export const BackupModal: React.FC<BackupModalProps> = ({
 
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Cerrar modal"
+              accessibilityLabel={t.backup.closeAria}
               onPress={handleClose}
+              disabled={isBusy}
               style={({ pressed }) => [
                 styles.closeBtn,
                 { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
@@ -149,110 +197,117 @@ export const BackupModal: React.FC<BackupModalProps> = ({
             </Pressable>
           </View>
 
-          {/* Feedback Banner if present */}
-          {feedbackMessage && (
+          <ScrollView style={styles.bodyScroll} showsVerticalScrollIndicator={false}>
+            {/* Feedback Banner if present */}
+            {feedbackMessage && (
+              <View
+                style={[
+                  styles.feedbackBanner,
+                  {
+                    backgroundColor:
+                      feedbackMessage.type === 'success'
+                        ? theme.statusLight.delivered
+                        : theme.statusLight.exception,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                {feedbackMessage.type === 'success' ? (
+                  <CheckCircle size={16} color={theme.textPrimary} strokeWidth={2.5} />
+                ) : (
+                  <AlertTriangle size={16} color={theme.textPrimary} strokeWidth={2.5} />
+                )}
+                <Text style={[styles.feedbackText, { color: theme.textPrimary }]}>
+                  {feedbackMessage.text}
+                </Text>
+              </View>
+            )}
+
+            {/* Content: Export Card */}
             <View
               style={[
-                styles.feedbackBanner,
-                {
-                  backgroundColor:
-                    feedbackMessage.type === 'success' ? theme.mint : theme.coral,
-                  borderColor: theme.border,
-                },
+                styles.actionCard,
+                { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
               ]}
             >
-              {feedbackMessage.type === 'success' ? (
-                <CheckCircle size={16} color="#000000" strokeWidth={2.5} />
-              ) : (
-                <AlertTriangle size={16} color="#000000" strokeWidth={2.5} />
-              )}
-              <Text style={styles.feedbackText}>{feedbackMessage.text}</Text>
-            </View>
-          )}
-
-          {/* Content: Export Card */}
-          <View
-            style={[
-              styles.actionCard,
-              { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
-            ]}
-          >
-            <View style={styles.actionCardHeader}>
-              <Download size={16} color={theme.textPrimary} strokeWidth={2.5} />
-              <Text style={[styles.actionCardTitle, { color: theme.textPrimary }]}>
-                {t.backup.exportCardTitle}
+              <View style={styles.actionCardHeader}>
+                <Download size={16} color={theme.textPrimary} strokeWidth={2.5} />
+                <Text style={[styles.actionCardTitle, { color: theme.textPrimary }]}>
+                  {t.backup.exportCardTitle}
+                </Text>
+              </View>
+              <Text style={[styles.actionCardDesc, { color: theme.textSecondary }]}>
+                {t.backup.exportCardDesc}
               </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t.backup.exportBtn}
+                onPress={handleExport}
+                disabled={isBusy}
+                style={({ pressed }) => [
+                  styles.actionBtn,
+                  { backgroundColor: theme.yellow, borderColor: theme.border },
+                  pressed && styles.pressed,
+                ]}
+              >
+                {isExporting ? (
+                  <ActivityIndicator size="small" color="#000000" />
+                ) : (
+                  <>
+                    <Download size={16} color="#000000" strokeWidth={2.5} />
+                    <Text style={styles.actionBtnText}>{t.backup.exportBtn}</Text>
+                  </>
+                )}
+              </Pressable>
             </View>
-            <Text style={[styles.actionCardDesc, { color: theme.textSecondary }]}>
-              {t.backup.exportCardDesc}
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t.backup.exportBtn}
-              onPress={handleExport}
-              disabled={isExporting}
-              style={({ pressed }) => [
-                styles.actionBtn,
-                { backgroundColor: theme.yellow, borderColor: theme.border },
-                pressed && styles.pressed,
-              ]}
-            >
-              {isExporting ? (
-                <ActivityIndicator size="small" color="#000000" />
-              ) : (
-                <>
-                  <Download size={16} color="#000000" strokeWidth={2.5} />
-                  <Text style={styles.actionBtnText}>{t.backup.exportBtn}</Text>
-                </>
-              )}
-            </Pressable>
-          </View>
 
-          {/* Content: Import Card */}
-          <View
-            style={[
-              styles.actionCard,
-              { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
-            ]}
-          >
-            <View style={styles.actionCardHeader}>
-              <Upload size={16} color={theme.textPrimary} strokeWidth={2.5} />
-              <Text style={[styles.actionCardTitle, { color: theme.textPrimary }]}>
-                {t.backup.importCardTitle}
-              </Text>
-            </View>
-            <Text style={[styles.actionCardDesc, { color: theme.textSecondary }]}>
-              {t.backup.importCardDesc}
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t.backup.importBtn}
-              onPress={handleImport}
-              disabled={isImporting}
-              style={({ pressed }) => [
-                styles.actionBtn,
-                { backgroundColor: theme.coral, borderColor: theme.border },
-                pressed && styles.pressed,
+            {/* Content: Import Card */}
+            <View
+              style={[
+                styles.actionCard,
+                { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
               ]}
             >
-              {isImporting ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <>
-                  <Upload size={16} color="#FFFFFF" strokeWidth={2.5} />
-                  <Text style={[styles.actionBtnText, { color: '#FFFFFF' }]}>
-                    {t.backup.importBtn}
-                  </Text>
-                </>
-              )}
-            </Pressable>
-          </View>
+              <View style={styles.actionCardHeader}>
+                <Upload size={16} color={theme.textPrimary} strokeWidth={2.5} />
+                <Text style={[styles.actionCardTitle, { color: theme.textPrimary }]}>
+                  {t.backup.importCardTitle}
+                </Text>
+              </View>
+              <Text style={[styles.actionCardDesc, { color: theme.textSecondary }]}>
+                {t.backup.importCardDesc}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t.backup.importBtn}
+                onPress={handleImport}
+                disabled={isBusy}
+                style={({ pressed }) => [
+                  styles.actionBtn,
+                  { backgroundColor: theme.coral, borderColor: theme.border },
+                  pressed && styles.pressed,
+                ]}
+              >
+                {isImporting ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Upload size={16} color="#FFFFFF" strokeWidth={2.5} />
+                    <Text style={[styles.actionBtnText, { color: '#FFFFFF' }]}>
+                      {t.backup.importBtn}
+                    </Text>
+                  </>
+                )}
+              </Pressable>
+            </View>
+          </ScrollView>
 
           {/* Footer Close Button */}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t.backup.close}
             onPress={handleClose}
+            disabled={isBusy}
             style={({ pressed }) => [
               styles.bottomCloseBtn,
               { backgroundColor: theme.surface, borderColor: theme.border },
@@ -277,9 +332,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
+  dismissOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
   modalCard: {
     width: '100%',
     maxWidth: 420,
+    maxHeight: '90%',
     borderRadius: Theme.radius.md,
     borderWidth: 2.5,
     padding: 18,
@@ -289,6 +352,9 @@ const styles = StyleSheet.create({
     shadowRadius: 0,
     elevation: 8,
     ...(Theme.isWeb ? ({ boxShadow: '4px 4px 0px #000000' } as any) : {}),
+  },
+  bodyScroll: {
+    flexShrink: 1,
   },
   header: {
     flexDirection: 'row',

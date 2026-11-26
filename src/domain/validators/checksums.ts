@@ -14,7 +14,7 @@
  * otherwise removes spaces, dashes and non-alphanumeric chars.
  */
 export function cleanTrackingNumber(raw: string): string {
-  const trimmed = raw.trim();
+  const trimmed = (raw || '').trim();
   if (/^\d{3}-\d{8}$/.test(trimmed)) {
     return trimmed;
   }

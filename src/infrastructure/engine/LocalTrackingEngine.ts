@@ -7,7 +7,7 @@ import {
   detectCandidateCarriers,
   findCarrierBySlug,
 } from '../../domain/validators/detection';
-import { TrackingEngineError } from './errors';
+import { TrackingEngineError, isPostalCodeRequiredError } from './errors';
 import { getLocalizedStatusText } from './mapper';
 import { fetchInPostLive, fetchInPostItalyShipXLive } from './inpostLive';
 import { fetchCorreosSpainLive, fetchCorreosExpressLive } from './correosLive';
@@ -26,7 +26,7 @@ export class LocalTrackingEngine implements ITrackingEngine {
   }
 
   async track(params: TrackRequestParams): Promise<Parcel> {
-    const rawNumber = params.trackingNumber.trim();
+    const rawNumber = (params.trackingNumber || '').trim();
     if (!rawNumber) {
       throw new TrackingEngineError(
         'El número de seguimiento no puede estar vacío',
@@ -35,8 +35,9 @@ export class LocalTrackingEngine implements ITrackingEngine {
       );
     }
 
-    if (params.carrierHint) {
-      const selectedCarrier = findCarrierBySlug(params.carrierHint);
+    const hint = params.carrierHint?.trim();
+    if (hint) {
+      const selectedCarrier = findCarrierBySlug(hint);
       return await this.executeTrackForCarrier(rawNumber, selectedCarrier, params);
     }
 
@@ -62,7 +63,7 @@ export class LocalTrackingEngine implements ITrackingEngine {
       if (
         candidates.length > 1 &&
         err instanceof TrackingEngineError &&
-        (err.code === 'POSTAL_CODE_REQUIRED' || err.code === 'SHIPMENT_NOT_FOUND')
+        (isPostalCodeRequiredError(err) || err.code === 'SHIPMENT_NOT_FOUND')
       ) {
         for (const candidate of candidates) {
           if (candidate.carrier.slug === primaryCarrier.slug) continue;
@@ -71,8 +72,9 @@ export class LocalTrackingEngine implements ITrackingEngine {
           } catch (fallbackErr) {
             if (
               fallbackErr instanceof TrackingEngineError &&
-              (fallbackErr.code === 'POSTAL_CODE_REQUIRED' ||
-                fallbackErr.code === 'SHIPMENT_NOT_FOUND')
+              (isPostalCodeRequiredError(fallbackErr) ||
+                fallbackErr.code === 'SHIPMENT_NOT_FOUND' ||
+                fallbackErr.code === 'CARRIER_NOT_IMPLEMENTED')
             ) {
               continue;
             }
@@ -84,12 +86,48 @@ export class LocalTrackingEngine implements ITrackingEngine {
     }
   }
 
+  private async runLiveAdapter(
+    slug: string,
+    rawNumber: string,
+    postalCode: string,
+    selectedCarrier: Carrier,
+    params: TrackRequestParams
+  ): Promise<Parcel | null> {
+    if (slug === 'inpost' || slug === 'inpost-es') {
+      return await fetchInPostLive(
+        rawNumber,
+        postalCode,
+        selectedCarrier,
+        params.destinationCountry,
+        params.lang
+      );
+    }
+    if (slug === 'inpost-it') {
+      return await fetchInPostItalyShipXLive(rawNumber, selectedCarrier, params.lang);
+    }
+    if (slug === 'correos-spain') {
+      return await fetchCorreosSpainLive(rawNumber, selectedCarrier, params.lang);
+    }
+    if (slug === 'correosexpress') {
+      return await fetchCorreosExpressLive(rawNumber, selectedCarrier, params.lang);
+    }
+    if (slug === 'asm-gls-spain') {
+      return await fetchGLSSpainLive(rawNumber, postalCode, selectedCarrier, params.lang);
+    }
+    if (slug === 'seur') {
+      return await fetchSEURLive(rawNumber, postalCode, selectedCarrier, params.lang);
+    }
+    return null;
+  }
+
   private async executeTrackForCarrier(
     rawNumber: string,
     selectedCarrier: Carrier,
     params: TrackRequestParams
   ): Promise<Parcel> {
-    if (selectedCarrier.requiresPostalCode && !params.postalCode?.trim()) {
+    const postalCode = params.postalCode?.trim() || '';
+
+    if (selectedCarrier.requiresPostalCode && !postalCode) {
       throw new TrackingEngineError(
         `Código postal obligatorio para ${selectedCarrier.name}`,
         'POSTAL_CODE_REQUIRED',
@@ -106,105 +144,34 @@ export class LocalTrackingEngine implements ITrackingEngine {
     }
 
     const slug = selectedCarrier.slug;
-    const postalCode = params.postalCode?.trim() || '';
 
-    // Real live tracking for InPost / Mondial Relay
-    if (slug === 'inpost' || slug === 'inpost-es') {
-      try {
-        return await fetchInPostLive(
-          rawNumber,
-          postalCode,
-          selectedCarrier,
-          params.destinationCountry,
-          params.lang
-        );
-      } catch (err) {
-        if (err instanceof TrackingEngineError && err.code === 'POSTAL_CODE_REQUIRED') {
-          throw err;
-        }
-        if (params.allowSimulated === false) {
-          throw err;
-        }
-        console.warn('InPost live fetch failed, falling back to canonical pending record:', err);
+    try {
+      const liveResult = await this.runLiveAdapter(
+        slug,
+        rawNumber,
+        postalCode,
+        selectedCarrier,
+        params
+      );
+      if (liveResult) {
+        return liveResult;
       }
+    } catch (err) {
+      if (isPostalCodeRequiredError(err) || params.allowSimulated === false) {
+        throw err;
+      }
+      console.warn(
+        `${selectedCarrier.name} live fetch failed, falling back to canonical pending record:`,
+        err
+      );
     }
 
-    // Real live tracking for InPost Italy (ShipX)
-    if (slug === 'inpost-it') {
-      try {
-        return await fetchInPostItalyShipXLive(rawNumber, selectedCarrier, params.lang);
-      } catch (err) {
-        if (params.allowSimulated === false) {
-          throw err;
-        }
-        console.warn('InPost Italy live fetch failed, falling back to canonical pending record:', err);
-      }
-    }
-
-    // Real live tracking for Correos España
-    if (slug === 'correos-spain') {
-      try {
-        return await fetchCorreosSpainLive(rawNumber, selectedCarrier, params.lang);
-      } catch (err) {
-        if (params.allowSimulated === false) {
-          throw err;
-        }
-        console.warn('Correos Spain live fetch failed, falling back to canonical pending record:', err);
-      }
-    }
-
-    // Real live tracking for Correos Express
-    if (slug === 'correosexpress') {
-      try {
-        return await fetchCorreosExpressLive(rawNumber, selectedCarrier, params.lang);
-      } catch (err) {
-        if (err instanceof TrackingEngineError && err.code === 'POSTAL_CODE_REQUIRED') {
-          throw err;
-        }
-        if (params.allowSimulated === false) {
-          throw err;
-        }
-        console.warn('Correos Express live fetch failed, falling back to canonical pending record:', err);
-      }
-    }
-
-    // Real live tracking for GLS Spain
-    if (slug === 'asm-gls-spain') {
-      try {
-        return await fetchGLSSpainLive(rawNumber, postalCode, selectedCarrier, params.lang);
-      } catch (err) {
-        if (err instanceof TrackingEngineError && err.code === 'POSTAL_CODE_REQUIRED') {
-          throw err;
-        }
-        if (params.allowSimulated === false) {
-          throw err;
-        }
-        console.warn('GLS Spain live fetch failed, falling back to canonical pending record:', err);
-      }
-    }
-
-    // Real live tracking for SEUR
-    if (slug === 'seur') {
-      try {
-        return await fetchSEURLive(rawNumber, postalCode, selectedCarrier, params.lang);
-      } catch (err) {
-        if (err instanceof TrackingEngineError && err.code === 'POSTAL_CODE_REQUIRED') {
-          throw err;
-        }
-        if (params.allowSimulated === false) {
-          throw err;
-        }
-        console.warn('SEUR live fetch failed, falling back to canonical pending record:', err);
-      }
-    }
-
-    // Canonical initial tracking record when live tracking is unavailable or fails
-    const now = new Date();
-    const nowIso = now.toISOString();
+    // Canonical initial tracking record when live tracking is unavailable or fails (unless allowSimulated === false)
+    const nowIso = new Date().toISOString();
     const status: CanonicalStatus = 'pending';
 
     const trackingUrl = selectedCarrier.trackingUrl
-      ? selectedCarrier.trackingUrl.replace('%s', encodeURIComponent(rawNumber))
+      ? selectedCarrier.trackingUrl.replace(/%s/g, encodeURIComponent(rawNumber))
       : selectedCarrier.website;
 
     const carrierWithResolvedUrl: Carrier = {
@@ -219,9 +186,13 @@ export class LocalTrackingEngine implements ITrackingEngine {
       status,
       statusText: getLocalizedStatusText(status, params.lang),
       progress: CANONICAL_STATUS_MAP[status].baseProgress,
-      origin: selectedCarrier.country
-        ? { code: selectedCarrier.country, name: selectedCarrier.countryName || selectedCarrier.country }
-        : undefined,
+      origin:
+        selectedCarrier.country && selectedCarrier.country !== 'GLOBAL'
+          ? {
+              code: selectedCarrier.country,
+              name: selectedCarrier.countryName || selectedCarrier.country,
+            }
+          : undefined,
       destination: params.destinationCountry
         ? { code: params.destinationCountry, name: params.destinationCountry }
         : undefined,

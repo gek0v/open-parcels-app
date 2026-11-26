@@ -7,7 +7,7 @@ import { openSafeWebUrl } from '../utils/url';
 
 export { isNewerVersion };
 
-export const CURRENT_APP_VERSION = '1.5.5';
+export const CURRENT_APP_VERSION = '1.5.6';
 export const GITHUB_REPO = 'gek0v/open-parcels-app';
 
 const LAST_CHECK_KEY = '@open_parcels:last_update_check';
@@ -42,6 +42,10 @@ export function isTrustedDownloadUrl(urlStr: string): boolean {
   } catch {
     return false;
   }
+}
+
+function normalizeVersionTag(version: string): string {
+  return String(version ?? '').trim().replace(/^v/i, '');
 }
 
 export interface UpdateInfo {
@@ -83,6 +87,24 @@ export class UpdateService {
   private activeDownload: FileSystem.DownloadResumable | null = null;
   private isCancelled = false;
 
+  private async fetchGitHubJson(url: string, timeoutMs: number): Promise<Response> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          Accept: 'application/vnd.github.v3+json',
+          'User-Agent': 'open-parcels-app',
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+        },
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
   /**
    * Check GitHub Releases API for a newer version than CURRENT_APP_VERSION
    * @param force - If true, bypasses last check throttling and ignored versions
@@ -91,56 +113,73 @@ export class UpdateService {
   async checkForUpdate(force = false, timeoutMs = 10000): Promise<UpdateInfo | null> {
     try {
       if (!force) {
-        // Throttling: Check at most once every 30 minutes in normal launch
-        const lastCheckStr = await AsyncStorage.getItem(LAST_CHECK_KEY);
+        // Throttling: Check at most once every 30 minutes after a successful check
+        const lastCheckStr = await AsyncStorage.getItem(LAST_CHECK_KEY).catch(() => null);
         if (lastCheckStr) {
           const lastCheck = parseInt(lastCheckStr, 10);
           const thirtyMinutes = 30 * 60 * 1000;
-          if (Date.now() - lastCheck < thirtyMinutes) {
+          const elapsed = Date.now() - lastCheck;
+          if (!Number.isNaN(lastCheck) && elapsed >= 0 && elapsed < thirtyMinutes) {
             return null;
           }
         }
       }
 
-      await AsyncStorage.setItem(LAST_CHECK_KEY, Date.now().toString());
+      let release: any = null;
+      const latestRes = await this.fetchGitHubJson(
+        `https://api.github.com/repos/${this.repo}/releases/latest`,
+        timeoutMs
+      );
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-      let res: Response;
-      try {
-        res = await fetch(`https://api.github.com/repos/${this.repo}/releases/latest`, {
-          signal: controller.signal,
-          headers: {
-            Accept: 'application/vnd.github.v3+json',
-          },
-        });
-      } finally {
-        clearTimeout(timeoutId);
-      }
-
-      if (!res.ok) {
+      if (latestRes.ok) {
+        release = await latestRes.json();
+      } else if (latestRes.status === 404) {
+        // Fallback to recent releases list in case /releases/latest returns 404
+        const listRes = await this.fetchGitHubJson(
+          `https://api.github.com/repos/${this.repo}/releases?per_page=5`,
+          timeoutMs
+        );
+        if (!listRes.ok) {
+          return null;
+        }
+        const releases = await listRes.json();
+        if (Array.isArray(releases)) {
+          release = releases.find((r: any) => r && !r.draft && !r.prerelease) || null;
+        }
+      } else {
         return null;
       }
 
-      const release = await res.json();
-      const latestTag = release.tag_name || '';
+      // Only record throttle timestamp after a successful GitHub API response
+      await AsyncStorage.setItem(LAST_CHECK_KEY, Date.now().toString()).catch(() => {});
 
+      if (!release) {
+        return null;
+      }
+
+      const latestTag = String(release.tag_name || '').trim();
       if (!isNewerVersion(CURRENT_APP_VERSION, latestTag)) {
         return null;
       }
 
+      const cleanVersion = normalizeVersionTag(latestTag);
+
       // Check if user chose to ignore this version
       if (!force) {
-        const ignored = await AsyncStorage.getItem(IGNORED_VERSION_KEY);
-        if (ignored === latestTag) {
+        const ignored = await AsyncStorage.getItem(IGNORED_VERSION_KEY).catch(() => null);
+        if (ignored && normalizeVersionTag(ignored) === cleanVersion) {
           return null;
         }
       }
 
       // Find .apk asset in release
       const apkAsset = Array.isArray(release.assets)
-        ? release.assets.find((asset: any) =>
-            asset.name?.toLowerCase().endsWith('.apk')
+        ? release.assets.find(
+            (asset: any) =>
+              typeof asset?.name === 'string' &&
+              asset.name.toLowerCase().endsWith('.apk') &&
+              typeof asset?.browser_download_url === 'string' &&
+              asset.browser_download_url.length > 0
           )
         : null;
 
@@ -150,7 +189,7 @@ export class UpdateService {
         : undefined;
 
       return {
-        version: latestTag,
+        version: cleanVersion || latestTag,
         title: release.name || latestTag,
         changelog: release.body || '',
         publishedAt: release.published_at || '',
@@ -167,7 +206,9 @@ export class UpdateService {
 
   async ignoreVersion(version: string): Promise<void> {
     try {
-      await AsyncStorage.setItem(IGNORED_VERSION_KEY, version);
+      const clean = normalizeVersionTag(version);
+      if (!clean) return;
+      await AsyncStorage.setItem(IGNORED_VERSION_KEY, clean);
     } catch (err) {
       console.warn('Failed to save ignored version:', err);
     }
@@ -181,22 +222,26 @@ export class UpdateService {
     }
   }
 
-  cancelDownload(): void {
+  async cancelDownload(): Promise<void> {
     this.isCancelled = true;
     if (this.activeDownload) {
+      const download = this.activeDownload;
+      this.activeDownload = null;
       try {
-        this.activeDownload.cancelAsync().catch(() => {});
+        await download.cancelAsync();
       } catch {
         // Ignore error on cancel
       }
-      this.activeDownload = null;
     }
   }
 
   getApkFileUri(version: string): string {
-    const normalized = version.startsWith('v') ? version : `v${version}`;
+    const clean = normalizeVersionTag(version);
+    const normalized = `v${clean}`;
     const cleanVersion = normalized.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const dir = FileSystem.documentDirectory || 'file:///data/user/0/com.openparcels.app/files/';
+    const baseDir =
+      FileSystem.documentDirectory || 'file:///data/user/0/com.openparcels.app/files/';
+    const dir = baseDir.endsWith('/') ? baseDir : `${baseDir}/`;
     return `${dir}open-parcels-${cleanVersion}.apk`;
   }
 
@@ -229,15 +274,29 @@ export class UpdateService {
       throw new Error('UNTRUSTED_DOWNLOAD_URL');
     }
 
+    if (
+      updateInfo.hasApkAsset === false ||
+      (!updateInfo.apkDownloadUrl.toLowerCase().includes('.apk') &&
+        updateInfo.apkDownloadUrl === updateInfo.htmlUrl)
+    ) {
+      throw new Error('NO_APK_ASSET');
+    }
+
+    // Cancel any leftover active download before starting a fresh one
+    if (this.activeDownload) {
+      await this.cancelDownload();
+    }
+
     this.isCancelled = false;
     const destinationUri = this.getApkFileUri(updateInfo.version);
     const tmpUri = `${destinationUri}.tmp`;
 
-    // If destination already exists and is valid, return immediately
-    const existing = await FileSystem.getInfoAsync(destinationUri);
-    if (existing.exists && existing.size && existing.size > 0) {
+    // Reuse cached APK only if it passes size validation; otherwise delete corrupted file
+    const alreadyValid = await this.isApkDownloaded(updateInfo.version, updateInfo.apkSizeMb);
+    if (alreadyValid) {
+      const existing = await FileSystem.getInfoAsync(destinationUri);
       if (onProgress) {
-        const size = existing.size;
+        const size = (existing.exists && existing.size) || 0;
         onProgress({
           progress: 1,
           percent: 100,
@@ -248,19 +307,9 @@ export class UpdateService {
       return destinationUri;
     }
 
-    if (
-      updateInfo.hasApkAsset === false ||
-      (!updateInfo.apkDownloadUrl.toLowerCase().includes('.apk') &&
-        updateInfo.apkDownloadUrl === updateInfo.htmlUrl)
-    ) {
-      throw new Error('NO_APK_ASSET');
-    }
+    await this.safeDelete(destinationUri);
+    await this.safeDelete(tmpUri);
 
-    try {
-      await FileSystem.deleteAsync(tmpUri, { idempotent: true });
-    } catch {
-      // Ignore cleanup failures
-    }
     if (this.isCancelled) {
       throw new DownloadCancelledError();
     }
@@ -310,10 +359,26 @@ export class UpdateService {
         throw new Error(`HTTP_${result.status}`);
       }
 
+      const headers = (result as any).headers as Record<string, string> | undefined;
+      const contentType =
+        headers?.['content-type'] || headers?.['Content-Type'] || '';
+      if (contentType.toLowerCase().includes('text/html')) {
+        await this.safeDelete(tmpUri);
+        throw new Error('INVALID_APK_CONTENT');
+      }
+
       const tmpInfo = await FileSystem.getInfoAsync(tmpUri);
       if (!tmpInfo.exists || !tmpInfo.size || tmpInfo.size <= 0) {
         await this.safeDelete(tmpUri);
         throw new Error('EMPTY_DOWNLOAD');
+      }
+
+      if (updateInfo.apkSizeMb && updateInfo.apkSizeMb >= 1) {
+        const minBytes = Math.max(0, (updateInfo.apkSizeMb - 0.1) * 1024 * 1024 * 0.9);
+        if (tmpInfo.size < minBytes) {
+          await this.safeDelete(tmpUri);
+          throw new Error('INCOMPLETE_DOWNLOAD');
+        }
       }
 
       // Atomic replace: remove previous file if present and move tmp into place
@@ -353,11 +418,19 @@ export class UpdateService {
       };
     }
 
+    if (!fileUriOrVersion || !String(fileUriOrVersion).trim()) {
+      return {
+        success: false,
+        error: 'APK file path or version is missing.',
+      };
+    }
+
     try {
+      const trimmed = String(fileUriOrVersion).trim();
       const fileUri =
-        fileUriOrVersion.includes('://') || fileUriOrVersion.startsWith('/')
-          ? fileUriOrVersion
-          : this.getApkFileUri(fileUriOrVersion);
+        trimmed.includes('://') || trimmed.startsWith('/')
+          ? trimmed
+          : this.getApkFileUri(trimmed);
 
       const info = await FileSystem.getInfoAsync(fileUri);
       if (!info.exists) {

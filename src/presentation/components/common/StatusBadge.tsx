@@ -40,7 +40,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
 
   return (
     <View
-      accessibilityLabel={`Estado: ${meta.labelEs}`}
+      accessibilityLabel={label}
       style={[
         styles.badge,
         {

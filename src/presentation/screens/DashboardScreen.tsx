@@ -14,7 +14,7 @@ import * as Clipboard from 'expo-clipboard';
 import { Parcel } from '../../domain/models/parcel';
 import { parcelRepository } from '../../infrastructure/storage/ParcelRepository';
 import { trackingEngineManager } from '../../infrastructure/engine';
-import { validateTrackingNumber } from '../../domain/validators/detection';
+import { validateTrackingNumber, findCarrierBySlug } from '../../domain/validators/detection';
 import { cleanTrackingNumber } from '../../domain/validators/checksums';
 import { Theme } from '../theme/adaptiveTheme';
 import { ParcelCardBento } from '../components/dashboard/ParcelCardBento';
@@ -25,10 +25,12 @@ import { SegmentedFilter, FilterTab } from '../components/dashboard/SegmentedFil
 import { RenameParcelModal } from '../components/common/RenameParcelModal';
 import { ThemeSelectorModal } from '../components/common/ThemeSelectorModal';
 import { BackupModal } from '../components/common/BackupModal';
+import { UpdateAvailableModal } from '../components/common/UpdateAvailableModal';
 import { ClipboardDetectedBanner } from '../components/dashboard/ClipboardDetectedBanner';
 import { useI18n } from '../../infrastructure/i18n';
 import { useTheme } from '../theme/ThemeContext';
 import { ShareService } from '../../infrastructure/services/ShareService';
+import { updateService, UpdateInfo } from '../../infrastructure/services/UpdateService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -47,6 +49,9 @@ import {
   Clock,
   Calendar,
   Truck,
+  RefreshCw,
+  CheckCircle2,
+  AlertTriangle,
 } from 'lucide-react-native';
 
 export type CardStyle = 'bento' | 'industrial' | 'retro';
@@ -76,6 +81,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const [renamingParcel, setRenamingParcel] = useState<Parcel | null>(null);
   const [isThemeModalVisible, setIsThemeModalVisible] = useState(false);
   const [isBackupModalVisible, setIsBackupModalVisible] = useState(false);
+  const [updateCheckStatus, setUpdateCheckStatus] = useState<'idle' | 'checking' | 'up_to_date'>('idle');
+  const [manualUpdateInfo, setManualUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [refreshFeedback, setRefreshFeedback] = useState<string | null>(null);
 
   const [detectedClipboard, setDetectedClipboard] = useState<{
     trackingNumber: string;
@@ -85,11 +93,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   } | null>(null);
   const dismissedClipboardRef = useRef<Set<string>>(new Set());
   const isMountedRef = useRef(true);
+  const upToDateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      if (upToDateTimerRef.current) {
+        clearTimeout(upToDateTimerRef.current);
+      }
     };
   }, []);
 
@@ -125,7 +137,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    await AsyncStorage.setItem(CARD_STYLE_KEY, style);
+    try {
+      await AsyncStorage.setItem(CARD_STYLE_KEY, style);
+    } catch (err) {
+      console.warn('[DashboardScreen] save card style error:', err);
+    }
   };
 
   const handleSortChange = async (sort: SortOption) => {
@@ -133,12 +149,18 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    await AsyncStorage.setItem(SORT_OPTION_KEY, sort);
+    try {
+      await AsyncStorage.setItem(SORT_OPTION_KEY, sort);
+    } catch (err) {
+      console.warn('[DashboardScreen] save sort option error:', err);
+    }
   };
 
   const loadParcels = useCallback(async () => {
     const list = await parcelRepository.getAll();
-    setParcels(list);
+    if (isMountedRef.current) {
+      setParcels(list);
+    }
   }, []);
 
   const checkClipboard = useCallback(async () => {
@@ -217,6 +239,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   useEffect(() => {
     const sub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
       if (nextState === 'active') {
+        void loadParcels();
         void checkClipboard();
       }
     });
@@ -229,7 +252,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       sub.remove();
       clearTimeout(timer);
     };
-  }, [checkClipboard]);
+  }, [checkClipboard, loadParcels]);
 
   const handleAddClipboardParcel = () => {
     if (!detectedClipboard) return;
@@ -247,46 +270,134 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     setDetectedClipboard(null);
   };
 
+  const handleManualUpdateCheck = async () => {
+    if (updateCheckStatus === 'checking') return;
+    setUpdateCheckStatus('checking');
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+
+    try {
+      const info = await updateService.checkForUpdate(true);
+      if (!isMountedRef.current) return;
+      if (info) {
+        setUpdateCheckStatus('idle');
+        setManualUpdateInfo(info);
+      } else {
+        setUpdateCheckStatus('up_to_date');
+        if (upToDateTimerRef.current) {
+          clearTimeout(upToDateTimerRef.current);
+        }
+        upToDateTimerRef.current = setTimeout(() => {
+          if (isMountedRef.current) {
+            setUpdateCheckStatus('idle');
+          }
+        }, 3500);
+      }
+    } catch (err) {
+      console.warn('[DashboardScreen] manual update check failed:', err);
+      if (isMountedRef.current) {
+        setUpdateCheckStatus('idle');
+      }
+    }
+  };
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
+    setRefreshFeedback(null);
     try {
       const currentParcels = await parcelRepository.getAll();
-      const activeParcels = currentParcels.filter((p) => !p.isArchived && p.status !== 'delivered');
+      const activeParcels = currentParcels.filter(
+        (p) => !p.isArchived && p.status !== 'delivered' && p.status !== 'expired'
+      );
 
-      if (activeParcels.length > 0) {
+      const isNativeGo = trackingEngineManager.isNativeGoActive;
+      const liveParcels = activeParcels.filter(
+        (p) =>
+          isNativeGo ||
+          Boolean(
+            p.carrier?.hasLiveTracking ||
+              (p.carrier?.slug && findCarrierBySlug(p.carrier.slug).hasLiveTracking)
+          )
+      );
+
+      if (liveParcels.length > 0) {
         const engine = trackingEngineManager.current;
         const updatedParcels: Parcel[] = [];
+        let failedCount = 0;
 
-        for (const parcel of activeParcels) {
-          try {
+        const results = await Promise.allSettled(
+          liveParcels.map(async (parcel) => {
             const refreshed = await engine.track({
               trackingNumber: parcel.trackingNumber,
-              carrierHint: parcel.carrier.slug,
+              carrierHint: parcel.carrier.slug && parcel.carrier.slug !== 'unknown'
+                ? parcel.carrier.slug
+                : undefined,
               postalCode: parcel.postalCode,
               destinationCountry: parcel.destination?.code,
               allowSimulated: false,
+              forceRefresh: true,
               lang,
             });
+            return { parcel, refreshed };
+          })
+        );
 
-            if (refreshed && refreshed.isLiveData !== false && !refreshed.error) {
-              const merged: Parcel = {
-                ...refreshed,
-                id: parcel.id,
-                customAlias: parcel.customAlias,
-                notes: parcel.notes,
-                isArchived: parcel.isArchived,
-                createdAt: parcel.createdAt,
-                updatedAt: new Date().toISOString(),
-              };
-              updatedParcels.push(merged);
-            }
-          } catch (trackErr) {
-            console.warn(`[DashboardScreen] Refresh failed for ${parcel.trackingNumber}:`, trackErr);
+        for (const result of results) {
+          if (result.status !== 'fulfilled') {
+            failedCount += 1;
+            console.warn('[DashboardScreen] Refresh failed:', result.reason);
+            continue;
           }
+
+          const { parcel, refreshed } = result.value;
+          if (!refreshed || refreshed.isLiveData === false || refreshed.error) {
+            failedCount += 1;
+            continue;
+          }
+
+          const refreshedEvents = Array.isArray(refreshed.events) ? refreshed.events : [];
+          const parcelEvents = Array.isArray(parcel.events) ? parcel.events : [];
+
+          // Avoid regressing known tracking history on transient empty payloads
+          if (refreshed.status === 'pending' && parcel.status !== 'pending') {
+            continue;
+          }
+          if (refreshedEvents.length === 0 && parcelEvents.length > 0 && refreshed.status !== 'delivered') {
+            continue;
+          }
+
+          const merged: Parcel = {
+            ...parcel,
+            ...refreshed,
+            id: parcel.id,
+            trackingNumber: parcel.trackingNumber,
+            customAlias: parcel.customAlias,
+            notes: parcel.notes,
+            isArchived: parcel.isArchived,
+            createdAt: parcel.createdAt,
+            postalCode: parcel.postalCode || refreshed.postalCode,
+            origin: refreshed.origin || parcel.origin,
+            destination: refreshed.destination || parcel.destination,
+            lastMileCarrier: refreshed.lastMileCarrier || parcel.lastMileCarrier,
+            lastMileTrackingNumber: refreshed.lastMileTrackingNumber || parcel.lastMileTrackingNumber,
+            additionalCarriers:
+              refreshed.additionalCarriers && refreshed.additionalCarriers.length > 0
+                ? refreshed.additionalCarriers
+                : parcel.additionalCarriers,
+            events: refreshedEvents.length > 0 ? refreshedEvents : parcelEvents,
+            isLiveData: refreshed.isLiveData ?? !engine.isLocal,
+            updatedAt: new Date().toISOString(),
+          };
+          updatedParcels.push(merged);
         }
 
         if (updatedParcels.length > 0) {
           await parcelRepository.saveAll(updatedParcels);
+        }
+
+        if (failedCount > 0 && isMountedRef.current) {
+          setRefreshFeedback(t.dashboard.refreshError.replace('%d', String(failedCount)));
         }
       }
 
@@ -294,21 +405,26 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     } catch (err) {
       console.warn('[DashboardScreen] handleRefresh error:', err);
     } finally {
-      setIsRefreshing(false);
+      if (isMountedRef.current) {
+        setIsRefreshing(false);
+      }
     }
   };
 
-
   const handleUpdateAlias = async (id: string, newAlias: string) => {
-    await parcelRepository.updateAlias(id, newAlias);
-    await loadParcels();
+    try {
+      await parcelRepository.updateAlias(id, newAlias);
+      await loadParcels();
+    } catch (err) {
+      console.warn('[DashboardScreen] handleUpdateAlias error:', err);
+    }
   };
 
   const handleShareParcel = async (parcel: Parcel) => {
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    await ShareService.shareParcel(parcel);
+    await ShareService.shareParcel(parcel, { lang });
   };
 
   // Filter parcels according to active tab and search query
@@ -368,19 +484,21 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           </View>
           <View style={styles.brandCopy}>
             <Text style={[styles.appTitle, { color: theme.textPrimary }]} numberOfLines={1}>
-              OPEN PARCELS
+              {t.appName}
             </Text>
             <View style={styles.headerChipsRow}>
               <View
                 style={[styles.engineBadge, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}
               >
                 <Cpu size={12} color={theme.textPrimary} strokeWidth={2.5} />
-                <Text style={[styles.engineBadgeText, { color: theme.textPrimary }]}>LOCAL</Text>
+                <Text style={[styles.engineBadgeText, { color: theme.textPrimary }]}>
+                  {t.engine.localBadge}
+                </Text>
               </View>
 
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Cambiar idioma"
+                accessibilityLabel={t.engine.langAria}
                 onPress={toggleLang}
                 style={({ pressed }) => [styles.langToggleBtn, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }, pressed && styles.pressed]}
                 hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
@@ -391,24 +509,53 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Temas y apariencia de la app"
+                accessibilityLabel={t.themes.btnAria}
                 onPress={() => setIsThemeModalVisible(true)}
                 style={({ pressed }) => [styles.langToggleBtn, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }, pressed && styles.pressed]}
                 hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
               >
                 <Palette size={12} color={theme.textPrimary} strokeWidth={2.5} />
-                <Text style={[styles.langToggleText, { color: theme.textPrimary }]}>TEMAS</Text>
+                <Text style={[styles.langToggleText, { color: theme.textPrimary }]}>{t.themes.btnLabel}</Text>
               </Pressable>
 
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Copia de seguridad y restauración"
+                accessibilityLabel={t.backup.btnAria}
                 onPress={() => setIsBackupModalVisible(true)}
                 style={({ pressed }) => [styles.langToggleBtn, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }, pressed && styles.pressed]}
                 hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
               >
                 <HardDrive size={12} color={theme.textPrimary} strokeWidth={2.5} />
                 <Text style={[styles.langToggleText, { color: theme.textPrimary }]}>{t.backup.btnLabel}</Text>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t.engine.updateCheckAria}
+                onPress={handleManualUpdateCheck}
+                disabled={updateCheckStatus === 'checking'}
+                style={({ pressed }) => [
+                  styles.updateCheckBtn,
+                  {
+                    backgroundColor: updateCheckStatus === 'up_to_date' ? theme.mint : theme.yellow,
+                    borderColor: theme.border,
+                  },
+                  pressed && styles.pressed,
+                ]}
+                hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+              >
+                {updateCheckStatus === 'up_to_date' ? (
+                  <CheckCircle2 size={12} color="#000000" strokeWidth={2.5} />
+                ) : (
+                  <RefreshCw size={12} color="#000000" strokeWidth={2.5} />
+                )}
+                <Text style={[styles.langToggleText, { color: '#000000' }]}>
+                  {updateCheckStatus === 'checking'
+                    ? t.engine.checking
+                    : updateCheckStatus === 'up_to_date'
+                    ? t.engine.upToDate
+                    : t.engine.updateBtn}
+                </Text>
               </Pressable>
             </View>
           </View>
@@ -443,9 +590,12 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           {searchQuery.length > 0 && (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Limpiar búsqueda"
+              accessibilityLabel={t.search.clearAria}
               onPress={() => setSearchQuery('')}
-              style={({ pressed }) => [styles.clearSearch, pressed && styles.clearSearchPressed]}
+              style={({ pressed }) => [
+                styles.clearSearch,
+                pressed && { backgroundColor: theme.surfaceSubtle },
+              ]}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <X size={16} color={theme.textPrimary} strokeWidth={2.5} />
@@ -463,7 +613,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         <View style={styles.controlTabs}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`${t.sort.updated} - Ordenar por más reciente`}
+            accessibilityLabel={`${t.sort.updated} - ${t.dashboard.sortUpdatedAria}`}
             onPress={() => handleSortChange('updated')}
             style={({ pressed }) => [
               styles.controlBtn,
@@ -489,7 +639,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`${t.sort.days} - Ordenar por días en tránsito`}
+            accessibilityLabel={`${t.sort.days} - ${t.dashboard.sortDaysAria}`}
             onPress={() => handleSortChange('days')}
             style={({ pressed }) => [
               styles.controlBtn,
@@ -515,7 +665,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`${t.sort.carrier} - Ordenar por transportista`}
+            accessibilityLabel={`${t.sort.carrier} - ${t.dashboard.sortCarrierAria}`}
             onPress={() => handleSortChange('carrier')}
             style={({ pressed }) => [
               styles.controlBtn,
@@ -544,7 +694,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         <View style={styles.controlTabs}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Estilo Bento"
+            accessibilityLabel={t.dashboard.styleBentoAria}
             onPress={() => handleCardStyleChange('bento')}
             style={({ pressed }) => [
               styles.controlIconBtn,
@@ -561,7 +711,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Estilo Industrial"
+            accessibilityLabel={t.dashboard.styleIndustrialAria}
             onPress={() => handleCardStyleChange('industrial')}
             style={({ pressed }) => [
               styles.controlIconBtn,
@@ -578,7 +728,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Estilo Retro OS"
+            accessibilityLabel={t.dashboard.styleRetroAria}
             onPress={() => handleCardStyleChange('retro')}
             style={({ pressed }) => [
               styles.controlIconBtn,
@@ -595,10 +745,35 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         </View>
       </View>
 
+      {refreshFeedback && (
+        <View
+          style={[
+            styles.refreshFeedbackBanner,
+            { backgroundColor: theme.statusLight.exception, borderColor: theme.border },
+          ]}
+        >
+          <AlertTriangle size={14} color={theme.textPrimary} strokeWidth={2.5} />
+          <Text style={[styles.refreshFeedbackText, { color: theme.textPrimary }]} numberOfLines={2}>
+            {refreshFeedback}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t.search.clearAria}
+            onPress={() => setRefreshFeedback(null)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <X size={14} color={theme.textPrimary} strokeWidth={2.5} />
+          </Pressable>
+        </View>
+      )}
+
       {/* Parcels List */}
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: detectedClipboard ? 200 : 104 },
+        ]}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -626,7 +801,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
               {searchQuery
                 ? t.empty.subNoResults
-                : t.empty.subActive}
+                : activeTab === 'active'
+                ? t.empty.subActive
+                : activeTab === 'delivered'
+                ? t.empty.subDelivered
+                : t.empty.subArchived}
             </Text>
             {!searchQuery && activeTab === 'active' && (
               <Pressable
@@ -680,7 +859,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       {/* Floating Action Button (FAB) */}
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Nuevo envío"
+        accessibilityLabel={t.dashboard.newParcelAria}
         onPress={() => onOpenNewParcel()}
         style={({ pressed }) => [
           styles.fab,
@@ -702,7 +881,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           trackingNumber={renamingParcel.trackingNumber}
           onClose={() => setRenamingParcel(null)}
           onSave={(newAlias) => {
-            handleUpdateAlias(renamingParcel.id, newAlias);
+            void handleUpdateAlias(renamingParcel.id, newAlias);
             setRenamingParcel(null);
           }}
         />
@@ -721,6 +900,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         onClose={() => setIsBackupModalVisible(false)}
         onRestoreSuccess={loadParcels}
       />
+
+      {/* Manual Update Check Modal */}
+      {manualUpdateInfo && (
+        <UpdateAvailableModal
+          visible={!!manualUpdateInfo}
+          updateInfo={manualUpdateInfo}
+          onClose={() => setManualUpdateInfo(null)}
+        />
+      )}
     </View>
   );
 };
@@ -729,34 +917,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Theme.colors.background,
-  },
-  retroOsBanner: {
-    backgroundColor: '#7C3AED',
-    paddingVertical: 5,
-    paddingHorizontal: 14,
-    borderBottomWidth: 2,
-    borderBottomColor: '#000000',
-  },
-  retroOsBannerText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-    textAlign: 'center',
-  },
-  hazardBanner: {
-    backgroundColor: '#FFE600',
-    paddingVertical: 5,
-    paddingHorizontal: 14,
-    borderBottomWidth: 2,
-    borderBottomColor: '#000000',
-  },
-  hazardBannerText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#000000',
-    letterSpacing: 0.5,
-    textAlign: 'center',
   },
   topBar: {
     flexDirection: 'row',
@@ -797,9 +957,10 @@ const styles = StyleSheet.create({
   },
   headerChipsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 6,
-    marginTop: 3,
+    marginTop: 4,
   },
   engineBadge: {
     flexDirection: 'row',
@@ -855,18 +1016,6 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     letterSpacing: 0.5,
   },
-  headerAddButton: {
-    width: 48,
-    height: 48,
-    borderRadius: Theme.radius.sm,
-    backgroundColor: Theme.colors.coral,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    marginLeft: 12,
-    ...Theme.shadows.md,
-  },
   searchContainer: {
     paddingHorizontal: 20,
     marginBottom: 14,
@@ -900,19 +1049,20 @@ const styles = StyleSheet.create({
     padding: 4,
     borderRadius: Theme.radius.xs,
   },
-  clearSearchPressed: {
-    backgroundColor: Theme.colors.surfaceSubtle,
-  },
   controlsBar: {
     paddingHorizontal: 20,
     paddingTop: 4,
     paddingBottom: 8,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 8,
   },
   controlTabs: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    flexShrink: 1,
     alignItems: 'center',
     gap: 6,
   },
@@ -946,6 +1096,23 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flex: 1,
+  },
+  refreshFeedbackBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 20,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: Theme.radius.xs,
+    borderWidth: 2,
+    ...Theme.shadows.sm,
+  },
+  refreshFeedbackText: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '800',
   },
   scrollContent: {
     paddingHorizontal: 20,

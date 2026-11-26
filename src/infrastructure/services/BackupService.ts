@@ -179,12 +179,17 @@ export function mergeParcels(
       importedCount++;
     } else {
       // Existing parcel: check if incoming is newer or has more events
+      const safeTime = (value?: string | number | null): number => {
+        if (!value) return 0;
+        const ts = new Date(value).getTime();
+        return Number.isNaN(ts) ? 0 : ts;
+      };
       const existingLatest = getLatestEvent(existing.events);
       const incomingLatest = getLatestEvent(inc.events);
-      const existingLatestDate = existingLatest ? new Date(existingLatest.date).getTime() : 0;
-      const incomingLatestDate = incomingLatest ? new Date(incomingLatest.date).getTime() : 0;
-      const existingUpdated = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
-      const incomingUpdated = new Date(inc.updatedAt || inc.createdAt || 0).getTime();
+      const existingLatestDate = safeTime(existingLatest?.date);
+      const incomingLatestDate = safeTime(incomingLatest?.date);
+      const existingUpdated = safeTime(existing.updatedAt || existing.createdAt);
+      const incomingUpdated = safeTime(inc.updatedAt || inc.createdAt);
 
       const incomingIsNewer =
         incomingLatestDate > existingLatestDate ||
@@ -195,6 +200,14 @@ export function mergeParcels(
 
       if (incomingIsNewer) {
         // Update journey & status details
+        if (inc.carrier?.slug) {
+          const baseCarrier = findCarrierBySlug(inc.carrier.slug);
+          existing.carrier = { ...baseCarrier, ...inc.carrier };
+        }
+        existing.additionalCarriers = inc.additionalCarriers ?? existing.additionalCarriers;
+        existing.lastMileCarrier = inc.lastMileCarrier ?? existing.lastMileCarrier;
+        existing.lastMileTrackingNumber = inc.lastMileTrackingNumber ?? existing.lastMileTrackingNumber;
+        existing.postalCode = inc.postalCode || existing.postalCode;
         existing.status = inc.status;
         existing.statusText = inc.statusText || existing.statusText;
         existing.progress = inc.progress ?? existing.progress;
@@ -209,6 +222,9 @@ export function mergeParcels(
         existing.flightLegs = inc.flightLegs || existing.flightLegs;
         existing.isLiveData = inc.isLiveData ?? existing.isLiveData;
         existing.updatedAt = inc.updatedAt || new Date().toISOString();
+        wasModified = true;
+      } else if (!existing.postalCode && inc.postalCode) {
+        existing.postalCode = inc.postalCode;
         wasModified = true;
       }
 
@@ -298,7 +314,7 @@ export class BackupService {
         document.body.appendChild(anchor);
         anchor.click();
         document.body.removeChild(anchor);
-        URL.revokeObjectURL(url);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
       }
     } catch (shareErr) {
       console.warn('Sharing error in BackupService.exportBackup:', shareErr);
@@ -395,7 +411,11 @@ export class BackupService {
 
       if (asset.file && typeof (asset.file as any).text === 'function') {
         jsonString = await (asset.file as any).text();
-      } else if (asset.uri.startsWith('blob:') || asset.uri.startsWith('http')) {
+      } else if (
+        asset.uri.startsWith('blob:') ||
+        asset.uri.startsWith('http') ||
+        asset.uri.startsWith('data:')
+      ) {
         const response = await fetch(asset.uri);
         jsonString = await response.text();
       } else {

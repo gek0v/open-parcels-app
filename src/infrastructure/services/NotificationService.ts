@@ -7,6 +7,7 @@ import { CANONICAL_STATUS_MAP, CanonicalStatus } from '../../domain/models/statu
 import { normalizeCanonicalStatus } from '../engine/mapper';
 
 const LAST_NOTIFIED_PREFIX = '@open_parcels:last_notified:';
+const ANDROID_CHANNEL_ID = 'default';
 
 interface LastNotifiedRecord {
   status: CanonicalStatus;
@@ -15,28 +16,52 @@ interface LastNotifiedRecord {
 }
 
 // Configure notification behavior
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+if (typeof Notifications?.setNotificationHandler === 'function') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
 
 export class NotificationService {
   private hasPermission = false;
+  private channelConfigured = false;
   private lastNotifiedCache = new Map<string, LastNotifiedRecord>();
 
   clearDeduplicationCache(): void {
     this.lastNotifiedCache.clear();
   }
 
+  private async ensureAndroidChannel(): Promise<void> {
+    if (Platform.OS !== 'android' || this.channelConfigured) return;
+
+    try {
+      if (typeof Notifications.setNotificationChannelAsync === 'function') {
+        const importance = (Notifications as any).AndroidImportance?.HIGH ?? 4;
+        await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
+          name: 'Parcel Updates',
+          importance,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#D9FF38',
+        });
+      }
+      this.channelConfigured = true;
+    } catch (err) {
+      console.warn('Failed to configure Android notification channel:', err);
+    }
+  }
+
   async requestPermissions(): Promise<boolean> {
     if (Platform.OS === 'web') return false;
 
     try {
+      await this.ensureAndroidChannel();
+
       const settings = await Notifications.getPermissionsAsync();
       if (settings.granted || settings.status === 'granted') {
         this.hasPermission = true;
@@ -62,7 +87,9 @@ export class NotificationService {
   private getLatestEventKey(parcel: Parcel): string {
     const latest = getLatestEvent(parcel.events);
     if (!latest) return '';
-    return `${latest.date || ''}|${latest.eventCode || ''}|${latest.description || ''}`;
+    const parsedTs = latest.date ? Date.parse(latest.date) : NaN;
+    const normalizedDate = !Number.isNaN(parsedTs) ? String(parsedTs) : (latest.date || '');
+    return `${normalizedDate}|${latest.eventCode || ''}|${latest.description || ''}`;
   }
 
   async sendParcelStatusNotification(
@@ -89,17 +116,33 @@ export class NotificationService {
     const latestEventKey = this.getLatestEventKey(parcel);
 
     const cached = this.lastNotifiedCache.get(parcelKey);
-    if (cached && cached.status === normNew) {
+    if (
+      cached &&
+      cached.status === normNew &&
+      (!latestEventKey || !cached.latestEventKey || cached.latestEventKey === latestEventKey)
+    ) {
       return false;
     }
 
     try {
+      if (typeof Notifications.getPermissionsAsync === 'function') {
+        const perms = await Notifications.getPermissionsAsync();
+        const granted = perms.granted || perms.status === 'granted';
+        this.hasPermission = granted;
+        if (!granted) {
+          return false;
+        }
+      }
+
       const storageKey = `${LAST_NOTIFIED_PREFIX}${parcelKey}`;
       const rawStored = await AsyncStorage.getItem(storageKey).catch(() => null);
       if (rawStored) {
         try {
           const parsed = JSON.parse(rawStored) as Partial<LastNotifiedRecord>;
-          if (parsed.status === normNew) {
+          if (
+            parsed.status === normNew &&
+            (!latestEventKey || !parsed.latestEventKey || parsed.latestEventKey === latestEventKey)
+          ) {
             this.lastNotifiedCache.set(parcelKey, {
               status: normNew,
               latestEventKey: parsed.latestEventKey || latestEventKey,
@@ -113,6 +156,8 @@ export class NotificationService {
           }
         }
       }
+
+      await this.ensureAndroidChannel();
 
       const meta = CANONICAL_STATUS_MAP[normNew] || CANONICAL_STATUS_MAP.in_transit;
       const isEn = lang === 'en';

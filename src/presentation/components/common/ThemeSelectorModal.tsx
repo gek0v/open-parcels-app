@@ -12,6 +12,7 @@ import {
 import { Theme } from '../../theme/adaptiveTheme';
 import { useTheme, ThemeKey } from '../../theme/ThemeContext';
 import type { ColorPalette } from '../../theme/palettes';
+import { useI18n } from '../../../infrastructure/i18n';
 import { X, Sparkles, Check, CheckCircle2, Package, ShieldCheck, Palette, CheckCheck } from 'lucide-react-native';
 
 interface ThemeSelectorModalProps {
@@ -23,9 +24,18 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
   visible,
   onClose,
 }) => {
+  const { t } = useI18n();
   const { theme: currentTheme, themeKey: activeThemeKey, setTheme, themes } = useTheme();
   const themeKeys = Object.keys(themes) as ThemeKey[];
+  const [prevVisible, setPrevVisible] = useState(visible);
   const [userSelectedKey, setUserSelectedKey] = useState<ThemeKey | null>(null);
+
+  if (visible !== prevVisible) {
+    setPrevVisible(visible);
+    if (visible) {
+      setUserSelectedKey(null);
+    }
+  }
 
   const inspectKey: ThemeKey = userSelectedKey ?? activeThemeKey;
   const inspectPalette: ColorPalette = themes[inspectKey] || currentTheme;
@@ -40,6 +50,7 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
     <Modal
       visible={visible}
       transparent
+      statusBarTranslucent
       animationType="fade"
       onRequestClose={onClose}
     >
@@ -49,36 +60,58 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
       >
         <Pressable style={styles.dismissOverlay} onPress={onClose} />
 
-        <View style={styles.modalCard}>
+        <View
+          accessibilityViewIsModal
+          style={[
+            styles.modalCard,
+            { backgroundColor: currentTheme.surface, borderColor: currentTheme.border },
+          ]}
+        >
           {/* Header */}
-          <View style={styles.header}>
+          <View
+            style={[
+              styles.header,
+              { backgroundColor: currentTheme.surface, borderBottomColor: currentTheme.border },
+            ]}
+          >
             <View style={styles.headerLeft}>
               <View style={styles.dotRow}>
-                <View style={[styles.dot, { backgroundColor: currentTheme.coral }]} />
-                <View style={[styles.dot, { backgroundColor: currentTheme.yellow }]} />
-                <View style={[styles.dot, { backgroundColor: currentTheme.mint }]} />
+                <View style={[styles.dot, { backgroundColor: currentTheme.coral, borderColor: currentTheme.border }]} />
+                <View style={[styles.dot, { backgroundColor: currentTheme.yellow, borderColor: currentTheme.border }]} />
+                <View style={[styles.dot, { backgroundColor: currentTheme.mint, borderColor: currentTheme.border }]} />
               </View>
               <View style={styles.titleRow}>
-                <Palette size={16} color="#000000" strokeWidth={2.5} style={{ marginRight: 6 }} />
-                <Text style={styles.headerTitle}>TEMAS Y APARIENCIA</Text>
+                <Palette size={16} color={currentTheme.textPrimary} strokeWidth={2.5} style={{ marginRight: 6 }} />
+                <Text style={[styles.headerTitle, { color: currentTheme.textPrimary }]}>
+                  {t.themes.modalTitle}
+                </Text>
               </View>
             </View>
 
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Cerrar modal"
+              accessibilityLabel={t.themes.closeAria}
               onPress={onClose}
-              style={({ pressed }) => [styles.closeBtn, pressed && styles.pressed]}
+              style={({ pressed }) => [
+                styles.closeBtn,
+                { backgroundColor: currentTheme.surfaceSubtle, borderColor: currentTheme.border },
+                pressed && styles.pressed,
+              ]}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <X size={18} color="#000000" strokeWidth={2.5} />
+              <X size={18} color={currentTheme.textPrimary} strokeWidth={2.5} />
             </Pressable>
           </View>
 
           {/* Golden Ratio & WCAG Subtitle Banner */}
-          <View style={[styles.formulaBanner, { backgroundColor: currentTheme.yellow }]}>
+          <View
+            style={[
+              styles.formulaBanner,
+              { backgroundColor: currentTheme.yellow, borderBottomColor: currentTheme.border },
+            ]}
+          >
             <Text style={styles.formulaText}>
-              📐 <Text style={{ fontWeight: '900' }}>Golden Ratio (φ ≈ 1.618)</Text> • Cambia el aspecto completo de la app en tiempo real
+              📐 <Text style={{ fontWeight: '900' }}>{t.themes.formulaSubtitle}</Text> • {t.themes.formulaDesc}
             </Text>
           </View>
 
@@ -86,7 +119,10 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            style={styles.tabsScroll}
+            style={[
+              styles.tabsScroll,
+              { backgroundColor: currentTheme.surfaceSubtle, borderBottomColor: currentTheme.border },
+            ]}
             contentContainerStyle={styles.tabsContent}
           >
             {themeKeys.map((key) => {
@@ -99,17 +135,29 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
                   onPress={() => setUserSelectedKey(key)}
                   style={({ pressed }) => [
                     styles.tabButton,
+                    {
+                      backgroundColor: isKeyActive ? currentTheme.yellow : currentTheme.surface,
+                      borderColor: currentTheme.border,
+                    },
                     isInspected && styles.tabButtonInspected,
-                    isKeyActive && styles.tabButtonActive,
                     pressed && styles.pressed,
                   ]}
                 >
                   <View style={[styles.tabColorIndicator, { backgroundColor: pal.canvas, borderColor: pal.border }]} />
-                  <Text style={[styles.tabButtonText, (isInspected || isKeyActive) && styles.tabButtonTextActive]}>
+                  <Text
+                    style={[
+                      styles.tabButtonText,
+                      { color: isKeyActive ? '#000000' : currentTheme.textSecondary },
+                      (isInspected || isKeyActive) && [
+                        styles.tabButtonTextActive,
+                        { color: isKeyActive ? '#000000' : currentTheme.textPrimary },
+                      ],
+                    ]}
+                  >
                     {pal.name.split(' (')[0].toUpperCase()}
                   </Text>
                   {isKeyActive && (
-                    <View style={styles.activeDotBadge}>
+                    <View style={[styles.activeDotBadge, { backgroundColor: currentTheme.mint }]}>
                       <Check size={10} color="#000000" strokeWidth={3} />
                     </View>
                   )}
@@ -121,26 +169,34 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
           {/* Main Content Area */}
           <ScrollView style={styles.bodyScroll} showsVerticalScrollIndicator={false}>
             {/* Theme Meta & Apply Bar */}
-            <View style={styles.paletteMetaCard}>
+            <View
+              style={[
+                styles.paletteMetaCard,
+                { backgroundColor: currentTheme.surfaceSubtle, borderColor: currentTheme.border },
+              ]}
+            >
               <View style={styles.paletteMetaHeader}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.paletteName}>{inspectPalette.name}</Text>
-                  <Text style={styles.paletteDesc}>{inspectPalette.description}</Text>
+                  <Text style={[styles.paletteName, { color: currentTheme.textPrimary }]}>{inspectPalette.name}</Text>
+                  <Text style={[styles.paletteDesc, { color: currentTheme.textSecondary }]}>{inspectPalette.description}</Text>
                 </View>
 
-                <View style={styles.angleBadge}>
-                  <Text style={styles.angleBadgeText}>H₀ = {inspectPalette.goldenAngleOriginDeg}°</Text>
+                <View style={[styles.angleBadge, { backgroundColor: currentTheme.textPrimary }]}>
+                  <Text style={[styles.angleBadgeText, { color: currentTheme.textInverse }]}>
+                    H₀ = {inspectPalette.goldenAngleOriginDeg}°
+                  </Text>
                 </View>
               </View>
 
               {/* Action Button: Apply or Active Status */}
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={isActive ? 'Tema activo actualmente' : `Aplicar tema ${inspectPalette.name}`}
+                accessibilityLabel={isActive ? t.themes.activeAria : `${t.themes.applyAria} ${inspectPalette.name}`}
                 onPress={() => handleApplyTheme(inspectKey)}
                 disabled={isActive}
                 style={({ pressed }) => [
                   styles.applyThemeBtn,
+                  { borderColor: currentTheme.border },
                   isActive
                     ? [styles.applyThemeBtnActive, { backgroundColor: inspectPalette.yellow }]
                     : [styles.applyThemeBtnInactive, { backgroundColor: inspectPalette.primary }],
@@ -150,19 +206,23 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
                 {isActive ? (
                   <>
                     <CheckCheck size={16} color="#000000" strokeWidth={3} style={{ marginRight: 6 }} />
-                    <Text style={styles.applyThemeBtnActiveText}>TEMA APLICADO ACTUALMENTE</Text>
+                    <Text style={styles.applyThemeBtnActiveText}>{t.themes.appliedBtn}</Text>
                   </>
                 ) : (
                   <>
-                    <Sparkles size={16} color="#FFFFFF" strokeWidth={2.5} style={{ marginRight: 6 }} />
-                    <Text style={styles.applyThemeBtnInactiveText}>APLICAR ESTE TEMA A LA APP</Text>
+                    <Sparkles size={16} color={inspectPalette.textInverse} strokeWidth={2.5} style={{ marginRight: 6 }} />
+                    <Text style={[styles.applyThemeBtnInactiveText, { color: inspectPalette.textInverse }]}>
+                      {t.themes.applyBtn}
+                    </Text>
                   </>
                 )}
               </Pressable>
             </View>
 
             {/* LIVE PREVIEW SIMULATOR */}
-            <Text style={styles.sectionHeader}>VISTA PREVIA EN VIVO (SIMULADOR DE UI)</Text>
+            <Text style={[styles.sectionHeader, { color: currentTheme.textTertiary }]}>
+              {t.themes.previewHeader}
+            </Text>
             <View
               style={[
                 styles.liveCanvas,
@@ -181,7 +241,7 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
               >
                 <View style={styles.previewTopRow}>
                   <View style={styles.previewCarrierRow}>
-                    <View style={[styles.previewCarrierBadge, { backgroundColor: inspectPalette.border }]}>
+                    <View style={[styles.previewCarrierBadge, { backgroundColor: inspectPalette.textPrimary }]}>
                       <Text style={[styles.previewCarrierText, { color: inspectPalette.textInverse }]}>
                         CORREOS
                       </Text>
@@ -202,15 +262,15 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
                     ]}
                   >
                     <CheckCircle2 size={12} color="#000000" strokeWidth={2.5} style={{ marginRight: 4 }} />
-                    <Text style={styles.previewStatusText}>ENTREGADO</Text>
+                    <Text style={styles.previewStatusText}>{t.themes.previewDelivered}</Text>
                   </View>
                 </View>
 
                 <Text style={[styles.previewTitle, { color: inspectPalette.textPrimary }]}>
-                  Teclado Mecánico Custom
+                  {t.themes.previewTitle}
                 </Text>
                 <Text style={[styles.previewCheckpoint, { color: inspectPalette.textSecondary }]}>
-                  Entregado en buzón principal • Madrid
+                  {t.themes.previewCheckpoint}
                 </Text>
 
                 <View style={styles.previewActionRow}>
@@ -223,8 +283,10 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
                       },
                     ]}
                   >
-                    <Package size={14} color="#FFFFFF" strokeWidth={2.5} style={{ marginRight: 6 }} />
-                    <Text style={styles.previewActionText}>DETALLES</Text>
+                    <Package size={14} color={inspectPalette.textInverse} strokeWidth={2.5} style={{ marginRight: 6 }} />
+                    <Text style={[styles.previewActionText, { color: inspectPalette.textInverse }]}>
+                      {t.themes.previewDetails}
+                    </Text>
                   </View>
 
                   <View
@@ -236,14 +298,16 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
                       },
                     ]}
                   >
-                    <Text style={styles.previewSecondaryBadgeText}>URGENTE</Text>
+                    <Text style={styles.previewSecondaryBadgeText}>{t.themes.previewUrgent}</Text>
                   </View>
                 </View>
               </View>
             </View>
 
             {/* COLOR SWATCHES & HSV METRICS */}
-            <Text style={styles.sectionHeader}>MUESTRAS CROMÁTICAS Y COORDENADAS HSV</Text>
+            <Text style={[styles.sectionHeader, { color: currentTheme.textTertiary }]}>
+              {t.themes.swatchesHeader}
+            </Text>
             <View style={styles.swatchesList}>
               {[
                 { label: 'Lienzo / Canvas', hex: inspectPalette.canvas, hsv: `H: ${inspectPalette.goldenAngleOriginDeg}°`, role: 'Fondo 61.8%', wcag: 'AAA' },
@@ -254,7 +318,13 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
                 { label: 'En Reparto (Amber)', hex: inspectPalette.status.out_for_delivery, hsv: 'Alerta media', role: 'Sticker', wcag: 'AAA' },
                 { label: 'Atención (Coral)', hex: inspectPalette.coral, hsv: 'Alerta alta', role: 'Sticker / Botón', wcag: 'AA' },
               ].map((swatch, idx) => (
-                <View key={idx} style={styles.swatchRow}>
+                <View
+                  key={idx}
+                  style={[
+                    styles.swatchRow,
+                    { backgroundColor: currentTheme.surfaceSubtle, borderColor: currentTheme.border },
+                  ]}
+                >
                   <View
                     style={[
                       styles.swatchBox,
@@ -262,13 +332,13 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
                     ]}
                   />
                   <View style={styles.swatchInfo}>
-                    <Text style={styles.swatchLabel}>{swatch.label}</Text>
-                    <Text style={styles.swatchValues}>
-                      <Text style={{ fontWeight: '900', color: '#000000' }}>{swatch.hex}</Text> • {swatch.hsv}
+                    <Text style={[styles.swatchLabel, { color: currentTheme.textPrimary }]}>{swatch.label}</Text>
+                    <Text style={[styles.swatchValues, { color: currentTheme.textSecondary }]}>
+                      <Text style={{ fontWeight: '900', color: currentTheme.textPrimary }}>{swatch.hex}</Text> • {swatch.hsv}
                     </Text>
                   </View>
                   <View style={styles.swatchRoleBadge}>
-                    <ShieldCheck size={11} color="#000000" strokeWidth={2.5} style={{ marginRight: 3 }} />
+                    <ShieldCheck size={11} color="#065F46" strokeWidth={2.5} style={{ marginRight: 3 }} />
                     <Text style={styles.swatchRoleText}>{swatch.wcag}</Text>
                   </View>
                 </View>
@@ -277,15 +347,24 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
           </ScrollView>
 
           {/* Footer */}
-          <View style={styles.footer}>
+          <View
+            style={[
+              styles.footer,
+              { backgroundColor: currentTheme.surface, borderTopColor: currentTheme.border },
+            ]}
+          >
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Cerrar modal de temas"
+              accessibilityLabel={t.themes.closeAria}
               onPress={onClose}
-              style={({ pressed }) => [styles.doneBtn, pressed && styles.pressed]}
+              style={({ pressed }) => [
+                styles.doneBtn,
+                { backgroundColor: currentTheme.yellow, borderColor: currentTheme.border },
+                pressed && styles.pressed,
+              ]}
             >
               <Check size={16} color="#000000" strokeWidth={3} style={{ marginRight: 6 }} />
-              <Text style={styles.doneBtnText}>LISTO</Text>
+              <Text style={styles.doneBtnText}>{t.themes.doneBtn}</Text>
             </Pressable>
           </View>
         </View>
@@ -434,6 +513,8 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   bodyScroll: {
+    flexShrink: 1,
+    minHeight: 0,
     padding: 16,
   },
   paletteMetaCard: {

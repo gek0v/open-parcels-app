@@ -4,6 +4,7 @@ import { Parcel } from '../../../domain/models/parcel';
 import { getLatestEvent } from '../../../domain/entities/events';
 import { Theme } from '../../theme/adaptiveTheme';
 import { useTheme } from '../../theme/ThemeContext';
+import { useI18n } from '../../../infrastructure/i18n';
 import { StatusBadge } from '../common/StatusBadge';
 import { ProgressBar } from '../common/ProgressBar';
 import { ArrowUpRight, Clock, Edit2, Share2 } from 'lucide-react-native';
@@ -23,6 +24,7 @@ export const ParcelCardRetroOS: React.FC<ParcelCardRetroOSProps> = ({
   onShare,
 }) => {
   const { theme } = useTheme();
+  const { t } = useI18n();
   const latestEvent = getLatestEvent(parcel.events);
 
   // Dynamic window title bar color based on status
@@ -89,7 +91,7 @@ export const ParcelCardRetroOS: React.FC<ParcelCardRetroOSProps> = ({
                 {onShare && (
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Compartir datos del envío"
+                    accessibilityLabel={t.card.shareAria}
                     onPress={handleSharePress}
                     style={[styles.renameIconBtn, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}
                     hitSlop={{ top: 12, bottom: 12, left: 6, right: 6 }}
@@ -100,7 +102,7 @@ export const ParcelCardRetroOS: React.FC<ParcelCardRetroOSProps> = ({
                 {onRename && (
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Renombrar alias del envío"
+                    accessibilityLabel={t.card.renameAria}
                     onPress={handleRenamePress}
                     style={[styles.renameIconBtn, { backgroundColor: theme.yellow, borderColor: theme.border }]}
                     hitSlop={{ top: 12, bottom: 12, left: 6, right: 6 }}
@@ -127,8 +129,8 @@ export const ParcelCardRetroOS: React.FC<ParcelCardRetroOSProps> = ({
           <View style={styles.progressWrapper}>
             <ProgressBar progress={parcel.progress} status={parcel.status} height={12} />
           </View>
-          <View style={styles.percentBox}>
-            <Text style={styles.percentText}>{parcel.progress}%</Text>
+          <View style={[styles.percentBox, { backgroundColor: theme.textPrimary }]}>
+            <Text style={[styles.percentText, { color: theme.textInverse }]}>{parcel.progress}%</Text>
           </View>
         </View>
 
@@ -202,13 +204,18 @@ const styles = StyleSheet.create({
   },
   infoCol: {
     flex: 1,
+    minWidth: 0,
     marginRight: 10,
   },
   aliasRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    minWidth: 0,
   },
   alias: {
+    flex: 1,
+    minWidth: 0,
     fontSize: 17,
     fontWeight: '900',
     letterSpacing: -0.3,
@@ -217,6 +224,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    marginLeft: 8,
   },
   renameIconBtn: {
     minWidth: 36,
@@ -226,7 +234,6 @@ const styles = StyleSheet.create({
     padding: 5,
     borderRadius: Theme.radius.xs,
     borderWidth: 1.5,
-    marginLeft: 8,
   },
   trackingPill: {
     alignSelf: 'flex-start',

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Theme } from '../../theme/adaptiveTheme';
+import { useTheme } from '../../theme/ThemeContext';
 import { CanonicalStatus } from '../../../domain/models/status';
 
 interface ProgressBarProps {
@@ -17,12 +18,13 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   status = 'in_transit',
   height = 12,
 }) => {
+  const { theme } = useTheme();
   const clamped = Math.min(100, Math.max(0, progress));
-  const activeColor = Theme.colors.status[status] || Theme.colors.primary;
+  const activeColor = theme.status[status] || theme.primary;
 
   return (
-    <View style={[styles.shadowWrap, { height }]}>
-      <View style={styles.container}>
+    <View style={[styles.shadowWrap, { height, backgroundColor: theme.surface }]}>
+      <View style={[styles.container, { backgroundColor: theme.surface, borderColor: theme.border }]}>
         {clamped > 0 && (
           <View
             style={[
@@ -30,6 +32,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
               {
                 width: `${clamped}%`,
                 backgroundColor: activeColor,
+                borderRightColor: theme.border,
                 borderRightWidth: clamped < 100 ? 2 : 0,
               },
             ]}
@@ -40,7 +43,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
           <View
             key={milestone}
             pointerEvents="none"
-            style={[styles.milestone, { left: `${milestone}%` }]}
+            style={[styles.milestone, { left: `${milestone}%`, backgroundColor: theme.textPrimary }]}
           />
         ))}
       </View>

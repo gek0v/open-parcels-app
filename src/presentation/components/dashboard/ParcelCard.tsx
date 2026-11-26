@@ -6,6 +6,8 @@ import { AdaptiveCard } from '../common/AdaptiveCard';
 import { StatusBadge } from '../common/StatusBadge';
 import { ProgressBar } from '../common/ProgressBar';
 import { Theme } from '../../theme/adaptiveTheme';
+import { useTheme } from '../../theme/ThemeContext';
+import { useI18n } from '../../../infrastructure/i18n';
 import { ArrowRight, Clock, Edit2, Share2 } from 'lucide-react-native';
 
 interface ParcelCardProps {
@@ -16,6 +18,8 @@ interface ParcelCardProps {
 }
 
 export const ParcelCard: React.FC<ParcelCardProps> = ({ parcel, onPress, onRename, onShare }) => {
+  const { theme } = useTheme();
+  const { t } = useI18n();
   const latestEvent = getLatestEvent(parcel.events);
   const isChained = !!(parcel.additionalCarriers && parcel.additionalCarriers.length > 0);
 
@@ -23,7 +27,7 @@ export const ParcelCard: React.FC<ParcelCardProps> = ({ parcel, onPress, onRenam
     <AdaptiveCard onPress={onPress} hasWindowHeader>
       {/* Top Header: Carrier info & Status */}
       <View style={styles.headerRow}>
-        <View style={styles.carrierTag}>
+        <View style={[styles.carrierTag, { backgroundColor: theme.yellow, borderColor: theme.border }]}>
           <Text style={styles.carrierName} numberOfLines={1}>
             {parcel.carrier.name}
           </Text>
@@ -44,13 +48,13 @@ export const ParcelCard: React.FC<ParcelCardProps> = ({ parcel, onPress, onRenam
       {/* Main Info: Custom Alias & Tracking Number */}
       <View style={styles.titleSection}>
         <View style={styles.titleRow}>
-          <Text style={styles.alias} numberOfLines={1}>
+          <Text style={[styles.alias, { color: theme.textPrimary }]} numberOfLines={1}>
             {parcel.customAlias || parcel.trackingNumber}
           </Text>
           <View style={styles.actionButtonsRow}>
             {onShare && (
               <Pressable
-                accessibilityLabel="Compartir paquete"
+                accessibilityLabel={t.card.shareAria}
                 accessibilityRole="button"
                 onPress={(e) => {
                   e.stopPropagation();
@@ -58,16 +62,17 @@ export const ParcelCard: React.FC<ParcelCardProps> = ({ parcel, onPress, onRenam
                 }}
                 style={({ pressed }) => [
                   styles.cardRenameButton,
+                  { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
                   pressed && styles.iconButtonPressed,
                 ]}
                 hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
               >
-                <Share2 size={13} color="#000000" strokeWidth={2.5} />
+                <Share2 size={13} color={theme.textPrimary} strokeWidth={2.5} />
               </Pressable>
             )}
             {onRename && (
               <Pressable
-                accessibilityLabel="Renombrar paquete"
+                accessibilityLabel={t.card.renameAria}
                 accessibilityRole="button"
                 onPress={(e) => {
                   e.stopPropagation();
@@ -75,6 +80,7 @@ export const ParcelCard: React.FC<ParcelCardProps> = ({ parcel, onPress, onRenam
                 }}
                 style={({ pressed }) => [
                   styles.cardRenameButton,
+                  { backgroundColor: theme.yellow, borderColor: theme.border },
                   pressed && styles.iconButtonPressed,
                 ]}
                 hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
@@ -85,8 +91,8 @@ export const ParcelCard: React.FC<ParcelCardProps> = ({ parcel, onPress, onRenam
           </View>
         </View>
 
-        <View style={styles.trackingBox}>
-          <Text style={styles.trackingNumber} numberOfLines={1}>
+        <View style={[styles.trackingBox, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border }]}>
+          <Text style={[styles.trackingNumber, { color: theme.textPrimary }]} numberOfLines={1}>
             {parcel.trackingNumber}
           </Text>
         </View>
@@ -100,18 +106,18 @@ export const ParcelCard: React.FC<ParcelCardProps> = ({ parcel, onPress, onRenam
       {/* Footer: Latest Event and Days in Transit */}
       <View style={styles.footerRow}>
         <View style={styles.latestEventContainer}>
-          <View style={styles.eventTick} />
-          <Text style={styles.latestEventText} numberOfLines={1}>
+          <View style={[styles.eventTick, { backgroundColor: theme.textPrimary }]} />
+          <Text style={[styles.latestEventText, { color: theme.textSecondary }]} numberOfLines={1}>
             {latestEvent ? latestEvent.description : parcel.statusText}
           </Text>
         </View>
 
         <View
-          style={styles.daysBadge}
-          accessibilityLabel={`${parcel.daysInTransit} días en tránsito`}
+          style={[styles.daysBadge, { backgroundColor: theme.surface, borderColor: theme.border }]}
+          accessibilityLabel={t.card.daysInTransitAria.replace('%d', String(parcel.daysInTransit))}
         >
-          <Clock size={12} color="#000000" strokeWidth={2.5} style={styles.clockIcon} />
-          <Text style={styles.daysText}>{parcel.daysInTransit}d</Text>
+          <Clock size={12} color={theme.textPrimary} strokeWidth={2.5} style={styles.clockIcon} />
+          <Text style={[styles.daysText, { color: theme.textPrimary }]}>{parcel.daysInTransit}d</Text>
         </View>
       </View>
     </AdaptiveCard>
@@ -177,6 +183,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    marginLeft: 8,
   },
   cardRenameButton: {
     width: 28,
@@ -187,7 +194,6 @@ const styles = StyleSheet.create({
     backgroundColor: Theme.colors.yellow,
     borderWidth: 2,
     borderColor: '#000000',
-    marginLeft: 8,
     ...Theme.shadows.sm,
   },
   iconButtonPressed: {

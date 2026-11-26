@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Image, Animated, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Theme } from '../../theme/adaptiveTheme';
 import { CURRENT_APP_VERSION } from '../../../infrastructure/services/UpdateService';
 
@@ -12,8 +13,10 @@ export const AppLoadingSplash: React.FC<AppLoadingSplashProps> = ({
   onFinish,
   minDurationMs = 1200,
 }) => {
+  const insets = useSafeAreaInsets();
   const [progressStep, setProgressStep] = useState(1);
-  const fadeAnim = useState(new Animated.Value(1))[0];
+  const [fadeAnim] = useState(() => new Animated.Value(1));
+  const didFinishRef = useRef(false);
 
   useEffect(() => {
     // Animate segmented loading blocks (1 -> 2 -> 3 -> 4 -> 5)
@@ -29,8 +32,11 @@ export const AppLoadingSplash: React.FC<AppLoadingSplashProps> = ({
         toValue: 0,
         duration: 350,
         useNativeDriver: Platform.OS !== 'web',
-      }).start(() => {
-        onFinish();
+      }).start(({ finished }) => {
+        if (finished && !didFinishRef.current) {
+          didFinishRef.current = true;
+          onFinish();
+        }
       });
     }, minDurationMs);
 
@@ -60,8 +66,8 @@ export const AppLoadingSplash: React.FC<AppLoadingSplashProps> = ({
       </View>
 
       {/* Footer */}
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>OPEN PARCELS ENGINE v{(CURRENT_APP_VERSION || '1.5.4').replace(/^v/, '')} · LOCAL-FIRST</Text>
+      <View style={[styles.footer, { bottom: Math.max(insets.bottom + 16, 30) }]}>
+        <Text style={styles.footerText}>OPEN PARCELS ENGINE v{(CURRENT_APP_VERSION || '1.5.6').replace(/^v/, '')} · LOCAL-FIRST</Text>
       </View>
     </Animated.View>
   );
@@ -86,8 +92,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   splashImage: {
-    width: 320,
-    height: 320,
+    width: '100%',
+    maxWidth: 280,
+    height: 280,
   },
   statusPill: {
     backgroundColor: '#000000',

@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { TrackingEvent, EventStage } from '../../../domain/models/event';
 import { Theme } from '../../theme/adaptiveTheme';
+import { useTheme } from '../../theme/ThemeContext';
+import { useI18n } from '../../../infrastructure/i18n';
 import {
   FileText,
   Package,
@@ -18,18 +20,25 @@ interface EventTimelineProps {
 }
 
 export const EventTimeline: React.FC<EventTimelineProps> = ({ events }) => {
+  const { theme } = useTheme();
+  const { t, lang } = useI18n();
+
   const sorted = [...events].sort((a, b) => {
     const ta = new Date(a.date).getTime();
     const tb = new Date(b.date).getTime();
-    if (!isNaN(ta) && !isNaN(tb) && ta !== tb) {
+    const validA = !isNaN(ta);
+    const validB = !isNaN(tb);
+    if (validA && validB) {
       return tb - ta;
+    }
+    if (validA !== validB) {
+      return validA ? -1 : 1;
     }
     return 0;
   });
 
-  const getStageIcon = (stage: EventStage) => {
+  const getStageIcon = (stage: EventStage, color: string) => {
     const size = 15;
-    const color = '#000000';
 
     switch (stage) {
       case 'created':
@@ -56,97 +65,157 @@ export const EventTimeline: React.FC<EventTimelineProps> = ({ events }) => {
   };
 
   const getStageBg = (stage: EventStage, isLatest: boolean) => {
-    if (stage === 'completed') return Theme.colors.status.delivered;
-    if (stage === 'exception') return Theme.colors.status.failed_attempt;
-    if (isLatest) return Theme.colors.yellow;
-    return '#FFFFFF';
+    if (stage === 'completed') return theme.status.delivered;
+    if (stage === 'exception') return theme.status.failed_attempt;
+    if (isLatest) return theme.yellow;
+    return theme.surfaceSubtle;
   };
 
-  const formatDate = (isoStr: string) => {
+  const getStageIconColor = (stage: EventStage, isLatest: boolean) => {
+    if (stage === 'completed' || stage === 'exception' || isLatest) {
+      return '#000000';
+    }
+    return theme.textPrimary;
+  };
+
+  const formatDate = (isoStr: string, rawDate?: string) => {
     try {
       const d = new Date(isoStr);
+      if (isNaN(d.getTime())) {
+        return rawDate || isoStr;
+      }
+      const locale = lang === 'en' ? 'en-US' : 'es-ES';
       return (
-        d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) +
+        d.toLocaleDateString(locale, { day: '2-digit', month: 'short' }) +
         ' · ' +
-        d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+        d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
       );
     } catch {
-      return isoStr;
+      return rawDate || isoStr;
     }
   };
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
       {/* Retro window header */}
-      <View style={styles.cardHeader}>
+      <View style={[styles.cardHeader, { borderBottomColor: theme.border }]}>
         <View style={styles.dotsRow}>
-          <View style={[styles.dot, { backgroundColor: Theme.colors.coral }]} />
-          <View style={[styles.dot, { backgroundColor: Theme.colors.yellow }]} />
-          <View style={[styles.dot, { backgroundColor: Theme.colors.mint }]} />
+          <View style={[styles.dot, { backgroundColor: theme.coral, borderColor: theme.border }]} />
+          <View style={[styles.dot, { backgroundColor: theme.yellow, borderColor: theme.border }]} />
+          <View style={[styles.dot, { backgroundColor: theme.mint, borderColor: theme.border }]} />
         </View>
-        <Text style={styles.cardTitle}>HISTORIAL DE EVENTOS</Text>
+        <Text style={[styles.cardTitle, { color: theme.textPrimary }]} numberOfLines={1}>
+          {t.detail.timelineTitle}
+        </Text>
       </View>
 
-      <View style={styles.timelineContainer}>
-        {sorted.map((ev, index) => {
-          const isLatest = index === 0;
-          const isLast = index === sorted.length - 1;
+      {sorted.length === 0 ? (
+        <View
+          style={[
+            styles.emptyContainer,
+            { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+          ]}
+        >
+          <Package size={22} color={theme.textTertiary} strokeWidth={2.5} />
+          <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+            {t.detail.noEvents}
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.timelineContainer}>
+          {sorted.map((ev, index) => {
+            const isLatest = index === 0;
+            const isLast = index === sorted.length - 1;
+            const carrierLabel = ev.carrierName || ev.carrierSlug;
 
-          return (
-            <View key={ev.id || index} style={styles.timelineRow}>
-              {/* Left Column: Icon and connecting vertical line */}
-              <View style={styles.indicatorCol}>
-                <View
-                  style={[
-                    styles.iconBox,
-                    { backgroundColor: getStageBg(ev.stage, isLatest) },
-                    isLatest && styles.iconBoxActive,
-                  ]}
-                >
-                  {getStageIcon(ev.stage)}
+            return (
+              <View key={ev.id ? `${ev.id}-${index}` : `ev-${index}`} style={styles.timelineRow}>
+                {/* Left Column: Icon and connecting vertical line */}
+                <View style={styles.indicatorCol}>
+                  <View
+                    style={[
+                      styles.iconBox,
+                      {
+                        backgroundColor: getStageBg(ev.stage, isLatest),
+                        borderColor: theme.border,
+                      },
+                      isLatest && styles.iconBoxActive,
+                    ]}
+                  >
+                    {getStageIcon(ev.stage, getStageIconColor(ev.stage, isLatest))}
+                  </View>
+                  {!isLast && (
+                    <View style={[styles.verticalLine, { backgroundColor: theme.border }]} />
+                  )}
                 </View>
-                {!isLast && <View style={styles.verticalLine} />}
-              </View>
 
-              {/* Right Column: Event Content */}
-              <View style={[styles.contentCol, isLast && styles.contentColLast]}>
-                <View style={styles.metaRow}>
-                  <View style={styles.metaLeft}>
-                    <Text
-                      style={[styles.dateText, isLatest && styles.dateTextActive]}
-                      numberOfLines={1}
-                    >
-                      {formatDate(ev.date)}
-                    </Text>
-                    {isLatest && (
-                      <View style={styles.latestTag}>
-                        <Text style={styles.latestTagText}>ÚLTIMO</Text>
+                {/* Right Column: Event Content */}
+                <View style={[styles.contentCol, isLast && styles.contentColLast]}>
+                  <View style={styles.metaRow}>
+                    <View style={styles.metaLeft}>
+                      <Text
+                        style={[
+                          styles.dateText,
+                          { color: isLatest ? theme.textPrimary : theme.textTertiary },
+                          isLatest && styles.dateTextActive,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {formatDate(ev.date, ev.rawDate)}
+                      </Text>
+                      {isLatest && (
+                        <View style={styles.latestTag}>
+                          <Text style={[styles.latestTagText, { color: theme.yellow }]}>
+                            {lang === 'en' ? 'LATEST' : 'ÚLTIMO'}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    {!!carrierLabel && (
+                      <View
+                        style={[
+                          styles.carrierTag,
+                          { backgroundColor: theme.yellow, borderColor: theme.border },
+                        ]}
+                      >
+                        <Text style={styles.carrierTagText} numberOfLines={1}>
+                          {carrierLabel}
+                        </Text>
                       </View>
                     )}
                   </View>
-                  <View style={styles.carrierTag}>
-                    <Text style={styles.carrierTagText} numberOfLines={1}>
-                      {ev.carrierName}
-                    </Text>
-                  </View>
+
+                  <Text
+                    style={[
+                      styles.description,
+                      { color: isLatest ? theme.textPrimary : theme.textSecondary },
+                      isLatest && styles.descriptionActive,
+                    ]}
+                  >
+                    {ev.description}
+                  </Text>
+
+                  {!!ev.location && (
+                    <View
+                      style={[
+                        styles.locationBox,
+                        { backgroundColor: theme.surfaceSubtle, borderColor: theme.border },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.locationText, { color: theme.textSecondary }]}
+                        numberOfLines={2}
+                      >
+                        {ev.location}
+                      </Text>
+                    </View>
+                  )}
                 </View>
-
-                <Text style={[styles.description, isLatest && styles.descriptionActive]}>
-                  {ev.description}
-                </Text>
-
-                {ev.location && (
-                  <View style={styles.locationBox}>
-                    <Text style={styles.locationText} numberOfLines={1}>
-                      {ev.location}
-                    </Text>
-                  </View>
-                )}
               </View>
-            </View>
-          );
-        })}
-      </View>
+            );
+          })}
+        </View>
+      )}
     </View>
   );
 };
@@ -183,10 +252,26 @@ const styles = StyleSheet.create({
     borderColor: '#000000',
   },
   cardTitle: {
+    flex: 1,
     fontSize: 13,
     fontWeight: '900',
     color: '#000000',
     letterSpacing: 0.5,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    borderRadius: Theme.radius.sm,
+    borderWidth: 2,
+    gap: 8,
+  },
+  emptyText: {
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 18,
   },
   timelineContainer: {
     paddingLeft: 2,
@@ -230,6 +315,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
     marginBottom: 5,
     gap: 8,
   },
@@ -237,13 +323,14 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    minWidth: 0,
+    minWidth: 120,
   },
   dateText: {
     fontSize: 11,
     color: Theme.colors.textTertiary,
     fontWeight: '700',
     letterSpacing: 0.2,
+    flexShrink: 1,
   },
   dateTextActive: {
     color: '#000000',
@@ -263,7 +350,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.7,
   },
   carrierTag: {
-    maxWidth: '42%',
+    maxWidth: '45%',
     backgroundColor: Theme.colors.yellow,
     paddingHorizontal: 6,
     paddingVertical: 2,

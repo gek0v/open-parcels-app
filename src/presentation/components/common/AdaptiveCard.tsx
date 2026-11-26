@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle, Pressable, StyleProp } from 'react-native';
 import { Theme } from '../../theme/adaptiveTheme';
+import { useTheme } from '../../theme/ThemeContext';
 
 interface AdaptiveCardProps {
   children: React.ReactNode;
@@ -16,26 +17,29 @@ export const AdaptiveCard: React.FC<AdaptiveCardProps> = ({
   onPress,
   style,
   elevated = false,
-  backgroundColor = Theme.colors.surface,
+  backgroundColor,
   hasWindowHeader = false,
 }) => {
+  const { theme } = useTheme();
+  const cardBg = backgroundColor ?? theme.surface;
+
   const cardStyle: StyleProp<ViewStyle> = [
     styles.card,
     elevated ? Theme.shadows.lg : Theme.shadows.md,
-    { backgroundColor },
+    { backgroundColor: cardBg, borderColor: theme.border },
     style,
   ];
 
   const content = (
     <>
       {hasWindowHeader && (
-        <View style={styles.windowHeader}>
+        <View style={[styles.windowHeader, { borderBottomColor: theme.border }]}>
           <View style={styles.dotsRow}>
-            <View style={[styles.dot, { backgroundColor: Theme.colors.coral }]} />
-            <View style={[styles.dot, { backgroundColor: Theme.colors.yellow }]} />
-            <View style={[styles.dot, { backgroundColor: Theme.colors.mint }]} />
+            <View style={[styles.dot, { backgroundColor: theme.coral, borderColor: theme.border }]} />
+            <View style={[styles.dot, { backgroundColor: theme.yellow, borderColor: theme.border }]} />
+            <View style={[styles.dot, { backgroundColor: theme.mint, borderColor: theme.border }]} />
           </View>
-          <View style={styles.windowGrip} />
+          <View style={[styles.windowGrip, { backgroundColor: theme.border }]} />
         </View>
       )}
       {children}

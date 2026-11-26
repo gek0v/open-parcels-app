@@ -18,10 +18,29 @@ export const es = {
   // Engine Chips & Top Bar
   engine: {
     local: 'GO EMBEBIDO',
+    localBadge: 'LOCAL',
     rest: 'REST :8080',
     toggleAria: 'Cambiar motor de seguimiento',
+    langAria: 'Cambiar idioma',
     updateBtn: 'ACTUALIZAR',
     checking: 'BUSCANDO...',
+    upToDate: 'AL DÍA',
+    updateCheckAria: 'Buscar actualizaciones de la aplicación',
+  },
+
+  // Dashboard Controls & Feedback
+  dashboard: {
+    newParcelAria: 'Nuevo envío',
+    refreshError: 'No se pudo actualizar %d envío(s). Verifica tu conexión o código postal.',
+    refreshSuccess: 'Envíos actualizados',
+    sortUpdatedAria: 'Ordenar por más reciente',
+    sortDaysAria: 'Ordenar por días en tránsito',
+    sortCarrierAria: 'Ordenar por transportista',
+    styleBentoAria: 'Estilo Bento',
+    styleIndustrialAria: 'Estilo Industrial',
+    styleRetroAria: 'Estilo Retro OS',
+    itemsCountAria: 'envíos',
+    completedCountAria: 'completados',
   },
 
   // Bento Stats
@@ -86,7 +105,20 @@ export const es = {
     noArchived: 'NO HAY ENVÍOS ARCHIVADOS',
     subNoResults: 'Prueba con otro término de búsqueda o número de albarán.',
     subActive: 'Pulsa el botón "+" o "RASTREAR PRIMER ENVÍO" para registrar tu paquete introduciendo el número de seguimiento.',
+    subDelivered: 'Cuando un envío se marque como entregado aparecerá aquí.',
+    subArchived: 'Los envíos archivados se guardan aquí para consulta.',
     trackFirstBtn: 'RASTREAR PRIMER ENVÍO',
+  },
+
+  // Parcel Cards
+  card: {
+    shipmentTag: 'EXPEDICIÓN',
+    originFallback: 'ORIG',
+    destFallback: 'DEST',
+    daysUnit: 'DÍAS',
+    shareAria: 'Compartir datos del envío',
+    renameAria: 'Renombrar alias del envío',
+    daysInTransitAria: '%d días en tránsito',
   },
 
   // Detail Screen
@@ -195,6 +227,8 @@ export const es = {
     title: 'COPIAS DE SEGURIDAD',
     subtitle: 'Gestión local y privada de tus paquetes en JSON',
     btnLabel: 'BACKUP',
+    btnAria: 'Copia de seguridad y restauración',
+    closeAria: 'Cerrar modal de copia de seguridad',
     exportCardTitle: 'EXPORTAR COPIA DE SEGURIDAD',
     exportCardDesc: 'Guarda un archivo JSON con todos tus envíos, eventos y alias para salvaguardarlos o transferirlos.',
     exportBtn: 'EXPORTAR ARCHIVO JSON',
@@ -208,6 +242,45 @@ export const es = {
     importErrorTitle: 'Error de Restauración',
     importInvalid: 'El archivo seleccionado no tiene una estructura válida de Open Parcels.',
     close: 'CERRAR',
+  },
+
+  // Themes Modal
+  themes: {
+    btnLabel: 'TEMAS',
+    btnAria: 'Temas y apariencia de la app',
+    modalTitle: 'TEMAS Y APARIENCIA',
+    closeAria: 'Cerrar modal de temas',
+    formulaSubtitle: 'Golden Ratio (φ ≈ 1.618)',
+    formulaDesc: 'Cambia el aspecto completo de la app en tiempo real',
+    activeAria: 'Tema activo actualmente',
+    applyAria: 'Aplicar tema',
+    appliedBtn: 'TEMA APLICADO ACTUALMENTE',
+    applyBtn: 'APLICAR ESTE TEMA A LA APP',
+    previewHeader: 'VISTA PREVIA EN VIVO (SIMULADOR DE UI)',
+    previewDelivered: 'ENTREGADO',
+    previewTitle: 'Teclado Mecánico Custom',
+    previewCheckpoint: 'Entregado en buzón principal • Madrid',
+    previewDetails: 'DETALLES',
+    previewUrgent: 'URGENTE',
+    swatchesHeader: 'MUESTRAS CROMÁTICAS Y COORDENADAS HSV',
+    doneBtn: 'LISTO',
+  },
+
+  // Route Error & Not Found
+  errors: {
+    routeTitle: 'ERROR EN LA RUTA',
+    routeSubtitle: 'Se ha producido un error inesperado al cargar esta pantalla en la navegación.',
+    unknownError: 'Error desconocido',
+    toggleDetailsAria: 'Alternar detalles técnicos',
+    hideDetails: 'OCULTAR DETALLES',
+    showDetails: 'VER DETALLES TÉCNICOS',
+    retry: 'REINTENTAR',
+    home: 'INICIO',
+    notFoundCode: 'ERROR 404',
+    notFoundTitle: 'PÁGINA NO ENCONTRADA',
+    notFoundSubtitle: 'La ruta o pantalla que estás buscando no existe o ha sido movida.',
+    backHome: 'VOLVER AL INICIO',
+    backHomeAria: 'Volver a la pantalla principal',
   },
 
   // Share

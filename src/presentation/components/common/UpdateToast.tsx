@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -31,18 +31,38 @@ export const UpdateToast: React.FC<UpdateToastProps> = ({
   const [slideAnim] = useState(() => new Animated.Value(-120));
   const [opacityAnim] = useState(() => new Animated.Value(0));
   const [isDownloaded, setIsDownloaded] = useState(false);
+  const isDismissingRef = useRef(false);
+
+  const cleanVersion = updateInfo.version.replace(/^v/i, '');
 
   useEffect(() => {
+    isDismissingRef.current = false;
+  }, [cleanVersion]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') {
+      return;
+    }
+
     let isMounted = true;
-    updateService.isApkDownloaded(updateInfo.version, updateInfo.apkSizeMb).then((ready) => {
-      if (isMounted) {
-        setIsDownloaded(ready);
-      }
-    });
+    updateService
+      .isApkDownloaded(cleanVersion, updateInfo.apkSizeMb)
+      .then((ready) => {
+        if (isMounted) {
+          setIsDownloaded(ready);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setIsDownloaded(false);
+        }
+      });
     return () => {
       isMounted = false;
     };
-  }, [updateInfo.version, updateInfo.apkSizeMb]);
+  }, [cleanVersion, updateInfo.apkSizeMb]);
+
+  const isReadyToInstall = Platform.OS === 'android' && isDownloaded;
 
   useEffect(() => {
     // Slide in from top
@@ -65,7 +85,11 @@ export const UpdateToast: React.FC<UpdateToastProps> = ({
     };
   }, [slideAnim, opacityAnim]);
 
-  const handleDismiss = () => {
+  const handleDismiss = (e?: any) => {
+    e?.stopPropagation?.();
+    if (isDismissingRef.current) return;
+    isDismissingRef.current = true;
+
     Animated.parallel([
       Animated.timing(slideAnim, {
         toValue: -120,
@@ -95,7 +119,7 @@ export const UpdateToast: React.FC<UpdateToastProps> = ({
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${t.updateModal.title}: v${updateInfo.version}. ${isDownloaded ? t.updateModal.toastReadySubtitle : t.updateModal.toastSubtitle}`}
+        accessibilityLabel={`${t.updateModal.title}: v${cleanVersion}. ${isReadyToInstall ? t.updateModal.toastReadySubtitle : t.updateModal.toastSubtitle}`}
         onPress={onPress}
         style={({ pressed }) => [
           styles.toastCard,
@@ -104,8 +128,14 @@ export const UpdateToast: React.FC<UpdateToastProps> = ({
         ]}
       >
         {/* Left Badge Icon */}
-        <View style={[styles.iconCircle, { borderColor: theme.border }, isDownloaded && { backgroundColor: theme.mint }]}>
-          {isDownloaded ? (
+        <View
+          style={[
+            styles.iconCircle,
+            { borderColor: theme.border },
+            isReadyToInstall && { backgroundColor: theme.mint },
+          ]}
+        >
+          {isReadyToInstall ? (
             <Check size={16} color="#000000" strokeWidth={3} />
           ) : (
             <Sparkles size={16} color="#000000" strokeWidth={2.5} />
@@ -116,24 +146,30 @@ export const UpdateToast: React.FC<UpdateToastProps> = ({
         <View style={styles.contentCol}>
           <View style={styles.titleRow}>
             <Text style={styles.toastTitle} numberOfLines={1}>
-              {t.updateModal.toastTitlePrefix} v{updateInfo.version}
+              {t.updateModal.toastTitlePrefix} v{cleanVersion}
             </Text>
-            {updateInfo.apkSizeMb && (
+            {Boolean(updateInfo.apkSizeMb && updateInfo.apkSizeMb > 0) && (
               <View style={[styles.sizePill, { borderColor: theme.border }]}>
                 <Text style={styles.sizePillText}>{updateInfo.apkSizeMb} MB</Text>
               </View>
             )}
           </View>
           <Text style={styles.toastSubtitle} numberOfLines={1}>
-            {isDownloaded ? t.updateModal.toastReadySubtitle : t.updateModal.toastSubtitle}
+            {isReadyToInstall ? t.updateModal.toastReadySubtitle : t.updateModal.toastSubtitle}
           </Text>
         </View>
 
         {/* Action Button */}
-        <View style={[styles.actionBtn, { borderColor: theme.border }, isDownloaded && styles.actionBtnReady]}>
+        <View
+          style={[
+            styles.actionBtn,
+            { borderColor: theme.border },
+            isReadyToInstall && styles.actionBtnReady,
+          ]}
+        >
           <Download size={13} color="#FFFFFF" strokeWidth={3} />
           <Text style={styles.actionBtnText}>
-            {isDownloaded ? t.updateModal.installNowBtn : t.updateModal.updateBtn}
+            {isReadyToInstall ? t.updateModal.installNowBtn : t.updateModal.updateBtn}
           </Text>
         </View>
 
@@ -143,7 +179,11 @@ export const UpdateToast: React.FC<UpdateToastProps> = ({
           accessibilityLabel={t.updateModal.laterBtn}
           onPress={handleDismiss}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          style={({ pressed }) => [styles.dismissBtn, { borderColor: theme.border }, pressed && styles.pressed]}
+          style={({ pressed }) => [
+            styles.dismissBtn,
+            { borderColor: theme.border },
+            pressed && styles.pressed,
+          ]}
         >
           <X size={14} color="#000000" strokeWidth={3} />
         </Pressable>
@@ -196,6 +236,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   toastTitle: {
+    flexShrink: 1,
     fontSize: 12,
     fontWeight: '900',
     color: '#000000',

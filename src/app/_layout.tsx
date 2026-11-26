@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { AppState, AppStateStatus, StyleSheet, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -13,17 +13,19 @@ import { notificationService } from '../infrastructure/services/NotificationServ
 import { registerBackgroundSync } from '../infrastructure/services/BackgroundSyncService';
 import { trackingEngineManager } from '../infrastructure/engine';
 import { Theme } from '../presentation/theme/adaptiveTheme';
-import { ErrorBoundary } from '../presentation/components/common/ErrorBoundary';
+import { ErrorBoundary as AppErrorBoundary } from '../presentation/components/common/ErrorBoundary';
+
+export { default as ErrorBoundary } from '../presentation/components/common/RouteErrorFallback';
 
 export default function RootLayout() {
   return (
-    <ErrorBoundary>
+    <AppErrorBoundary>
       <I18nProvider>
         <ThemeProvider>
           <RootLayoutContent />
         </ThemeProvider>
       </I18nProvider>
-    </ErrorBoundary>
+    </AppErrorBoundary>
   );
 }
 
@@ -32,33 +34,19 @@ function RootLayoutContent() {
   const [isLoadingSplash, setIsLoadingSplash] = useState(true);
   const [updateToastInfo, setUpdateToastInfo] = useState<UpdateInfo | null>(null);
   const [updateModalInfo, setUpdateModalInfo] = useState<UpdateInfo | null>(null);
+  const isMountedRef = useRef(true);
+  const splashFinishedRef = useRef(false);
+  const hasVisibleUpdateUIRef = useRef(false);
 
-  React.useEffect(() => {
-    void trackingEngineManager.hydrate().catch((err) => {
-      console.warn('[RootLayout] trackingEngine hydrate error:', err);
-    });
+  useEffect(() => {
+    hasVisibleUpdateUIRef.current = !!(updateToastInfo || updateModalInfo);
+  }, [updateToastInfo, updateModalInfo]);
 
-    notificationService
-      .requestPermissions()
-      .then((granted) => {
-        if (granted) {
-          registerBackgroundSync().catch((err) => {
-            console.warn('[RootLayout] registerBackgroundSync error:', err);
-          });
-        }
-      })
-      .catch((err) => {
-        console.warn('[RootLayout] notificationService requestPermissions error:', err);
-      });
-  }, []);
-
-  const handleSplashFinish = useCallback(() => {
-    setIsLoadingSplash(false);
-    // Check if an update is available on GitHub Releases
+  const runSilentUpdateCheck = useCallback(() => {
     updateService
       .checkForUpdate()
       .then((info) => {
-        if (info) {
+        if (info && isMountedRef.current && !hasVisibleUpdateUIRef.current) {
           setUpdateToastInfo(info);
         }
       })
@@ -67,12 +55,46 @@ function RootLayoutContent() {
       });
   }, []);
 
+  useEffect(() => {
+    isMountedRef.current = true;
+    void trackingEngineManager.hydrate().catch((err) => {
+      console.warn('[RootLayout] trackingEngine hydrate error:', err);
+    });
+
+    // Register background sync unconditionally so parcel updates work even if notifications are denied
+    void registerBackgroundSync().catch((err) => {
+      console.warn('[RootLayout] registerBackgroundSync error:', err);
+    });
+
+    void notificationService.requestPermissions().catch((err) => {
+      console.warn('[RootLayout] notificationService requestPermissions error:', err);
+    });
+
+    const sub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (nextState === 'active' && splashFinishedRef.current) {
+        runSilentUpdateCheck();
+      }
+    });
+
+    return () => {
+      isMountedRef.current = false;
+      sub.remove();
+    };
+  }, [runSilentUpdateCheck]);
+
+  const handleSplashFinish = useCallback(() => {
+    splashFinishedRef.current = true;
+    setIsLoadingSplash(false);
+    // Check if an update is available on GitHub Releases
+    runSilentUpdateCheck();
+  }, [runSilentUpdateCheck]);
+
   const isDarkMode = themeKey === 'tokyoCyberpunk';
 
   return (
     <SafeAreaProvider style={[styles.provider, { backgroundColor: Theme.isWeb ? theme.surfaceSubtle : theme.canvas }]}>
-      <View key={themeKey} style={[styles.container, { backgroundColor: theme.canvas }]}>
-        <StatusBar style={isDarkMode ? 'light' : (Theme.isIOS ? 'dark' : 'auto')} />
+      <View style={[styles.container, { backgroundColor: theme.canvas }]}>
+        <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
         <Stack
           screenOptions={{
